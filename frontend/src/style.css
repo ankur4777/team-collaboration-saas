@@ -70,3 +70,21 @@
 .group-people-picker label small{display:block;color:#95a99e;font-size:10px;margin-top:4px}
 @media(max-width:900px){.private-chat-page{padding:16px}.private-chat-layout{grid-template-columns:225px minmax(0,1fr)}}
 @media(max-width:600px){.private-chat-page{padding:10px;overflow:visible}.private-chat-heading h1{font-size:21px}.private-chat-layout{display:flex;flex-direction:column;min-height:500px}.private-chat-list{max-height:180px;border-right:0;border-bottom:1px solid #e5eee8}.private-chat-conversation{min-height:420px}.private-chat-history{max-height:300px}.private-chat-heading p{display:none}}
+
+/* Chat message actions & group participant management */
+.group-manage-button{display:inline-flex;align-items:center;gap:7px;margin-left:auto;border:1px solid #d7e9dc;background:#f4faf7;color:#317b60;border-radius:9px;padding:9px 10px;font-size:11px;white-space:nowrap;cursor:pointer}
+.private-chat-toolbar .chat-connected{margin-left:0}
+.private-message-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:5px}
+.private-message:not(.mine) .private-message-actions{justify-content:flex-start}
+.private-message-actions button,.message-edit-form button{border:0;background:transparent;color:#598e75;cursor:pointer;font-size:11px;padding:5px}
+.private-message-actions button:last-child{color:#a6544a}
+.private-message-actions button:disabled,.message-edit-form button:disabled{opacity:.45;cursor:not-allowed}
+.private-message-body.deleted{color:#8c9b93;font-style:italic;background:#f2f4f2}
+.edited-note{font-size:10px;color:#8f9f95}
+.message-edit-form{display:flex;flex-direction:column;gap:6px;min-width:min(270px,65vw)}
+.message-edit-form input{border:1px solid #b6dfc8;border-radius:8px;padding:9px 11px;background:white;color:#335546;outline:none;font-size:12px;width:100%}
+.message-edit-form div{display:flex;justify-content:flex-end;gap:12px}
+.group-manage-add{display:flex;gap:9px;align-items:flex-end;flex-wrap:wrap}
+.group-manage-add label{flex:1;min-width:180px}
+.group-manage-add button{white-space:nowrap}
+@media(max-width:600px){.group-manage-button{padding:8px;font-size:10px}.private-chat-toolbar p{max-width:160px}}
