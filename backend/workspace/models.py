@@ -176,6 +176,8 @@ class ChatParticipant(models.Model):
     conversation = models.ForeignKey(ChatConversation, on_delete=models.CASCADE, related_name='participants')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_memberships')
     joined_at = models.DateTimeField(auto_now_add=True)
+    # Latest message timestamp explicitly viewed by this participant.
+    last_read_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [
