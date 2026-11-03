@@ -109,7 +109,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
     socket.onmessage = event => {
       try {
         const payload = JSON.parse(event.data) as {
-          type:string; message?:ChatMessage; user_id?:string;
+          type:string; message:ChatMessage; user_id?:string;
           full_name?:string; active?:boolean; last_read_at?:string;
         };
         if (!valid) return;
@@ -325,8 +325,8 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
                 <div><button type="button" onClick={() => setEditingId(null)} disabled={working}>Cancel</button><button type="submit" disabled={working || !editDraft.trim()}>Save</button></div>
               </form> : <div className={`private-message-body ${message.deleted_at ? 'deleted' : ''}`}>{message.deleted_at ? 'Message deleted' : message.body}{!message.deleted_at && message.edited_at && <small className="edited-note"> (edited)</small>}</div>}
               {message.sender.id===currentUser.id && <div className="chat-read-receipt">{
-                active.participants.some(p=>p.user.id!==currentUser.id && p.last_read_at && p.last_read_at>=message.created_at)
-                  ? (active.kind==='direct' ? 'Seen' : `Seen by ${active.participants.filter(p=>p.user.id!==currentUser.id && p.last_read_at && p.last_read_at>=message.created_at).length}`)
+                active.participants.some(p=>p.user.id!==currentUser.id && p.last_read_at && new Date(p.last_read_at).getTime()>=new Date(message.created_at).getTime())
+                  ? (active.kind==='direct' ? 'Seen' : `Seen by ${active.participants.filter(p=>p.user.id!==currentUser.id && p.last_read_at && new Date(p.last_read_at).getTime()>=new Date(message.created_at).getTime()).length}`)
                   : 'Sent'
               }</div>}
               {message.sender.id===currentUser.id && !message.deleted_at && editingId!==message.id && <div className="private-message-actions"><button type="button" disabled={working} onClick={() => {setEditingId(message.id);setEditDraft(message.body);}}>Edit</button><button type="button" disabled={working} onClick={() => void deleteMessage(message)}>Delete</button></div>}
