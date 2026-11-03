@@ -1,3 +1,4 @@
+import time
 from channels.db import database_sync_to_async
 from django.utils.dateparse import parse_datetime
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
@@ -50,7 +51,7 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
 
 
 class PrivateChatConsumer(AsyncJsonWebsocketConsumer):
-    """Read-only WebSocket: only REST may write private messages."""
+    """Private chat events; message writes still require authenticated REST."""
 
     async def connect(self):
         user = self.scope.get('user')
@@ -73,6 +74,24 @@ class PrivateChatConsumer(AsyncJsonWebsocketConsumer):
     async def receive_json(self, content, **kwargs):
         if content.get('type') == 'ping':
             await self.send_json({'type': 'pong'})
+            return
+        if content.get('type') != 'typing' or type(content.get('active')) is not bool:
+            return
+        user = self.scope.get('user')
+        chat_id = self.scope['url_route']['kwargs']['chat_id']
+        organization_id = self.scope['session'].get('active_organization_id')
+        if not user or not await self.allowed(user.pk, chat_id, organization_id):
+            await self.close(code=4403)
+            return
+        # Limit the volume of ephemeral typing events from each socket.
+        now = time.monotonic()
+        if content['active'] and now - getattr(self, 'last_typing_at', 0) < 1:
+            return
+        self.last_typing_at = now
+        await self.channel_layer.group_send(self.group_name, {
+            'type': 'chat.typing', 'user_id': str(user.pk),
+            'full_name': user.full_name[:150], 'active': content['active'],
+        })
 
     async def chat_message(self, event):
         user = self.scope.get('user')
@@ -100,6 +119,31 @@ class PrivateChatConsumer(AsyncJsonWebsocketConsumer):
             await self.close(code=4403)
             return
         await self.send_json({'type': 'participants_changed'})
+
+    async def chat_read(self, event):
+        user = self.scope.get('user')
+        chat_id = self.scope['url_route']['kwargs']['chat_id']
+        org_id = self.scope['session'].get('active_organization_id')
+        if not user or not await self.allowed(user.pk, chat_id, org_id):
+            await self.close(code=4403)
+            return
+        await self.send_json({
+            'type': 'read_receipt', 'user_id': event['user_id'],
+            'last_read_at': event['read_at'],
+        })
+
+    async def chat_typing(self, event):
+        user = self.scope.get('user')
+        chat_id = self.scope['url_route']['kwargs']['chat_id']
+        org_id = self.scope['session'].get('active_organization_id')
+        if not user or not await self.allowed(user.pk, chat_id, org_id):
+            await self.close(code=4403)
+            return
+        if str(user.pk) != event['user_id']:
+            await self.send_json({
+                'type': 'typing', 'user_id': event['user_id'],
+                'full_name': event['full_name'], 'active': event['active'],
+            })
 
     @database_sync_to_async
     def can_see_message(self, user_id, chat_id, created_at):
