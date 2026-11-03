@@ -10,7 +10,7 @@ from rest_framework.exceptions import NotFound, PermissionDenied, ValidationErro
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import OrganizationMember, TeamMember
+from .models import OrganizationMember, TeamMember, ChatConversation, ChatParticipant
 from .permissions import get_active_membership
 from .serializers import OrganizationMemberSerializer
 
@@ -83,6 +83,19 @@ class OrganizationMemberDetailView(APIView):
             # companies. Remove access only in this organization.
             TeamMember.objects.filter(
                 team__organization_id=pk, user_id=target.user_id,
+            ).delete()
+            # Revoke private-chat membership as part of the same transaction.
+            # Keep old direct messages accessible to remaining participants,
+            # but free the deterministic pair key so a future invitation
+            # creates a fresh chat without exposing historical messages.
+            ChatConversation.objects.filter(
+                organization_id=pk,
+                kind=ChatConversation.Kind.DIRECT,
+                participants__user_id=target.user_id,
+            ).update(direct_key=None)
+            ChatParticipant.objects.filter(
+                conversation__organization_id=pk,
+                user_id=target.user_id,
             ).delete()
             target.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
