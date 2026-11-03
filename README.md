@@ -14,10 +14,12 @@ This is a runnable **React + TypeScript frontend** and **Python Django + Django 
 - Workspace administrators may invite regular members; only the owner may invite or promote another administrator. Team owners must transfer team ownership before being removed from a workspace.
 - Create teams and `General` channels. Team owners can add channels and existing company employees to a team.
 - Post/read channel messages with membership checks; real-time WebSocket notification of new messages.
+- Start one-to-one chats or private group chats with employees in the active workspace; receive messages live through membership-scoped WebSockets.
+- Removing a workspace member revokes their chat participation; if re-invited later, they start a new direct conversation rather than regaining previous private history.
 - Responsive React screens for registration, login, workspace, team navigation, channels, messages, member management, and invitations.
 - First automated Django API tests for registration/CSRF/logout, invitations, and cross-company isolation.
 
-**Not yet implemented:** Gmail/Outlook OAuth and synchronized inbox, direct messages, attachments, calendar, meetings, files, tasks, MFA, email verification, payments, audit trails, full login rate limiting, password reset and advanced admin workflows. Sidebar items for later phases are intentionally marked as coming soon.
+**Not yet implemented:** Gmail/Outlook OAuth and synchronized inbox, read receipts, chat attachments, calendar, meetings, files, tasks, MFA, email verification, payments, audit trails, full login rate limiting, password reset and advanced admin workflows. Sidebar items for later phases are intentionally marked as coming soon.
 
 ## Requirements
 
@@ -89,6 +91,19 @@ docker compose exec api python manage.py test workspace --verbosity 2
 
 This grant only allows the existing application user to create and remove its isolated test schema; it does **not** grant global MySQL access. For a custom `MYSQL_USER` or `MYSQL_DATABASE`, adjust the account and test-schema names accordingly. This fix persists in the existing MySQL Docker volume.
 
+## New chat migration and local verification
+
+After pulling a release with private chat support, rebuild the backend to copy the migration into its image:
+
+```powershell
+git pull origin main
+docker compose up --build -d api frontend
+docker compose exec api python manage.py migrate
+docker compose exec api python manage.py makemigrations --check --dry-run
+```
+
+Use the **Chats & Groups** sidebar item to start a direct chat or create a group with at least two other employees. Existing workspaces and messages are preserved. If the local test account has permission on `test_teamworkspace`, run `docker compose exec api python manage.py test workspace`.
+
 ## Run without Docker (advanced)
 
 Run MySQL 8.4 and Redis first; create a MySQL database and user. Create `.env`, change `MYSQL_HOST=127.0.0.1`, `REDIS_URL=redis://127.0.0.1:6379/0`.
@@ -132,6 +147,9 @@ For WebSocket support, the backend must use ASGI (Daphne is installed and expose
 | POST | `/api/organizations/{id}/invitations/` | Invite company employee (admin/owner) |
 | GET | `/api/invitations/{token}/` | Preview an invitation |
 | POST | `/api/invitations/{token}/accept/` | Join company; existing accounts must log in |
+| GET/POST | `/api/chats/` | List participating chats / create direct or group chat |
+| GET/POST | `/api/chats/{id}/messages/` | Read latest 50 / send private message |
+| WS | `/ws/chats/{id}/` | Receive chat messages (members only) |
 | GET/POST | `/api/teams/` | List joined teams / create a team |
 | GET/POST | `/api/teams/{id}/channels/` | List channels / create channel (owner) |
 | GET/POST | `/api/teams/{id}/members/` | List / add existing company teammate (owner) |
@@ -146,7 +164,7 @@ JSON writes use `X-CSRFToken` with a first-party session cookie and the same-ori
 Web browser (React SPA)
   ├─ /api/*  -> Vite proxy -> Django REST / sessions / CSRF
   └─ /ws/*   -> Vite proxy -> Django Channels WebSocket
-                             ├─ MySQL (users, orgs, memberships, teams, channels, messages)
+                             ├─ MySQL (users, organizations, teams, channels, private chats, messages)
                              ├─ Redis (WebSocket event fanout)
                              └─ console email (dev only)
 ```

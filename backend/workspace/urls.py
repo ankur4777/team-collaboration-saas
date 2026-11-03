@@ -1,5 +1,5 @@
 from django.urls import path
-from . import auth_views, views, member_views
+from . import auth_views, views, member_views, chat_views
 
 urlpatterns = [
     path('auth/csrf/', auth_views.csrf),
@@ -14,6 +14,8 @@ urlpatterns = [
     path('organizations/<uuid:pk>/invitations/', views.OrganizationInvitationsView.as_view()),
     path('invitations/<str:token>/', auth_views.invitation_preview),
     path('invitations/<str:token>/accept/', auth_views.invitation_accept),
+    path('chats/', chat_views.ChatsView.as_view()),
+    path('chats/<uuid:chat_id>/messages/', chat_views.ChatMessagesView.as_view()),
     path('teams/', views.TeamsView.as_view()),
     path('teams/<uuid:team_id>/channels/', views.TeamChannelsView.as_view()),
     path('teams/<uuid:team_id>/members/', views.TeamMembersView.as_view()),

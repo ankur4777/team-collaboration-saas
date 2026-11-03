@@ -147,3 +147,48 @@ class Message(models.Model):
 
     class Meta:
         ordering = ['created_at', 'id']
+
+
+class ChatConversation(models.Model):
+    """Private direct or group chat scoped to one company workspace."""
+
+    class Kind(models.TextChoices):
+        DIRECT = 'direct', 'Direct'
+        GROUP = 'group', 'Group'
+
+    id = models.UUIDField(primary_key=True, default=make_id, editable=False)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='chat_conversations')
+    kind = models.CharField(max_length=8, choices=Kind.choices)
+    title = models.CharField(max_length=100, blank=True)
+    # Deterministic hash for one direct chat per pair, unique across tenants.
+    # Null is allowed for group chats and for archived direct chats.
+    direct_key = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='chats_created')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at', '-created_at']
+
+
+class ChatParticipant(models.Model):
+    id = models.UUIDField(primary_key=True, default=make_id, editable=False)
+    conversation = models.ForeignKey(ChatConversation, on_delete=models.CASCADE, related_name='participants')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_memberships')
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['conversation', 'user'], name='uq_chat_participant'),
+        ]
+
+
+class ChatMessage(models.Model):
+    id = models.UUIDField(primary_key=True, default=make_id, editable=False)
+    conversation = models.ForeignKey(ChatConversation, on_delete=models.CASCADE, related_name='messages')
+    sender = models.ForeignKey(User, on_delete=models.PROTECT, related_name='private_messages_sent')
+    body = models.TextField(max_length=4000)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'id']

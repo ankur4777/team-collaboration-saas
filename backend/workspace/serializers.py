@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Organization, OrganizationMember, Team, Channel, Message
+from .models import User, Organization, OrganizationMember, Team, Channel, Message, ChatConversation, ChatParticipant, ChatMessage
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -31,4 +31,28 @@ class MessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
     class Meta:
         model = Message
+        fields = ('id', 'body', 'created_at', 'sender')
+
+
+class ChatParticipantSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+
+    class Meta:
+        model = ChatParticipant
+        fields = ('user', 'joined_at')
+
+
+class ChatConversationSerializer(serializers.ModelSerializer):
+    participants = ChatParticipantSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ChatConversation
+        fields = ('id', 'kind', 'title', 'created_at', 'updated_at', 'participants')
+
+
+class ChatMessageSerializer(serializers.ModelSerializer):
+    sender = UserSerializer(read_only=True)
+
+    class Meta:
+        model = ChatMessage
         fields = ('id', 'body', 'created_at', 'sender')

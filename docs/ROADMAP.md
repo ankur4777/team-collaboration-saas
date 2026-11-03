@@ -29,6 +29,12 @@
 
 **Acceptance:** Company A cannot query, mutate or subscribe to Company B resources; a removed member immediately loses data and WebSocket access; CSRF and permission tests pass.
 
+## Phase 2 implementation update
+
+- Implemented: one-to-one private chats, company-scoped group chats, authenticated REST history/send APIs, member-scoped WebSockets, React chat view and message flow.
+- Implemented: removal of chat participation during employee offboarding; fresh direct conversation on future re-invite.
+- Still planned: managing group membership after creation, unread/read receipts, typing indicators, notifications, attachments, search, retention and file previews.
+
 ## Phase 2 — Real-time communication
 
 1. Complete channel message pagination, message edit/delete, read receipts and mention notifications.
@@ -72,4 +78,4 @@
 
 ## High-priority next task
 
-**Run Docker Compose locally and fix any migration/build discrepancies**; after that, implement verified email and account recovery. Do not begin unrestricted mailbox integration before isolation and authentication tests are green.
+**Validate the chat migration and browser-to-browser real-time messaging in Docker;** then add group participant management, notifications and verified-email/account recovery. Do not begin unrestricted mailbox integration before isolation and authentication tests are green.
