@@ -52,41 +52,41 @@ Stop: `docker compose down`. This preserves the MySQL volume. **Be careful:** `d
 
 ## Fix local MySQL test database permissions (one time)
 
-The normal application MySQL account is intentionally limited to the \`teamworkspace\` database. Django's test runner creates **another** database, \`test_teamworkspace\`, which needs its own permissions. If you see:
+The normal application MySQL account is intentionally limited to the `teamworkspace` database. Django's test runner creates **another** database, `test_teamworkspace`, which needs its own permissions. If you see:
 
-\`\`\`
+```
 Access denied for user 'teamworkspace'@'%' to database 'test_teamworkspace'
-\`\`\`
+```
 
 grant permissions **only on the test database**. You do **not** need to reset Docker or delete the main database.
 
 In the project directory, start a shell in the MySQL container:
 
-\`\`\`powershell
+```powershell
 docker compose exec mysql sh
-\`\`\`
+```
 
 Inside the container's shell (not PowerShell), start MySQL as root using the container's existing root password:
 
-\`\`\`sh
+```sh
 MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot
-\`\`\`
+```
 
-At the \`mysql>\` prompt, run the following SQL. The backslash escapes the underscore so the grant matches the literal test schema rather than a wildcard pattern:
+At the `mysql>` prompt, run the following SQL. The backslash escapes the underscore so the grant matches the literal test schema rather than a wildcard pattern:
 
-\`\`\`sql
-GRANT ALL PRIVILEGES ON \`test\_teamworkspace\`.* TO 'teamworkspace'@'%';
+```sql
+GRANT ALL PRIVILEGES ON `test\_teamworkspace`.* TO 'teamworkspace'@'%';
 SHOW GRANTS FOR 'teamworkspace'@'%';
 EXIT;
-\`\`\`
+```
 
-Back at the container shell, type \`exit\` to return to PowerShell. Then run:
+Back at the container shell, type `exit` to return to PowerShell. Then run:
 
-\`\`\`powershell
+```powershell
 docker compose exec api python manage.py test workspace --verbosity 2
-\`\`\`
+```
 
-This grant only allows the existing application user to create and remove its isolated test schema; it does **not** grant global MySQL access. For a custom \`MYSQL_USER\` or \`MYSQL_DATABASE\`, adjust the account and test-schema names accordingly. This fix persists in the existing MySQL Docker volume.
+This grant only allows the existing application user to create and remove its isolated test schema; it does **not** grant global MySQL access. For a custom `MYSQL_USER` or `MYSQL_DATABASE`, adjust the account and test-schema names accordingly. This fix persists in the existing MySQL Docker volume.
 
 ## Run without Docker (advanced)
 
