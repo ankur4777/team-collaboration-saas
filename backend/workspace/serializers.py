@@ -39,16 +39,30 @@ class ChatParticipantSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ChatParticipant
-        fields = ('user', 'joined_at')
+        fields = ('user', 'joined_at', 'last_read_at')
 
 
 class ChatConversationSerializer(serializers.ModelSerializer):
     participants = ChatParticipantSerializer(many=True, read_only=True)
     created_by = UserSerializer(read_only=True)
+    unread_count = serializers.SerializerMethodField()
 
     class Meta:
         model = ChatConversation
-        fields = ('id', 'kind', 'title', 'created_at', 'updated_at', 'created_by', 'participants')
+        fields = ('id', 'kind', 'title', 'created_at', 'updated_at', 'created_by', 'participants', 'unread_count')
+
+    def get_unread_count(self, obj):
+        request = self.context.get('request')
+        if request is None or not request.user.is_authenticated:
+            return 0
+        current = next((member for member in obj.participants.all()
+                        if member.user_id == request.user.pk), None)
+        if current is None:
+            return 0
+        baseline = max(filter(None, (current.joined_at, current.last_read_at)))
+        return obj.messages.filter(
+            created_at__gt=baseline, deleted_at__isnull=True,
+        ).exclude(sender_id=request.user.pk).count()
 
 
 class ChatMessageSerializer(serializers.ModelSerializer):
