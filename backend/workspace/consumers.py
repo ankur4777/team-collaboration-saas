@@ -82,7 +82,19 @@ class PrivateChatConsumer(AsyncJsonWebsocketConsumer):
         if not user or not await self.allowed(user.pk, chat_id, organization_id):
             await self.close(code=4403)
             return
-        await self.send_json({'type': 'message', 'message': event['message']})
+        await self.send_json({
+            'type': event.get('action', 'message'),
+            'message': event['message'],
+        })
+
+    async def chat_participants(self, event):
+        user = self.scope.get('user')
+        chat_id = self.scope['url_route']['kwargs']['chat_id']
+        organization_id = self.scope['session'].get('active_organization_id')
+        if not user or not await self.allowed(user.pk, chat_id, organization_id):
+            await self.close(code=4403)
+            return
+        await self.send_json({'type': 'participants_changed'})
 
     @database_sync_to_async
     def allowed(self, user_id, chat_id, organization_id):
