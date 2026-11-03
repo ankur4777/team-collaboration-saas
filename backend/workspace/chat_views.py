@@ -13,7 +13,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import status
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -41,15 +41,67 @@ def chat_key(org_id, first_id, second_id):
     return hashlib.sha256(f'{org_id}:{ids[0]}:{ids[1]}'.encode()).hexdigest()
 
 
-def publish_chat_message(chat_id, payload):
+def publish_chat_message(chat_id, payload, action='message'):
     try:
         async_to_sync(get_channel_layer().group_send)(
             f'private_chat_{chat_id}',
-            {'type': 'chat.message', 'message': payload},
+            {'type': 'chat.message', 'message': payload, 'action': action},
         )
     except Exception:
         # The message is already durable; clients can reload if Redis fails.
         logger.exception('Could not broadcast private chat event %s', chat_id)
+
+
+def publish_chat_participants(chat_id):
+    try:
+        async_to_sync(get_channel_layer().group_send)(
+            f'private_chat_{chat_id}', {'type': 'chat.participants'},
+        )
+    except Exception:
+        logger.exception('Could not broadcast chat participants %s', chat_id)
+
+
+def manage_group(request, chat_id):
+    chat = accessible_chat(request, chat_id)
+    if chat.kind != ChatConversation.Kind.GROUP:
+        raise ValidationError({'detail': 'Only group chats support participant management'})
+    if chat.created_by_id != request.user.id:
+        raise PermissionDenied('Only the group creator can manage participants')
+    return chat
+
+
+class ChatParticipantsView(APIView):
+    def post(self, request, chat_id):
+        chat = manage_group(request, chat_id)
+        email = str(request.data.get('email', '')).strip().lower()
+        membership = (OrganizationMember.objects.select_related('user')
+                      .filter(organization_id=chat.organization_id,
+                              user__email__iexact=email, user__is_active=True).first())
+        if not membership:
+            raise ValidationError({'email': 'Choose an active employee of this workspace'})
+        with transaction.atomic():
+            ChatConversation.objects.select_for_update().get(pk=chat.pk)
+            if ChatParticipant.objects.filter(conversation=chat, user=membership.user).exists():
+                raise ValidationError({'email': 'Employee is already a group participant'})
+            if ChatParticipant.objects.filter(conversation=chat).count() >= 25:
+                raise ValidationError({'email': 'Groups are limited to 25 participants'})
+            ChatParticipant.objects.create(conversation=chat, user=membership.user)
+            transaction.on_commit(lambda: publish_chat_participants(chat.pk))
+        chat = ChatConversation.objects.prefetch_related('participants__user').get(pk=chat.pk)
+        return Response(ChatConversationSerializer(chat).data, status=status.HTTP_201_CREATED)
+
+
+class ChatParticipantDetailView(APIView):
+    def delete(self, request, chat_id, user_id):
+        chat = manage_group(request, chat_id)
+        if chat.created_by_id == user_id:
+            raise PermissionDenied('Group creator cannot be removed')
+        with transaction.atomic():
+            ChatConversation.objects.select_for_update().get(pk=chat.pk)
+            participant = get_object_or_404(ChatParticipant, conversation=chat, user_id=user_id)
+            participant.delete()
+            transaction.on_commit(lambda: publish_chat_participants(chat.pk))
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ChatsView(APIView):
@@ -139,6 +191,11 @@ class ChatMessagesView(APIView):
     def get(self, request, chat_id):
         chat = accessible_chat(request, chat_id)
         records = ChatMessage.objects.filter(conversation=chat).select_related('sender')
+        # Newly invited group participants see messages from their join date,
+        # not the historical conversation that existed before their invitation.
+        if chat.kind == ChatConversation.Kind.GROUP:
+            participant = ChatParticipant.objects.get(conversation=chat, user=request.user)
+            records = records.filter(created_at__gte=participant.joined_at)
         before = request.query_params.get('before')
         if before:
             value = parse_datetime(before)
@@ -160,3 +217,50 @@ class ChatMessagesView(APIView):
             payload = ChatMessageSerializer(message).data
             transaction.on_commit(lambda: publish_chat_message(chat.pk, payload))
         return Response(payload, status=status.HTTP_201_CREATED)
+
+
+class ChatMessageDetailView(APIView):
+    """Only the author may edit or soft-delete a message in a chat they can access."""
+
+    def patch(self, request, chat_id, message_id):
+        chat = accessible_chat(request, chat_id)
+        body = str(request.data.get('body', '')).strip()
+        if not body or len(body) > 4000:
+            raise ValidationError({'body': 'Message must contain 1–4000 characters'})
+        with transaction.atomic():
+            message = get_object_or_404(
+                ChatMessage.objects.select_for_update().select_related('sender'),
+                pk=message_id, conversation=chat,
+            )
+            if message.sender_id != request.user.id:
+                raise PermissionDenied('Only the author can edit this message')
+            if message.deleted_at:
+                raise ValidationError({'detail': 'Deleted messages cannot be edited'})
+            message.body = body
+            message.edited_at = timezone.now()
+            message.save(update_fields=['body', 'edited_at'])
+            payload = ChatMessageSerializer(message).data
+            transaction.on_commit(
+                lambda: publish_chat_message(chat.pk, payload, action='message.updated')
+            )
+        return Response(payload)
+
+    def delete(self, request, chat_id, message_id):
+        chat = accessible_chat(request, chat_id)
+        with transaction.atomic():
+            message = get_object_or_404(
+                ChatMessage.objects.select_for_update().select_related('sender'),
+                pk=message_id, conversation=chat,
+            )
+            if message.sender_id != request.user.id:
+                raise PermissionDenied('Only the author can delete this message')
+            if message.deleted_at is None:
+                # Soft-delete without retaining deleted message contents.
+                message.body = ''
+                message.deleted_at = timezone.now()
+                message.save(update_fields=['body', 'deleted_at'])
+                payload = ChatMessageSerializer(message).data
+                transaction.on_commit(
+                    lambda: publish_chat_message(chat.pk, payload, action='message.deleted')
+                )
+        return Response(status=status.HTTP_204_NO_CONTENT)

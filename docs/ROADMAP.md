@@ -33,7 +33,8 @@
 
 - Implemented: one-to-one private chats, company-scoped group chats, authenticated REST history/send APIs, member-scoped WebSockets, React chat view and message flow.
 - Implemented: removal of chat participation during employee offboarding; fresh direct conversation on future re-invite.
-- Still planned: managing group membership after creation, unread/read receipts, typing indicators, notifications, attachments, search, retention and file previews.
+- Implemented: private-message edit and soft-delete, group creator management of participants, and join-time filtering of prior group messages.
+- Still planned: group creator transfer, group exit flow, unread/read receipts, typing indicators, notifications, attachments, search, retention and file previews.
 
 ## Phase 2 — Real-time communication
 
