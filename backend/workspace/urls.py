@@ -1,5 +1,5 @@
 from django.urls import path
-from . import auth_views, views
+from . import auth_views, views, member_views
 
 urlpatterns = [
     path('auth/csrf/', auth_views.csrf),
@@ -10,6 +10,7 @@ urlpatterns = [
     path('organizations/', views.OrganizationListView.as_view()),
     path('organizations/<uuid:pk>/activate/', views.ActivateOrganizationView.as_view()),
     path('organizations/<uuid:pk>/members/', views.OrganizationMembersView.as_view()),
+    path('organizations/<uuid:pk>/members/<uuid:member_id>/', member_views.OrganizationMemberDetailView.as_view()),
     path('organizations/<uuid:pk>/invitations/', views.OrganizationInvitationsView.as_view()),
     path('invitations/<str:token>/', auth_views.invitation_preview),
     path('invitations/<str:token>/accept/', auth_views.invitation_accept),
