@@ -108,9 +108,30 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
     socket.onclose = () => { if (valid) setConnected(false); };
     socket.onmessage = event => {
       try {
-        const payload = JSON.parse(event.data) as {type: string; message: ChatMessage};
+        const payload = JSON.parse(event.data) as {
+          type:string; message?:ChatMessage; user_id?:string;
+          full_name?:string; active?:boolean; last_read_at?:string;
+        };
         if (!valid) return;
-        if (payload.type === 'message' && payload.message) {
+        if (payload.type === 'typing' && payload.user_id && payload.full_name) {
+          const id=payload.user_id;
+          const oldTimer=typingTimersRef.current.get(id);
+          if(oldTimer) clearTimeout(oldTimer);
+          if(payload.active) {
+            setTypingUsers(old=>({...old,[id]:payload.full_name!}));
+            typingTimersRef.current.set(id,setTimeout(()=>{
+              setTypingUsers(old=>{const next={...old};delete next[id];return next;});
+              typingTimersRef.current.delete(id);
+            },3000));
+          } else {
+            setTypingUsers(old=>{const next={...old};delete next[id];return next;});
+            typingTimersRef.current.delete(id);
+          }
+        } else if (payload.type === 'read_receipt' && payload.user_id && payload.last_read_at) {
+          const id=payload.user_id,readAt=payload.last_read_at;
+          setThreads(old=>old.map(t=>t.id===selected
+            ? {...t,participants:t.participants.map(p=>p.user.id===id ? {...p,last_read_at:readAt} : p)} : t));
+        } else if (payload.type === 'message' && payload.message) {
           setMessages(current => current.some(row => row.id === payload.message.id)
             ? current : [...current, payload.message].sort(messageOrder));
           void loadThreads();
@@ -199,6 +220,8 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
     if (!selected || !draft.trim() || working) return;
     const body = draft.trim();
     setDraft('');
+    emitTyping(false);
+    if(stopTypingRef.current) clearTimeout(stopTypingRef.current);
     setError('');
     setWorking(true);
     try {
@@ -280,6 +303,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
         {visibleThreads.map(thread => <button type="button" key={thread.id} className={`chat-thread ${selected === thread.id ? 'selected' : ''}`} onClick={() => setSelected(thread.id)}>
           <span className="chat-thread-avatar">{thread.kind === 'group' ? <Users size={17}/> : initials(titleFor(thread,currentUser.id))}</span>
           <span className="chat-thread-details"><strong>{titleFor(thread,currentUser.id)}</strong><small>{thread.kind === 'group' ? `${thread.participants.length} participants` : 'Direct message'}</small></span>
+          {thread.unread_count>0&&<span className="chat-unread-badge" aria-label={`${thread.unread_count} unread messages`}>{thread.unread_count>99?'99+':thread.unread_count}</span>
         </button>)}
         {visibleThreads.length === 0 && <div className="chat-list-empty">No conversations yet. Start a new chat with a colleague.</div>}
         <button type="button" className="new-group-link" onClick={() => setMode('group')}><Users size={15}/> Create group chat</button>
@@ -300,11 +324,17 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
                 <input autoFocus aria-label="Edit message" maxLength={4000} value={editDraft} onChange={e => setEditDraft(e.target.value)}/>
                 <div><button type="button" onClick={() => setEditingId(null)} disabled={working}>Cancel</button><button type="submit" disabled={working || !editDraft.trim()}>Save</button></div>
               </form> : <div className={`private-message-body ${message.deleted_at ? 'deleted' : ''}`}>{message.deleted_at ? 'Message deleted' : message.body}{!message.deleted_at && message.edited_at && <small className="edited-note"> (edited)</small>}</div>}
+              {message.sender.id===currentUser.id && <div className="chat-read-receipt">{
+                active.participants.some(p=>p.user.id!==currentUser.id && p.last_read_at && p.last_read_at>=message.created_at)
+                  ? (active.kind==='direct' ? 'Seen' : `Seen by ${active.participants.filter(p=>p.user.id!==currentUser.id && p.last_read_at && p.last_read_at>=message.created_at).length}`)
+                  : 'Sent'
+              }</div>}
               {message.sender.id===currentUser.id && !message.deleted_at && editingId!==message.id && <div className="private-message-actions"><button type="button" disabled={working} onClick={() => {setEditingId(message.id);setEditDraft(message.body);}}>Edit</button><button type="button" disabled={working} onClick={() => void deleteMessage(message)}>Delete</button></div>}
             </div>)}
             <div ref={bottomRef}/>
           </div>
-          <form className="private-chat-compose" onSubmit={send}><input aria-label="Write a message" value={draft} maxLength={4000} placeholder="Write a message..." onChange={e => setDraft(e.target.value)}/><button className="send-button" aria-label="Send message" disabled={!draft.trim()||working}><Send size={18}/></button></form>
+          {Object.keys(typingUsers).length>0&&<div className="chat-typing-indicator" aria-live="polite">{Object.values(typingUsers).join(', ')} {Object.keys(typingUsers).length>1?'are':'is'} typing…</div>}
+          <form className="private-chat-compose" onSubmit={send}><input aria-label="Write a message" value={draft} maxLength={4000} placeholder="Write a message..." onChange={e => changeDraft(e.target.value)} onBlur={()=>emitTyping(false)}/><button className="send-button" aria-label="Send message" disabled={!draft.trim()||working}><Send size={18}/></button></form>
         </> : <div className="private-chat-welcome"><MessageCircle size={32}/><h3>Connect with your team</h3><p>Choose a conversation or start a new one.</p></div>}
       </div>
     </div>
