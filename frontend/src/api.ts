@@ -6,8 +6,8 @@ export interface Channel { id: string; name: string; description: string; create
 export interface Message { id: string; body: string; created_at: string; sender: Person }
 export interface ChatThread {
   id: string; kind: 'direct'|'group'; title: string;
-  created_at: string; updated_at: string; created_by: Person;
-  participants: Array<{user: Person; joined_at: string}>;
+  created_at: string; updated_at: string; created_by: Person; unread_count: number;
+  participants: Array<{user: Person; joined_at: string; last_read_at: string|null}>;
 }
 export type ChatMessage = Message & { edited_at: string|null; deleted_at: string|null };
 
@@ -66,6 +66,7 @@ export const api = {
   startGroupChat: (title:string,emails:string[]) => post<ChatThread>('chats/', {kind:'group',title,emails}),
   chatMessages: (id:string) => request<ChatMessage[]>(`chats/${id}/messages/`),
   sendChatMessage: (id:string, body:string) => post<ChatMessage>(`chats/${id}/messages/`,{body}),
+  markChatRead: (id:string, messageId:string) => post<{last_read_at:string}>(`chats/${id}/read/`,{message_id:messageId}),
   editChatMessage: (chatId:string, messageId:string, body:string) => request<ChatMessage>(`chats/${chatId}/messages/${messageId}/`, 'PATCH', {body}),
   deleteChatMessage: (chatId:string, messageId:string) => request<void>(`chats/${chatId}/messages/${messageId}/`, 'DELETE'),
   addGroupParticipant: (chatId:string,email:string) => post<ChatThread>(`chats/${chatId}/participants/`,{email}),

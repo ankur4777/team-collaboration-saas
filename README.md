@@ -17,6 +17,8 @@ This is a runnable **React + TypeScript frontend** and **Python Django + Django 
 - Start one-to-one chats or private group chats with employees in the active workspace; receive messages live through membership-scoped WebSockets.
 - Edit or delete your own private chat messages (deletions replace content with a tombstone); real-time updates reach authorized participants.
 - Group creators can add and remove employees; newly added participants only see messages sent after they joined the group.
+- Private/group chats show unread message counts and participant read receipts; read position advances only when the browser submits an explicitly viewed message.
+- Live typing indicators use authenticated, rate-limited WebSocket signals; the workspace bell shows unread-chat notifications, refreshed periodically (approximately 20 seconds).
 - Removing a workspace member revokes their chat participation; if re-invited later, they start a new direct conversation rather than regaining previous private history.
 - Responsive React screens for registration, login, workspace, team navigation, channels, messages, member management, and invitations.
 - First automated Django API tests for registration/CSRF/logout, invitations, and cross-company isolation.
@@ -152,6 +154,7 @@ For WebSocket support, the backend must use ASGI (Daphne is installed and expose
 | GET/POST | `/api/chats/` | List participating chats / create direct or group chat |
 | GET/POST | `/api/chats/{id}/messages/` | Read latest 50 / send private message |
 | PATCH/DELETE | `/api/chats/{id}/messages/{message_id}/` | Author edits or soft-deletes own message |
+| POST | `/api/chats/{id}/read/` | Mark an explicitly displayed message as read; broadcasts receipt |
 | POST | `/api/chats/{id}/participants/` | Group creator adds a workspace member |
 | DELETE | `/api/chats/{id}/participants/{user_id}/` | Group creator removes a group member |
 | WS | `/ws/chats/{id}/` | Receive chat messages (members only) |

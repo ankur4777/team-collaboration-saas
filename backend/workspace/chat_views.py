@@ -52,6 +52,16 @@ def publish_chat_message(chat_id, payload, action='message'):
         logger.exception('Could not broadcast private chat event %s', chat_id)
 
 
+def publish_chat_read(chat_id, user_id, read_at):
+    try:
+        async_to_sync(get_channel_layer().group_send)(
+            f'private_chat_{chat_id}',
+            {'type': 'chat.read', 'user_id': str(user_id), 'read_at': read_at.isoformat()},
+        )
+    except Exception:
+        logger.exception('Could not broadcast read receipt %s', chat_id)
+
+
 def publish_chat_participants(chat_id):
     try:
         async_to_sync(get_channel_layer().group_send)(
@@ -115,7 +125,7 @@ class ChatsView(APIView):
             .prefetch_related('participants__user')
             .order_by('-updated_at', '-created_at')[:200]
         )
-        return Response(ChatConversationSerializer(conversations, many=True).data)
+        return Response(ChatConversationSerializer(conversations, many=True, context={'request': request}).data)
 
     def post(self, request):
         membership = get_active_membership(request)
@@ -264,3 +274,38 @@ class ChatMessageDetailView(APIView):
                     lambda: publish_chat_message(chat.pk, payload, action='message.deleted')
                 )
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ChatReadView(APIView):
+    """A read receipt advances only to a message the member actually names.
+
+    The browser calls this after displaying the message. Never mark a whole
+    conversation read just because its list endpoint was polled.
+    """
+
+    def post(self, request, chat_id):
+        chat = accessible_chat(request, chat_id)
+        message_id = request.data.get('message_id')
+        if not message_id:
+            raise ValidationError({'message_id': 'Provide the last displayed message ID'})
+        message = get_object_or_404(
+            ChatMessage, pk=message_id, conversation=chat,
+        )
+        with transaction.atomic():
+            participant = ChatParticipant.objects.select_for_update().get(
+                conversation=chat, user=request.user,
+            )
+            if message.created_at < participant.joined_at:
+                raise ValidationError({'message_id': 'Message predates your membership'})
+            if participant.last_read_at is None or message.created_at > participant.last_read_at:
+                participant.last_read_at = message.created_at
+                participant.save(update_fields=['last_read_at'])
+                updated = True
+            else:
+                updated = False
+            read_at = participant.last_read_at
+            if updated:
+                transaction.on_commit(
+                    lambda: publish_chat_read(chat.pk, request.user.pk, read_at)
+                )
+        return Response({'last_read_at': read_at.isoformat()})

@@ -16,9 +16,9 @@ function messageOrder(a: ChatMessage, b: ChatMessage) {
   return a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id);
 }
 
-interface Props { workspaceId: string|null; currentUser: Person; members: Member[] }
+interface Props { workspaceId: string|null; currentUser: Person; members: Member[]; requestedChat?: {id:string;nonce:number}|null; onRead?: ()=>void }
 
-export default function ChatPanel({workspaceId, currentUser, members}: Props) {
+export default function ChatPanel({workspaceId, currentUser, members, requestedChat, onRead}: Props) {
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [selected, setSelected] = useState<string|null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -36,18 +36,33 @@ export default function ChatPanel({workspaceId, currentUser, members}: Props) {
   const [connected, setConnected] = useState(false);
   const [filter, setFilter] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const socketRef = useRef<WebSocket|null>(null);
+  const lastTypingAtRef = useRef(0);
+  const stopTypingRef = useRef<ReturnType<typeof setTimeout>|null>(null);
+  const typingTimersRef = useRef<Map<string,ReturnType<typeof setTimeout>>>(new Map());
+  const [typingUsers,setTypingUsers] = useState<Record<string,string>>({});
+  const [loadedChatId,setLoadedChatId] = useState<string|null>(null);
+  const lastMarkedRef = useRef<string|null>(null);
+  const onReadRef = useRef(onRead);
+  onReadRef.current = onRead;
+  const requestedChatRef = useRef(requestedChat);
+  requestedChatRef.current = requestedChat;
 
   const loadThreads = useCallback(async () => {
     try {
       const rows = await api.chats();
       setThreads(rows);
-      setSelected(current => current && rows.some(row => row.id === current) ? current : (rows[0]?.id || null));
+      setSelected(current => current && rows.some(row => row.id === current) ? current
+        : (requestedChatRef.current && rows.some(row=>row.id===requestedChatRef.current?.id)
+          ? requestedChatRef.current.id : (rows[0]?.id || null)));
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not load chats'); }
   }, []);
 
   useEffect(() => {
-    setSelected(null);
+    setSelected(requestedChatRef.current?.id || null);
     setMessages([]);
+    setLoadedChatId(null);
+    lastMarkedRef.current = null;
     setEditingId(null);
     setManagingGroup(false);
     setThreads([]);
@@ -55,27 +70,68 @@ export default function ChatPanel({workspaceId, currentUser, members}: Props) {
   }, [workspaceId, loadThreads]);
 
   useEffect(() => {
-    if (!selected) { setMessages([]); setConnected(false); return; }
+    if(requestedChat?.id) setSelected(requestedChat.id);
+  },[requestedChat?.nonce, requestedChat?.id]);
+
+  const markViewed = useCallback(async(chatId:string, messageId:string)=>{
+    try{
+      const read = await api.markChatRead(chatId,messageId);
+      setThreads(current=>current.map(t=>t.id===chatId
+        ? {...t,unread_count:0,participants:t.participants.map(p=>p.user.id===currentUser.id
+          ? {...p,last_read_at:read.last_read_at} : p)} : t));
+      onReadRef.current?.();
+    }catch(e){setError(e instanceof Error?e.message:'Could not mark chat read');}
+  },[currentUser.id]);
+
+  useEffect(() => {
+    if (!selected) { setMessages([]); setLoadedChatId(null); setConnected(false); return; }
     let valid = true;
     setMessages([]);
+    setLoadedChatId(null);
+    setTypingUsers({});
     setEditingId(null);
     setConnected(false);
     api.chatMessages(selected).then(rows => {
-      if (valid) setMessages(current => {
+      if (valid) {
+        setLoadedChatId(selected);
+        setMessages(current => {
         const all = new Map([...rows, ...current].map(item => [item.id, item]));
         return [...all.values()].sort(messageOrder);
-      });
+        });
+      }
     }).catch(e => { if (valid) setError(e instanceof Error ? e.message : 'Could not load messages'); });
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const socket = new WebSocket(`${protocol}//${location.host}/ws/chats/${selected}/`);
+    socketRef.current = socket;
     socket.onopen = () => { if (valid) setConnected(true); };
     socket.onclose = () => { if (valid) setConnected(false); };
     socket.onmessage = event => {
       try {
-        const payload = JSON.parse(event.data) as {type: string; message: ChatMessage};
+        const payload = JSON.parse(event.data) as {
+          type:string; message:ChatMessage; user_id?:string;
+          full_name?:string; active?:boolean; last_read_at?:string;
+        };
         if (!valid) return;
-        if (payload.type === 'message' && payload.message) {
+        if (payload.type === 'typing' && payload.user_id && payload.full_name) {
+          const id=payload.user_id;
+          const oldTimer=typingTimersRef.current.get(id);
+          if(oldTimer) clearTimeout(oldTimer);
+          if(payload.active) {
+            setTypingUsers(old=>({...old,[id]:payload.full_name!}));
+            typingTimersRef.current.set(id,setTimeout(()=>{
+              setTypingUsers(old=>{const next={...old};delete next[id];return next;});
+              typingTimersRef.current.delete(id);
+            },3000));
+          } else {
+            setTypingUsers(old=>{const next={...old};delete next[id];return next;});
+            typingTimersRef.current.delete(id);
+          }
+        } else if (payload.type === 'read_receipt' && payload.user_id && payload.last_read_at) {
+          const id=payload.user_id,readAt=payload.last_read_at;
+          setThreads(old=>old.map(t=>t.id===selected
+            ? {...t,participants:t.participants.map(p=>p.user.id===id ? {...p,last_read_at:readAt} : p)} : t));
+        } else if (payload.type === 'message' && payload.message) {
           setMessages(current => current.some(row => row.id === payload.message.id)
             ? current : [...current, payload.message].sort(messageOrder));
           void loadThreads();
@@ -86,10 +142,52 @@ export default function ChatPanel({workspaceId, currentUser, members}: Props) {
         }
       } catch { /* Ignore unexpected socket events. */ }
     };
-    return () => { valid = false; socket.close(); };
+    return () => {
+      valid = false;
+      if(socketRef.current===socket) socketRef.current=null;
+      if(stopTypingRef.current) clearTimeout(stopTypingRef.current);
+      typingTimersRef.current.forEach(timer=>clearTimeout(timer));
+      typingTimersRef.current.clear();
+      socket.close();
+    };
   }, [selected, loadThreads]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({behavior:'smooth'}); }, [messages.length]);
+
+  const latest = messages[messages.length-1];
+  const latestId = latest?.id;
+  useEffect(()=>{
+    if(!selected || loadedChatId!==selected || !latestId || document.visibilityState!=='visible')return;
+    const key=`${selected}:${latestId}`;
+    if(lastMarkedRef.current===key)return;
+    lastMarkedRef.current=key;
+    void markViewed(selected,latestId);
+  },[selected,loadedChatId,latestId,markViewed]);
+
+  useEffect(()=>{
+    const handleVisibility=()=>{
+      if(document.visibilityState==='visible' && selected && latestId && loadedChatId===selected)
+        void markViewed(selected,latestId);
+    };
+    document.addEventListener('visibilitychange',handleVisibility);
+    return()=>document.removeEventListener('visibilitychange',handleVisibility);
+  },[selected,latestId,loadedChatId,markViewed]);
+
+  function emitTyping(active:boolean) {
+    const socket=socketRef.current;
+    if(!socket || socket.readyState!==WebSocket.OPEN)return;
+    const now=Date.now();
+    if(active && now-lastTypingAtRef.current<1500)return;
+    lastTypingAtRef.current=now;
+    socket.send(JSON.stringify({type:'typing',active}));
+  }
+  function changeDraft(value:string) {
+    setDraft(value);
+    if(stopTypingRef.current)clearTimeout(stopTypingRef.current);
+    if(!value.trim()){emitTyping(false);return;}
+    emitTyping(true);
+    stopTypingRef.current=setTimeout(()=>emitTyping(false),2200);
+  }
 
   const active = threads.find(thread => thread.id === selected);
   const colleagues = members.filter(member => member.user.id !== currentUser.id);
@@ -122,6 +220,8 @@ export default function ChatPanel({workspaceId, currentUser, members}: Props) {
     if (!selected || !draft.trim() || working) return;
     const body = draft.trim();
     setDraft('');
+    emitTyping(false);
+    if(stopTypingRef.current) clearTimeout(stopTypingRef.current);
     setError('');
     setWorking(true);
     try {
@@ -203,6 +303,7 @@ export default function ChatPanel({workspaceId, currentUser, members}: Props) {
         {visibleThreads.map(thread => <button type="button" key={thread.id} className={`chat-thread ${selected === thread.id ? 'selected' : ''}`} onClick={() => setSelected(thread.id)}>
           <span className="chat-thread-avatar">{thread.kind === 'group' ? <Users size={17}/> : initials(titleFor(thread,currentUser.id))}</span>
           <span className="chat-thread-details"><strong>{titleFor(thread,currentUser.id)}</strong><small>{thread.kind === 'group' ? `${thread.participants.length} participants` : 'Direct message'}</small></span>
+          {thread.unread_count>0&&<span className="chat-unread-badge" aria-label={`${thread.unread_count} unread messages`}>{thread.unread_count>99?'99+':thread.unread_count}</span>}
         </button>)}
         {visibleThreads.length === 0 && <div className="chat-list-empty">No conversations yet. Start a new chat with a colleague.</div>}
         <button type="button" className="new-group-link" onClick={() => setMode('group')}><Users size={15}/> Create group chat</button>
@@ -223,11 +324,17 @@ export default function ChatPanel({workspaceId, currentUser, members}: Props) {
                 <input autoFocus aria-label="Edit message" maxLength={4000} value={editDraft} onChange={e => setEditDraft(e.target.value)}/>
                 <div><button type="button" onClick={() => setEditingId(null)} disabled={working}>Cancel</button><button type="submit" disabled={working || !editDraft.trim()}>Save</button></div>
               </form> : <div className={`private-message-body ${message.deleted_at ? 'deleted' : ''}`}>{message.deleted_at ? 'Message deleted' : message.body}{!message.deleted_at && message.edited_at && <small className="edited-note"> (edited)</small>}</div>}
+              {message.sender.id===currentUser.id && <div className="chat-read-receipt">{
+                active.participants.some(p=>p.user.id!==currentUser.id && p.last_read_at && new Date(p.last_read_at).getTime()>=new Date(message.created_at).getTime())
+                  ? (active.kind==='direct' ? 'Seen' : `Seen by ${active.participants.filter(p=>p.user.id!==currentUser.id && p.last_read_at && new Date(p.last_read_at).getTime()>=new Date(message.created_at).getTime()).length}`)
+                  : 'Sent'
+              }</div>}
               {message.sender.id===currentUser.id && !message.deleted_at && editingId!==message.id && <div className="private-message-actions"><button type="button" disabled={working} onClick={() => {setEditingId(message.id);setEditDraft(message.body);}}>Edit</button><button type="button" disabled={working} onClick={() => void deleteMessage(message)}>Delete</button></div>}
             </div>)}
             <div ref={bottomRef}/>
           </div>
-          <form className="private-chat-compose" onSubmit={send}><input aria-label="Write a message" value={draft} maxLength={4000} placeholder="Write a message..." onChange={e => setDraft(e.target.value)}/><button className="send-button" aria-label="Send message" disabled={!draft.trim()||working}><Send size={18}/></button></form>
+          {Object.keys(typingUsers).length>0&&<div className="chat-typing-indicator" aria-live="polite">{Object.values(typingUsers).join(', ')} {Object.keys(typingUsers).length>1?'are':'is'} typing…</div>}
+          <form className="private-chat-compose" onSubmit={send}><input aria-label="Write a message" value={draft} maxLength={4000} placeholder="Write a message..." onChange={e => changeDraft(e.target.value)} onBlur={()=>emitTyping(false)}/><button className="send-button" aria-label="Send message" disabled={!draft.trim()||working}><Send size={18}/></button></form>
         </> : <div className="private-chat-welcome"><MessageCircle size={32}/><h3>Connect with your team</h3><p>Choose a conversation or start a new one.</p></div>}
       </div>
     </div>

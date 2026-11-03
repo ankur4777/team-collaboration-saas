@@ -16,6 +16,7 @@ urlpatterns = [
     path('invitations/<str:token>/accept/', auth_views.invitation_accept),
     path('chats/', chat_views.ChatsView.as_view()),
     path('chats/<uuid:chat_id>/messages/', chat_views.ChatMessagesView.as_view()),
+    path('chats/<uuid:chat_id>/read/', chat_views.ChatReadView.as_view()),
     path('chats/<uuid:chat_id>/messages/<uuid:message_id>/', chat_views.ChatMessageDetailView.as_view()),
     path('chats/<uuid:chat_id>/participants/', chat_views.ChatParticipantsView.as_view()),
     path('chats/<uuid:chat_id>/participants/<uuid:user_id>/', chat_views.ChatParticipantDetailView.as_view()),
