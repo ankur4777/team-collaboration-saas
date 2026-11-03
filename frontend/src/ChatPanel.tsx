@@ -16,9 +16,9 @@ function messageOrder(a: ChatMessage, b: ChatMessage) {
   return a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id);
 }
 
-interface Props { workspaceId: string|null; currentUser: Person; members: Member[] }
+interface Props { workspaceId: string|null; currentUser: Person; members: Member[]; requestedChat?: {id:string;nonce:number}|null; onRead?: ()=>void }
 
-export default function ChatPanel({workspaceId, currentUser, members}: Props) {
+export default function ChatPanel({workspaceId, currentUser, members, requestedChat, onRead}: Props) {
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [selected, setSelected] = useState<string|null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -36,18 +36,33 @@ export default function ChatPanel({workspaceId, currentUser, members}: Props) {
   const [connected, setConnected] = useState(false);
   const [filter, setFilter] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const socketRef = useRef<WebSocket|null>(null);
+  const lastTypingAtRef = useRef(0);
+  const stopTypingRef = useRef<ReturnType<typeof setTimeout>|null>(null);
+  const typingTimersRef = useRef<Map<string,ReturnType<typeof setTimeout>>>(new Map());
+  const [typingUsers,setTypingUsers] = useState<Record<string,string>>({});
+  const [loadedChatId,setLoadedChatId] = useState<string|null>(null);
+  const lastMarkedRef = useRef<string|null>(null);
+  const onReadRef = useRef(onRead);
+  onReadRef.current = onRead;
+  const requestedChatRef = useRef(requestedChat);
+  requestedChatRef.current = requestedChat;
 
   const loadThreads = useCallback(async () => {
     try {
       const rows = await api.chats();
       setThreads(rows);
-      setSelected(current => current && rows.some(row => row.id === current) ? current : (rows[0]?.id || null));
+      setSelected(current => current && rows.some(row => row.id === current) ? current
+        : (requestedChatRef.current && rows.some(row=>row.id===requestedChatRef.current?.id)
+          ? requestedChatRef.current.id : (rows[0]?.id || null)));
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not load chats'); }
   }, []);
 
   useEffect(() => {
-    setSelected(null);
+    setSelected(requestedChatRef.current?.id || null);
     setMessages([]);
+    setLoadedChatId(null);
+    lastMarkedRef.current = null;
     setEditingId(null);
     setManagingGroup(false);
     setThreads([]);
@@ -55,20 +70,40 @@ export default function ChatPanel({workspaceId, currentUser, members}: Props) {
   }, [workspaceId, loadThreads]);
 
   useEffect(() => {
-    if (!selected) { setMessages([]); setConnected(false); return; }
+    if(requestedChat?.id) setSelected(requestedChat.id);
+  },[requestedChat?.nonce, requestedChat?.id]);
+
+  const markViewed = useCallback(async(chatId:string, messageId:string)=>{
+    try{
+      const read = await api.markChatRead(chatId,messageId);
+      setThreads(current=>current.map(t=>t.id===chatId
+        ? {...t,unread_count:0,participants:t.participants.map(p=>p.user.id===currentUser.id
+          ? {...p,last_read_at:read.last_read_at} : p)} : t));
+      onReadRef.current?.();
+    }catch(e){setError(e instanceof Error?e.message:'Could not mark chat read');}
+  },[currentUser.id]);
+
+  useEffect(() => {
+    if (!selected) { setMessages([]); setLoadedChatId(null); setConnected(false); return; }
     let valid = true;
     setMessages([]);
+    setLoadedChatId(null);
+    setTypingUsers({});
     setEditingId(null);
     setConnected(false);
     api.chatMessages(selected).then(rows => {
-      if (valid) setMessages(current => {
+      if (valid) {
+        setLoadedChatId(selected);
+        setMessages(current => {
         const all = new Map([...rows, ...current].map(item => [item.id, item]));
         return [...all.values()].sort(messageOrder);
-      });
+        });
+      }
     }).catch(e => { if (valid) setError(e instanceof Error ? e.message : 'Could not load messages'); });
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const socket = new WebSocket(`${protocol}//${location.host}/ws/chats/${selected}/`);
+    socketRef.current = socket;
     socket.onopen = () => { if (valid) setConnected(true); };
     socket.onclose = () => { if (valid) setConnected(false); };
     socket.onmessage = event => {
@@ -86,10 +121,52 @@ export default function ChatPanel({workspaceId, currentUser, members}: Props) {
         }
       } catch { /* Ignore unexpected socket events. */ }
     };
-    return () => { valid = false; socket.close(); };
+    return () => {
+      valid = false;
+      if(socketRef.current===socket) socketRef.current=null;
+      if(stopTypingRef.current) clearTimeout(stopTypingRef.current);
+      typingTimersRef.current.forEach(timer=>clearTimeout(timer));
+      typingTimersRef.current.clear();
+      socket.close();
+    };
   }, [selected, loadThreads]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({behavior:'smooth'}); }, [messages.length]);
+
+  const latest = messages[messages.length-1];
+  const latestId = latest?.id;
+  useEffect(()=>{
+    if(!selected || loadedChatId!==selected || !latestId || document.visibilityState!=='visible')return;
+    const key=`${selected}:${latestId}`;
+    if(lastMarkedRef.current===key)return;
+    lastMarkedRef.current=key;
+    void markViewed(selected,latestId);
+  },[selected,loadedChatId,latestId,markViewed]);
+
+  useEffect(()=>{
+    const handleVisibility=()=>{
+      if(document.visibilityState==='visible' && selected && latestId && loadedChatId===selected)
+        void markViewed(selected,latestId);
+    };
+    document.addEventListener('visibilitychange',handleVisibility);
+    return()=>document.removeEventListener('visibilitychange',handleVisibility);
+  },[selected,latestId,loadedChatId,markViewed]);
+
+  function emitTyping(active:boolean) {
+    const socket=socketRef.current;
+    if(!socket || socket.readyState!==WebSocket.OPEN)return;
+    const now=Date.now();
+    if(active && now-lastTypingAtRef.current<1500)return;
+    lastTypingAtRef.current=now;
+    socket.send(JSON.stringify({type:'typing',active}));
+  }
+  function changeDraft(value:string) {
+    setDraft(value);
+    if(stopTypingRef.current)clearTimeout(stopTypingRef.current);
+    if(!value.trim()){emitTyping(false);return;}
+    emitTyping(true);
+    stopTypingRef.current=setTimeout(()=>emitTyping(false),2200);
+  }
 
   const active = threads.find(thread => thread.id === selected);
   const colleagues = members.filter(member => member.user.id !== currentUser.id);
