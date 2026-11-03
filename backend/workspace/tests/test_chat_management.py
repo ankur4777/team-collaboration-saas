@@ -106,7 +106,7 @@ class ChatManagementTests(TestCase):
         self.assertEqual(len(added.json()['participants']), 4)
         self.assertEqual(self.write('POST', url, {'email': third.email}).status_code, 400)
         self.assertEqual(self.write('POST', url, {'email': 'outsider@other.test'}).status_code, 400)
-        self.assertEqual(self.write('DELETE', f'/api/chats/{chat_id}/participants/{chat.json()["participants"][0]["user"]["id"]}/').status_code, 403)
+        self.assertEqual(self.write('DELETE', f'/api/chats/{chat_id}/participants/{org.created_by_id}/').status_code, 403)
 
         self.login(third.email)
         old = self.client.get(f'/api/chats/{chat_id}/messages/')
