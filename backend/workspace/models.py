@@ -144,6 +144,8 @@ class Message(models.Model):
     sender = models.ForeignKey(User, on_delete=models.PROTECT, related_name='messages_sent')
     body = models.TextField(max_length=4000)
     created_at = models.DateTimeField(auto_now_add=True)
+    edited_at = models.DateTimeField(null=True, blank=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['created_at', 'id']
