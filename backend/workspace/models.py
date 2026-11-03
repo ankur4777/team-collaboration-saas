@@ -18,6 +18,10 @@ def make_id():
 
 
 class UserManager(BaseUserManager):
+    # This manager is serialized in the existing 0001_initial migration.
+    # Keep it migration-aware to avoid a spurious AlterModelManagers change.
+    use_in_migrations = True
+
     def create_user(self, email, password=None, **extra_fields):
         if not email:
             raise ValueError('An email address is required')
