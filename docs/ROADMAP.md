@@ -34,7 +34,8 @@
 - Implemented: one-to-one private chats, company-scoped group chats, authenticated REST history/send APIs, member-scoped WebSockets, React chat view and message flow.
 - Implemented: removal of chat participation during employee offboarding; fresh direct conversation on future re-invite.
 - Implemented: private-message edit and soft-delete, group creator management of participants, and join-time filtering of prior group messages.
-- Still planned: group creator transfer, group exit flow, unread/read receipts, typing indicators, notifications, attachments, search, retention and file previews.
+- Implemented: unread private-chat counts, per-member read cursors, read receipts, WebSocket typing indicators, and chat-only in-app notification bell.
+- Still planned: group creator transfer, group exit flow, channel unread counts, push/email notifications, richer persistent notification preferences, attachments, search, retention and file previews.
 
 ## Phase 2 — Real-time communication
 
@@ -79,4 +80,4 @@
 
 ## High-priority next task
 
-**Validate the chat migration and browser-to-browser real-time messaging in Docker;** then add group participant management, notifications and verified-email/account recovery. Do not begin unrestricted mailbox integration before isolation and authentication tests are green.
+**Validate unread chat counts, read receipts and typing indicators across two local browser sessions;** then work on channel notifications, verified-email/account recovery and shared files. Do not begin unrestricted mailbox integration before isolation and authentication tests are green.
