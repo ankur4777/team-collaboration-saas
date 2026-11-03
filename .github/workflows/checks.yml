@@ -38,8 +38,10 @@ jobs:
           MYSQL_HOST: 127.0.0.1
           MYSQL_PORT: '3306'
           MYSQL_DATABASE: teamworkspace
-          MYSQL_USER: teamworkspace
-          MYSQL_PASSWORD: test-password
+          # CI only: test runner needs CREATE DATABASE for test_teamworkspace.
+          # Production and docker-compose continue using the restricted app user.
+          MYSQL_USER: root
+          MYSQL_PASSWORD: test-root-password
           REDIS_URL: redis://127.0.0.1:6379/0
       - run: python manage.py test workspace --verbosity 2
         env: *env
