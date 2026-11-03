@@ -44,10 +44,11 @@ class ChatParticipantSerializer(serializers.ModelSerializer):
 
 class ChatConversationSerializer(serializers.ModelSerializer):
     participants = ChatParticipantSerializer(many=True, read_only=True)
+    created_by = UserSerializer(read_only=True)
 
     class Meta:
         model = ChatConversation
-        fields = ('id', 'kind', 'title', 'created_at', 'updated_at', 'participants')
+        fields = ('id', 'kind', 'title', 'created_at', 'updated_at', 'created_by', 'participants')
 
 
 class ChatMessageSerializer(serializers.ModelSerializer):
