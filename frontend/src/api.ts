@@ -6,10 +6,10 @@ export interface Channel { id: string; name: string; description: string; create
 export interface Message { id: string; body: string; created_at: string; sender: Person }
 export interface ChatThread {
   id: string; kind: 'direct'|'group'; title: string;
-  created_at: string; updated_at: string;
+  created_at: string; updated_at: string; created_by: Person;
   participants: Array<{user: Person; joined_at: string}>;
 }
-export type ChatMessage = Message;
+export type ChatMessage = Message & { edited_at: string|null; deleted_at: string|null };
 
 export interface Member { id: string; role: string; joined_at: string; user: Person }
 export interface InvitePreview { email: string; organization_name: string; role: string }
@@ -66,6 +66,10 @@ export const api = {
   startGroupChat: (title:string,emails:string[]) => post<ChatThread>('chats/', {kind:'group',title,emails}),
   chatMessages: (id:string) => request<ChatMessage[]>(`chats/${id}/messages/`),
   sendChatMessage: (id:string, body:string) => post<ChatMessage>(`chats/${id}/messages/`,{body}),
+  editChatMessage: (chatId:string, messageId:string, body:string) => request<ChatMessage>(`chats/${chatId}/messages/${messageId}/`, 'PATCH', {body}),
+  deleteChatMessage: (chatId:string, messageId:string) => request<void>(`chats/${chatId}/messages/${messageId}/`, 'DELETE'),
+  addGroupParticipant: (chatId:string,email:string) => post<ChatThread>(`chats/${chatId}/participants/`,{email}),
+  removeGroupParticipant: (chatId:string,userId:string) => request<void>(`chats/${chatId}/participants/${userId}/`,'DELETE'),
   teams: () => request<Team[]>('teams/'),
   createTeam: (name:string) => post<Team>('teams/', {name}),
   channels: (teamId:string) => request<Channel[]>(`teams/${teamId}/channels/`),
