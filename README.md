@@ -10,7 +10,8 @@ This is a runnable **React + TypeScript frontend** and **Python Django + Django 
 - Email + password login, CSRF-protected session authentication, logout and active workspace switching.
 - Company membership roles: **owner**, **admin**, and **member**.
 - Employee invitations: hashed, expiring single-use links; email content goes to backend logs during local development.
-- Organization membership listing; organization administrators can invite employees.
+- Organization member listing, role updates (owner only), and removal with cross-tenant restrictions; administrators can remove regular members.
+- Workspace administrators may invite regular members; only the owner may invite or promote another administrator. Team owners must transfer team ownership before being removed from a workspace.
 - Create teams and `General` channels. Team owners can add channels and existing company employees to a team.
 - Post/read channel messages with membership checks; real-time WebSocket notification of new messages.
 - Responsive React screens for registration, login, workspace, team navigation, channels, messages, member management, and invitations.
@@ -126,6 +127,8 @@ For WebSocket support, the backend must use ASGI (Daphne is installed and expose
 | GET | `/api/auth/me/` | Logged-in user and memberships |
 | POST | `/api/organizations/{id}/activate/` | Select active company membership |
 | GET | `/api/organizations/{id}/members/` | List active company's members |
+| PATCH | `/api/organizations/{id}/members/{member_id}/` | Owner: promote/demote member (admin/member) |
+| DELETE | `/api/organizations/{id}/members/{member_id}/` | Owner/admin: revoke workspace access (role limited) |
 | POST | `/api/organizations/{id}/invitations/` | Invite company employee (admin/owner) |
 | GET | `/api/invitations/{token}/` | Preview an invitation |
 | POST | `/api/invitations/{token}/accept/` | Join company; existing accounts must log in |

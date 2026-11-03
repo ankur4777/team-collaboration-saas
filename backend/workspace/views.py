@@ -56,6 +56,8 @@ class OrganizationInvitationsView(APIView):
             raise ValidationError({'email': 'Enter a valid email address'})
         if role not in (OrganizationMember.Role.ADMIN, OrganizationMember.Role.MEMBER):
             raise ValidationError({'role': 'Invites may grant admin or member access'})
+        if role == OrganizationMember.Role.ADMIN and membership.role != OrganizationMember.Role.OWNER:
+            raise PermissionDenied('Only the workspace owner can invite administrators')
         if OrganizationMember.objects.filter(organization_id=pk, user__email__iexact=email).exists():
             raise ValidationError({'email': 'This person is already a member'})
         token = Invitation.generate_token()
