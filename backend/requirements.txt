@@ -1,0 +1,7 @@
+Django>=5.2,<5.3
+djangorestframework>=3.16,<3.18
+channels[daphne]>=4.2,<5
+channels-redis>=4.2,<5
+mysqlclient>=2.2.4,<3
+python-dotenv>=1.0,<2
+celery>=5.5,<6
