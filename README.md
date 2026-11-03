@@ -15,6 +15,8 @@ This is a runnable **React + TypeScript frontend** and **Python Django + Django 
 - Create teams and `General` channels. Team owners can add channels and existing company employees to a team.
 - Post/read channel messages with membership checks; real-time WebSocket notification of new messages.
 - Start one-to-one chats or private group chats with employees in the active workspace; receive messages live through membership-scoped WebSockets.
+- Edit or delete your own private chat messages (deletions replace content with a tombstone); real-time updates reach authorized participants.
+- Group creators can add and remove employees; newly added participants only see messages sent after they joined the group.
 - Removing a workspace member revokes their chat participation; if re-invited later, they start a new direct conversation rather than regaining previous private history.
 - Responsive React screens for registration, login, workspace, team navigation, channels, messages, member management, and invitations.
 - First automated Django API tests for registration/CSRF/logout, invitations, and cross-company isolation.
@@ -149,6 +151,9 @@ For WebSocket support, the backend must use ASGI (Daphne is installed and expose
 | POST | `/api/invitations/{token}/accept/` | Join company; existing accounts must log in |
 | GET/POST | `/api/chats/` | List participating chats / create direct or group chat |
 | GET/POST | `/api/chats/{id}/messages/` | Read latest 50 / send private message |
+| PATCH/DELETE | `/api/chats/{id}/messages/{message_id}/` | Author edits or soft-deletes own message |
+| POST | `/api/chats/{id}/participants/` | Group creator adds a workspace member |
+| DELETE | `/api/chats/{id}/participants/{user_id}/` | Group creator removes a group member |
 | WS | `/ws/chats/{id}/` | Receive chat messages (members only) |
 | GET/POST | `/api/teams/` | List joined teams / create a team |
 | GET/POST | `/api/teams/{id}/channels/` | List channels / create channel (owner) |
