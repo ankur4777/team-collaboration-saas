@@ -4,6 +4,13 @@ export interface Session { user: Person; organizations: Org[]; active_organizati
 export interface Team { id: string; name: string; description: string; created_at: string }
 export interface Channel { id: string; name: string; description: string; created_at: string }
 export interface Message { id: string; body: string; created_at: string; sender: Person }
+export interface ChatThread {
+  id: string; kind: 'direct'|'group'; title: string;
+  created_at: string; updated_at: string;
+  participants: Array<{user: Person; joined_at: string}>;
+}
+export type ChatMessage = Message;
+
 export interface Member { id: string; role: string; joined_at: string; user: Person }
 export interface InvitePreview { email: string; organization_name: string; role: string }
 
@@ -54,6 +61,11 @@ export const api = {
   invite: (id:string, email:string, role: string) => post<{detail:string; development_invite_url?:string}>(`organizations/${id}/invitations/`, {email,role}),
   previewInvite: (token:string) => request<InvitePreview>(`invitations/${encodeURIComponent(token)}/`),
   acceptInvite: (token:string, full_name:string, password:string) => secureLogin(`invitations/${encodeURIComponent(token)}/accept/`, {full_name, password}),
+  chats: () => request<ChatThread[]>('chats/'),
+  startDirectChat: (email:string) => post<ChatThread>('chats/', {kind:'direct',email}),
+  startGroupChat: (title:string,emails:string[]) => post<ChatThread>('chats/', {kind:'group',title,emails}),
+  chatMessages: (id:string) => request<ChatMessage[]>(`chats/${id}/messages/`),
+  sendChatMessage: (id:string, body:string) => post<ChatMessage>(`chats/${id}/messages/`,{body}),
   teams: () => request<Team[]>('teams/'),
   createTeam: (name:string) => post<Team>('teams/', {name}),
   channels: (teamId:string) => request<Channel[]>(`teams/${teamId}/channels/`),
