@@ -28,6 +28,10 @@ export default function ChatPanel({workspaceId, currentUser, members}: Props) {
   const [groupTitle, setGroupTitle] = useState('');
   const [groupEmails, setGroupEmails] = useState<string[]>([]);
   const [working, setWorking] = useState(false);
+  const [editingId, setEditingId] = useState<string|null>(null);
+  const [editDraft, setEditDraft] = useState('');
+  const [managingGroup, setManagingGroup] = useState(false);
+  const [addEmail, setAddEmail] = useState('');
   const [error, setError] = useState('');
   const [connected, setConnected] = useState(false);
   const [filter, setFilter] = useState('');
@@ -44,6 +48,8 @@ export default function ChatPanel({workspaceId, currentUser, members}: Props) {
   useEffect(() => {
     setSelected(null);
     setMessages([]);
+    setEditingId(null);
+    setManagingGroup(false);
     setThreads([]);
     if (workspaceId) void loadThreads();
   }, [workspaceId, loadThreads]);
@@ -52,6 +58,7 @@ export default function ChatPanel({workspaceId, currentUser, members}: Props) {
     if (!selected) { setMessages([]); setConnected(false); return; }
     let valid = true;
     setMessages([]);
+    setEditingId(null);
     setConnected(false);
     api.chatMessages(selected).then(rows => {
       if (valid) setMessages(current => {
@@ -67,9 +74,14 @@ export default function ChatPanel({workspaceId, currentUser, members}: Props) {
     socket.onmessage = event => {
       try {
         const payload = JSON.parse(event.data) as {type: string; message: ChatMessage};
-        if (valid && payload.type === 'message') {
+        if (!valid) return;
+        if (payload.type === 'message' && payload.message) {
           setMessages(current => current.some(row => row.id === payload.message.id)
             ? current : [...current, payload.message].sort(messageOrder));
+          void loadThreads();
+        } else if ((payload.type === 'message.updated' || payload.type === 'message.deleted') && payload.message) {
+          setMessages(current => current.map(row => row.id === payload.message.id ? payload.message : row));
+        } else if (payload.type === 'participants_changed') {
           void loadThreads();
         }
       } catch { /* Ignore unexpected socket events. */ }
@@ -81,6 +93,7 @@ export default function ChatPanel({workspaceId, currentUser, members}: Props) {
 
   const active = threads.find(thread => thread.id === selected);
   const colleagues = members.filter(member => member.user.id !== currentUser.id);
+  const groupCandidates = colleagues.filter(m => !active?.participants.some(p => p.user.id === m.user.id));
   const visibleThreads = threads.filter(thread =>
     titleFor(thread, currentUser.id).toLowerCase().includes(filter.toLowerCase()),
   );
@@ -122,6 +135,61 @@ export default function ChatPanel({workspaceId, currentUser, members}: Props) {
     } finally { setWorking(false); }
   }
 
+  async function editMessage(e: FormEvent, messageId: string) {
+    e.preventDefault();
+    if (!selected || !editDraft.trim() || working) return;
+    setWorking(true);
+    setError('');
+    try {
+      const updated = await api.editChatMessage(selected, messageId, editDraft);
+      setMessages(current => current.map(row => row.id === updated.id ? updated : row));
+      setEditingId(null);
+      setEditDraft('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not edit message');
+    } finally { setWorking(false); }
+  }
+
+  async function deleteMessage(message: ChatMessage) {
+    if (!selected || working || !window.confirm('Delete this message for everyone in the chat?')) return;
+    setWorking(true);
+    setError('');
+    try {
+      await api.deleteChatMessage(selected, message.id);
+      const rows = await api.chatMessages(selected);
+      setMessages(rows);
+      if (editingId === message.id) setEditingId(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not delete message');
+    } finally { setWorking(false); }
+  }
+
+  async function addParticipant(e: FormEvent) {
+    e.preventDefault();
+    if (!selected || !addEmail || working) return;
+    setWorking(true);
+    setError('');
+    try {
+      await api.addGroupParticipant(selected, addEmail);
+      setAddEmail('');
+      await loadThreads();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not add teammate');
+    } finally { setWorking(false); }
+  }
+
+  async function removeParticipant(user: Person) {
+    if (!selected || working || !window.confirm(`Remove ${user.full_name} from this group chat?`)) return;
+    setWorking(true);
+    setError('');
+    try {
+      await api.removeGroupParticipant(selected, user.id);
+      await loadThreads();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not remove teammate');
+    } finally { setWorking(false); }
+  }
+
   return <section className="private-chat-page">
     <div className="private-chat-heading">
       <div><div className="eyebrow">YOUR WORKSPACE / MESSAGES</div><h1>Chats</h1><p>Private conversations with teammates in this company.</p></div>
@@ -144,13 +212,18 @@ export default function ChatPanel({workspaceId, currentUser, members}: Props) {
           <header className="private-chat-toolbar">
             <span className="chat-thread-avatar large">{active.kind === 'group' ? <Users size={19}/> : initials(titleFor(active,currentUser.id))}</span>
             <div><h2>{titleFor(active,currentUser.id)}</h2><p>{active.participants.map(p => p.user.full_name).join(', ')}</p></div>
+            {active.kind==='group' && active.created_by.id===currentUser.id && <button type="button" className="group-manage-button" onClick={() => setManagingGroup(true)}><Users size={15}/> Manage group</button>}
             <span className={`chat-connected ${connected ? 'yes' : ''}`} title={connected ? 'Live updates connected' : 'Messages saved; live updates unavailable'}/>
           </header>
           <div className="private-chat-history">
             {messages.length === 0 && <div className="private-chat-welcome"><MessageCircle size={30}/><h3>Start the conversation</h3><p>Only participants in this workspace can read these messages.</p></div>}
             {messages.map(message => <div key={message.id} className={`private-message ${message.sender.id===currentUser.id ? 'mine' : ''}`}>
               <div className="private-message-meta"><strong>{message.sender.full_name}</strong><time>{timeFor(message.created_at)}</time></div>
-              <div className="private-message-body">{message.body}</div>
+              {editingId===message.id ? <form className="message-edit-form" onSubmit={e => void editMessage(e,message.id)}>
+                <input autoFocus aria-label="Edit message" maxLength={4000} value={editDraft} onChange={e => setEditDraft(e.target.value)}/>
+                <div><button type="button" onClick={() => setEditingId(null)} disabled={working}>Cancel</button><button type="submit" disabled={working || !editDraft.trim()}>Save</button></div>
+              </form> : <div className={`private-message-body ${message.deleted_at ? 'deleted' : ''}`}>{message.deleted_at ? 'Message deleted' : message.body}{!message.deleted_at && message.edited_at && <small className="edited-note"> (edited)</small>}</div>}
+              {message.sender.id===currentUser.id && !message.deleted_at && editingId!==message.id && <div className="private-message-actions"><button type="button" disabled={working} onClick={() => {setEditingId(message.id);setEditDraft(message.body);}}>Edit</button><button type="button" disabled={working} onClick={() => void deleteMessage(message)}>Delete</button></div>}
             </div>)}
             <div ref={bottomRef}/>
           </div>
@@ -158,6 +231,20 @@ export default function ChatPanel({workspaceId, currentUser, members}: Props) {
         </> : <div className="private-chat-welcome"><MessageCircle size={32}/><h3>Connect with your team</h3><p>Choose a conversation or start a new one.</p></div>}
       </div>
     </div>
+    {managingGroup && active?.kind==='group' && active.created_by.id===currentUser.id && <div className="modal-backdrop" onMouseDown={e => {if (e.target===e.currentTarget) setManagingGroup(false);}}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label="Manage group participants">
+        <div className="modal-head"><div><div className="eyebrow">GROUP CHAT</div><h2>Manage participants</h2></div><button className="icon-button" onClick={() => setManagingGroup(false)} aria-label="Close"><X size={19}/></button></div>
+        <div className="modal-body">
+          <p className="muted">New participants see messages from the time they join, not earlier chat history.</p>
+          <div className="member-list">{active.participants.map(p => <div className="member-row" key={p.user.id}><div className="avatar small-avatar">{initials(p.user.full_name)}</div><div><strong>{p.user.full_name}</strong><small>{p.user.email}</small></div>{p.user.id===active.created_by.id ? <span className="role-pill">Creator</span> : <button className="member-remove" disabled={working} onClick={() => void removeParticipant(p.user)}>Remove</button>}</div>)}</div>
+          <form className="group-manage-add" onSubmit={addParticipant}>
+            <label>Add teammate<select aria-label="Select teammate to add" value={addEmail} onChange={e => setAddEmail(e.target.value)} required><option value="">Choose a member</option>{groupCandidates.map(m => <option key={m.id} value={m.user.email}>{m.user.full_name} ({m.user.email})</option>)}</select></label>
+            <button type="submit" className="primary-button" disabled={!addEmail || working || active.participants.length>=25}><Plus size={15}/> Add to group</button>
+          </form>
+          {active.participants.length>=25 && <p className="muted">Group is at the 25-person limit.</p>}
+        </div>
+      </div>
+    </div>}
     {mode && <div className="modal-backdrop" onMouseDown={e => {if (e.target === e.currentTarget) setMode(null);}}>
       <div className="modal" role="dialog" aria-modal="true" aria-label={mode==='direct'?'New direct chat':'New group chat'}>
         <div className="modal-head"><div><div className="eyebrow">TEAMWORKSPACE</div><h2>{mode==='direct'?'New direct chat':'Create group chat'}</h2></div><button className="icon-button" aria-label="Close" onClick={() => setMode(null)}><X size={19}/></button></div>
