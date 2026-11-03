@@ -303,7 +303,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
         {visibleThreads.map(thread => <button type="button" key={thread.id} className={`chat-thread ${selected === thread.id ? 'selected' : ''}`} onClick={() => setSelected(thread.id)}>
           <span className="chat-thread-avatar">{thread.kind === 'group' ? <Users size={17}/> : initials(titleFor(thread,currentUser.id))}</span>
           <span className="chat-thread-details"><strong>{titleFor(thread,currentUser.id)}</strong><small>{thread.kind === 'group' ? `${thread.participants.length} participants` : 'Direct message'}</small></span>
-          {thread.unread_count>0&&<span className="chat-unread-badge" aria-label={`${thread.unread_count} unread messages`}>{thread.unread_count>99?'99+':thread.unread_count}</span>
+          {thread.unread_count>0&&<span className="chat-unread-badge" aria-label={`${thread.unread_count} unread messages`}>{thread.unread_count>99?'99+':thread.unread_count}</span>}
         </button>)}
         {visibleThreads.length === 0 && <div className="chat-list-empty">No conversations yet. Start a new chat with a colleague.</div>}
         <button type="button" className="new-group-link" onClick={() => setMode('group')}><Users size={15}/> Create group chat</button>
