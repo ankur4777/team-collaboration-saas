@@ -19,6 +19,8 @@ This is a runnable **React + TypeScript frontend** and **Python Django + Django 
 - Group creators can add and remove employees; newly added participants only see messages sent after they joined the group.
 - Private/group chats show unread message counts and participant read receipts; read position advances only when the browser submits an explicitly viewed message.
 - Live typing indicators use authenticated, rate-limited WebSocket signals; the workspace bell shows unread-chat notifications, refreshed periodically (approximately 20 seconds).
+- Team channels now have independent per-member unread badges and explicit read cursors, scoped to current team and organization membership.
+- The notification bell includes unread team channels alongside private/group chats; clicking a channel notice opens the appropriate team and channel.
 - Removing a workspace member revokes their chat participation; if re-invited later, they start a new direct conversation rather than regaining previous private history.
 - Responsive React screens for registration, login, workspace, team navigation, channels, messages, member management, and invitations.
 - First automated Django API tests for registration/CSRF/logout, invitations, and cross-company isolation.
@@ -97,7 +99,7 @@ This grant only allows the existing application user to create and remove its is
 
 ## New chat migration and local verification
 
-After pulling a release with private chat support, rebuild the backend to copy the migration into its image:
+After pulling new chat or channel unread functionality, rebuild the backend to copy the migration into its image:
 
 ```powershell
 git pull origin main
@@ -107,6 +109,12 @@ docker compose exec api python manage.py makemigrations --check --dry-run
 ```
 
 Use the **Chats & Groups** sidebar item to start a direct chat or create a group with at least two other employees. Existing workspaces and messages are preserved. If the local test account has permission on `test_teamworkspace`, run `docker compose exec api python manage.py test workspace`.
+
+## Channel unread upgrade notes
+
+Migration `0006_channel_read_cursors` records each team member's join date and adds a per-user channel read cursor. Existing team memberships had no join timestamp: their date is initialized to the time the migration is applied, so old messages are not incorrectly marked unread on upgrade. Existing messages remain in the database.
+
+Channel unread counts exclude a user's own messages and messages before joining a team. The browser marks a channel read only after it has loaded a displayed message. Channel notifications currently refresh about every 20 seconds; live delivery continues for an open channel over WebSockets. System alerts, desktop pushes and notification preferences are future enhancements.
 
 ## Run without Docker (advanced)
 
@@ -162,6 +170,8 @@ For WebSocket support, the backend must use ASGI (Daphne is installed and expose
 | GET/POST | `/api/teams/{id}/channels/` | List channels / create channel (owner) |
 | GET/POST | `/api/teams/{id}/members/` | List / add existing company teammate (owner) |
 | GET/POST | `/api/channels/{id}/messages/` | Read latest 50 / send message |
+| GET | `/api/channel-notifications/` | List accessible team channels with unread counts |
+| POST | `/api/channels/{id}/read/` | Advance cursor to a displayed channel message |
 | WS | `/ws/channels/{id}/` | Receive new messages (member-only) |
 
 JSON writes use `X-CSRFToken` with a first-party session cookie and the same-origin Vite proxy. Passwords are never returned by an API. Invitations save a SHA-256 hash, not the plaintext invite token. Team and channel membership are checked on each protected request and before every WebSocket delivery.
