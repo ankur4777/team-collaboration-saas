@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError as PasswordValidationError
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
 from django.db import transaction
+from django.http import JsonResponse
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -77,4 +78,4 @@ def change_password(request):
     request.user.set_password(new)
     request.user.save(update_fields=['password'])
     update_session_auth_hash(request, request.user)
-    return Response({'detail': 'Password changed. Other sessions must sign in again.'})
+    return JsonResponse({'detail': 'Password changed. Other sessions must sign in again.'})
