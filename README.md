@@ -8,6 +8,7 @@ This is a runnable **React + TypeScript frontend** and **Python Django + Django 
 
 - Company/workspace registration creates an organization and owner account.
 - Email + password login, CSRF-protected session authentication, logout and active workspace switching.
+- Signed-in employees can change their password after entering the current password, preserving the current session while invalidating other old-password sessions.
 - New accounts receive a signed, expiring email-verification link; existing accounts are marked verified during migration 0007 to preserve access. Invitation redemption verifies its invited address.
 - Request a password reset without revealing whether an account exists; use an expiring, single-use reset link to choose a new password.
 - Company membership roles: **owner**, **admin**, and **member**.
@@ -23,6 +24,7 @@ This is a runnable **React + TypeScript frontend** and **Python Django + Django 
 - Live typing indicators use authenticated, rate-limited WebSocket signals; the workspace bell shows unread-chat notifications, refreshed periodically (approximately 20 seconds).
 - Team channels now have independent per-member unread badges and explicit read cursors, scoped to current team and organization membership.
 - The notification bell includes unread team channels alongside private/group chats; clicking a channel notice opens the appropriate team and channel.
+- A real Settings page lets employees choose direct-chat, group-chat and channel alert visibility separately for each organization. Muting a bell category does not erase unread counts or disable messaging.
 - Removing a workspace member revokes their chat participation; if re-invited later, they start a new direct conversation rather than regaining previous private history.
 - Responsive React screens for registration, login, workspace, team navigation, channels, messages, member management, and invitations.
 - First automated Django API tests for registration/CSRF/logout, invitations, and cross-company isolation.
@@ -132,6 +134,16 @@ If an account is unverified, sign in and use the **Resend verification** banner.
 
 Production requires real SMTP or an approved transactional email provider, HTTPS `FRONTEND_ORIGIN`, an external/shared authentication rate-limit cache, valid SPF/DKIM/DMARC, and proper monitoring of email failures. The local console mail backend is for development only. Secret keys and SMTP passwords belong in server secrets/`.env`, never in Git.
 
+## Settings, notifications and account security
+
+Use **Settings** in the left sidebar. Under **In-app notifications**, toggle direct messages, group chats and team channels, then save. Preferences are separate for each company membership and only affect the notification bell; unread message badges and messages remain available. Notification refresh currently runs approximately every 20 seconds.
+
+Under **Account security**, check your verified email status and change your password by entering your current password and a new password. The current browser remains signed in; sessions authenticated with the old password are invalidated. Use **Forgot password** on the sign-in screen if you don't know your existing password.
+
+The update includes migration `0008_notification_preferences`. Run `git pull origin main`, rebuild `api` and `frontend`, and apply `python manage.py migrate` using Docker Compose. Existing users, messages, workspaces and notification counts are preserved.
+
+This is not a full notification-delivery service: desktop push, sound alerts, email digests, session management and MFA are still planned.
+
 ## Run without Docker (advanced)
 
 Run MySQL 8.4 and Redis first; create a MySQL database and user. Create `.env`, change `MYSQL_HOST=127.0.0.1`, `REDIS_URL=redis://127.0.0.1:6379/0`.
@@ -168,6 +180,8 @@ For WebSocket support, the backend must use ASGI (Daphne is installed and expose
 | POST | `/api/auth/login/` | Session login |
 | POST | `/api/auth/logout/` | Session logout |
 | GET | `/api/auth/me/` | Logged-in user and memberships |
+| POST | `/api/auth/password-change/` | Verify current password, update password and preserve current session |
+| GET/PATCH | `/api/notification-preferences/` | Active company's personal in-app alert preferences |
 | POST | `/api/auth/verify-email/` | Confirm one-time signed verification token (24-hour expiry) |
 | POST | `/api/auth/verify-email/resend/` | Signed-in user: resend verification email (rate-limited) |
 | POST | `/api/auth/password-reset/request/` | Request reset link with non-enumerating response |
