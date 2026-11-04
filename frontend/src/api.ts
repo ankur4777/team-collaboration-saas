@@ -5,7 +5,7 @@ export interface Team { id: string; name: string; description: string; created_a
 export interface Channel { id: string; name: string; description: string; created_at: string }
 export interface ChannelNotice {
   channel_id: string; channel_name: string; team_id: string; team_name: string;
-  unread_count: number; last_read_at: string|null;
+  joined_at: string; unread_count: number; last_read_at: string|null;
 }
 export interface Message { id: string; body: string; created_at: string; sender: Person }
 export interface ChatThread {
