@@ -215,3 +215,25 @@ class ChatMessage(models.Model):
 
     class Meta:
         ordering = ['created_at', 'id']
+
+
+class NotificationPreference(models.Model):
+    """In-app notification visibility per employee and organization.
+
+    This record is not an authorization grant. The active workspace membership
+    must be verified every time it is read or changed.
+    """
+    id = models.UUIDField(primary_key=True, default=make_id, editable=False)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='notification_preferences')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notification_preferences')
+    direct_chats = models.BooleanField(default=True)
+    group_chats = models.BooleanField(default=True)
+    team_channels = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['organization', 'user'], name='uq_notification_preference_user_org',
+            ),
+        ]
