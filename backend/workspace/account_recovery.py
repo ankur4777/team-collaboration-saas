@@ -21,6 +21,7 @@ from django.core import signing
 from django.core.cache import cache
 from django.core.exceptions import ValidationError as PasswordValidationError
 from django.core.mail import send_mail
+from django.db import transaction
 from django.http import JsonResponse
 from django.middleware.csrf import get_token
 from django.utils import timezone
@@ -118,13 +119,19 @@ def verify_email(request):
         return bad('Invalid or expired verification link', 400)
     if not isinstance(payload, dict):
         return bad('Invalid or expired verification link', 400)
-    user = User.objects.filter(pk=payload.get('uid'), email=payload.get('email')).first() if (
-        isinstance(payload.get('uid'), str) and isinstance(payload.get('email'), str)
-    ) else None
-    if not user or not user.is_active or user.email_verified_at:
-        return bad('Verification link has expired or has already been used', 400)
-    user.email_verified_at = timezone.now()
-    user.save(update_fields=['email_verified_at'])
+    if not (isinstance(payload.get('uid'), str) and isinstance(payload.get('email'), str)):
+        return bad('Invalid or expired verification link', 400)
+    try:
+        with transaction.atomic():
+            user = User.objects.select_for_update().filter(
+                pk=payload['uid'], email=payload['email'],
+            ).first()
+            if not user or not user.is_active or user.email_verified_at:
+                return bad('Verification link has expired or has already been used', 400)
+            user.email_verified_at = timezone.now()
+            user.save(update_fields=['email_verified_at'])
+    except (ValueError, TypeError, PasswordValidationError):
+        return bad('Invalid or expired verification link', 400)
     return JsonResponse({'detail': 'Your email is verified. You can now sign in.'})
 
 
@@ -172,15 +179,20 @@ def password_reset_confirm(request):
         return bad('Invalid or expired password reset link')
     try:
         user_id = force_str(urlsafe_base64_decode(uid))
-        user = User.objects.filter(pk=user_id, is_active=True).first()
+        with transaction.atomic():
+            # Recheck token while holding the row lock. Two requests cannot
+            # both consume the same recovery token concurrently.
+            user = User.objects.select_for_update().filter(
+                pk=user_id, is_active=True,
+            ).first()
+            if user is None or not default_token_generator.check_token(user, token):
+                return bad('Invalid or expired password reset link')
+            try:
+                validate_password(password, user=user)
+            except PasswordValidationError as exc:
+                return bad(' '.join(exc.messages))
+            user.set_password(password)
+            user.save(update_fields=['password'])
     except (ValueError, TypeError, UnicodeDecodeError, OverflowError):
-        user = None
-    if user is None or not default_token_generator.check_token(user, token):
         return bad('Invalid or expired password reset link')
-    try:
-        validate_password(password, user=user)
-    except PasswordValidationError as exc:
-        return bad(' '.join(exc.messages))
-    user.set_password(password)
-    user.save(update_fields=['password'])
     return JsonResponse({'detail': 'Password updated. Sign in using your new password.'})
