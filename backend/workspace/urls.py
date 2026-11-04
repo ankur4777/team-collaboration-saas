@@ -1,5 +1,5 @@
 from django.urls import path
-from . import auth_views, views, member_views, chat_views, channel_notifications
+from . import auth_views, views, member_views, chat_views, channel_notifications, account_recovery
 
 urlpatterns = [
     path('auth/csrf/', auth_views.csrf),
@@ -7,6 +7,10 @@ urlpatterns = [
     path('auth/login/', auth_views.sign_in),
     path('auth/logout/', auth_views.sign_out),
     path('auth/me/', auth_views.me),
+    path('auth/verify-email/', account_recovery.verify_email),
+    path('auth/verify-email/resend/', account_recovery.resend_verification),
+    path('auth/password-reset/request/', account_recovery.password_reset_request),
+    path('auth/password-reset/confirm/', account_recovery.password_reset_confirm),
     path('organizations/', views.OrganizationListView.as_view()),
     path('organizations/<uuid:pk>/activate/', views.ActivateOrganizationView.as_view()),
     path('organizations/<uuid:pk>/members/', views.OrganizationMembersView.as_view()),
