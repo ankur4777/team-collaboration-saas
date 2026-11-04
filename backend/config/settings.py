@@ -101,4 +101,6 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'TeamWorkspace <noreply@example.local>')
+PASSWORD_RESET_TIMEOUT = int(os.getenv('PASSWORD_RESET_TIMEOUT', '3600'))
+SECURE_REFERRER_POLICY = 'no-referrer'  # Account recovery links must not leak via Referer.
 # For first-party SPA via the Vite proxy; no wildcard credentialed CORS.
