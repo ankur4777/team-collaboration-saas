@@ -42,7 +42,8 @@ def set_active_org(request, user):
 def auth_payload(request):
     memberships = list(OrganizationMember.objects.filter(user=request.user).select_related('organization').order_by('joined_at'))
     return {
-        'user': {'id': str(request.user.id), 'email': request.user.email, 'full_name': request.user.full_name},
+        'user': {'id': str(request.user.id), 'email': request.user.email, 'full_name': request.user.full_name,
+                 'email_verified': request.user.email_verified_at is not None},
         'organizations': [{'id': str(m.organization_id), 'name': m.organization.name,
                            'slug': m.organization.slug, 'role': m.role} for m in memberships],
         'active_organization_id': request.session.get('active_organization_id'),
@@ -86,6 +87,8 @@ def register(request):
         return bad('Could not create account; please try another email', 409)
     login(request, user, backend='django.contrib.auth.backends.ModelBackend')
     request.session['active_organization_id'] = str(org.id)
+    from .account_recovery import send_verification_email
+    send_verification_email(user)
     return JsonResponse(auth_payload(request), status=201)
 
 
@@ -165,7 +168,12 @@ def invitation_accept(request, token):
                     validate_password(password, user=User(email=invite.email, full_name=full_name))
                 except ValidationError as exc:
                     return bad(' '.join(exc.messages))
-                user = User.objects.create_user(email=invite.email, password=password, full_name=full_name)
+                user = User.objects.create_user(email=invite.email, password=password, full_name=full_name,
+                                                email_verified_at=timezone.now())
+            # A successfully redeemed email invitation proves mailbox ownership.
+            if not user.email_verified_at:
+                user.email_verified_at = timezone.now()
+                user.save(update_fields=['email_verified_at'])
             OrganizationMember.objects.get_or_create(
                 organization=invite.organization, user=user, defaults={'role': invite.role})
             invite.accepted_at = timezone.now()

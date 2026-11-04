@@ -1,4 +1,4 @@
-export interface Person { id: string; email: string; full_name: string }
+export interface Person { id: string; email: string; full_name: string; email_verified: boolean }
 export interface Org { id: string; name: string; slug: string; role: 'owner' | 'admin' | 'member' }
 export interface Session { user: Person; organizations: Org[]; active_organization_id: string | null }
 export interface Team { id: string; name: string; description: string; created_at: string }
@@ -57,6 +57,11 @@ export const api = {
   me: () => request<Session>('auth/me/'),
   register: (body: {email:string; password:string;full_name:string;organization_name:string}) => secureLogin('auth/register/', body),
   login: (email: string, password: string) => secureLogin('auth/login/', {email, password}),
+  resendVerification: () => post<{detail:string}>('auth/verify-email/resend/', {}),
+  verifyEmail: (token:string) => post<{detail:string}>('auth/verify-email/', {token}),
+  requestPasswordReset: (email:string) => post<{detail:string}>('auth/password-reset/request/', {email}),
+  confirmPasswordReset: (uid:string, token:string, password:string) =>
+    post<{detail:string}>('auth/password-reset/confirm/', {uid,token,password}),
   logout: async () => { await post('auth/logout/', {}); await csrf(); },
   activate: (id: string) => post<Session>(`organizations/${id}/activate/`, {}),
   members: (id:string) => request<Member[]>(`organizations/${id}/members/`),

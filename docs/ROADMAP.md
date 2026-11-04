@@ -21,7 +21,7 @@
 ## Phase 1 — Finish authentication + access controls
 
 1. Verify migrations on real MySQL and all integration tests in Docker.
-2. Add verified-email onboarding, password reset and change-password flows.
+2. Implemented: signed email verification, registration/resend UI and password reset; still to do: authenticated password change, mandatory verified-email gate for mailbox connection and production SMTP.
 3. Add organization-member disable/remove, role changes, owner transfer and offboarding.
 4. Add organization settings, audit log, invite resend/revoke and tenant-specific quotas.
 5. Add distributed Redis authentication throttles and device/session management.
@@ -81,4 +81,4 @@
 
 ## High-priority next task
 
-**Validate channel unread counts and the combined notification bell with two employee accounts in local Docker;** then continue verified-email/account recovery, push notifications and shared files. Do not begin unrestricted mailbox integration before isolation and authentication tests are green.
+**Validate email verification and password reset links in local Docker, including console-email delivery;** next build notification preferences and authenticated password-change flow. Production SMTP, distributed throttles and verified-address enforcement must be completed before external mailbox integration.

@@ -8,6 +8,8 @@ This is a runnable **React + TypeScript frontend** and **Python Django + Django 
 
 - Company/workspace registration creates an organization and owner account.
 - Email + password login, CSRF-protected session authentication, logout and active workspace switching.
+- New accounts receive a signed, expiring email-verification link; existing accounts are marked verified during migration 0007 to preserve access. Invitation redemption verifies its invited address.
+- Request a password reset without revealing whether an account exists; use an expiring, single-use reset link to choose a new password.
 - Company membership roles: **owner**, **admin**, and **member**.
 - Employee invitations: hashed, expiring single-use links; email content goes to backend logs during local development.
 - Organization member listing, role updates (owner only), and removal with cross-tenant restrictions; administrators can remove regular members.
@@ -25,7 +27,7 @@ This is a runnable **React + TypeScript frontend** and **Python Django + Django 
 - Responsive React screens for registration, login, workspace, team navigation, channels, messages, member management, and invitations.
 - First automated Django API tests for registration/CSRF/logout, invitations, and cross-company isolation.
 
-**Not yet implemented:** Gmail/Outlook OAuth and synchronized inbox, read receipts, chat attachments, calendar, meetings, files, tasks, MFA, email verification, payments, audit trails, full login rate limiting, password reset and advanced admin workflows. Sidebar items for later phases are intentionally marked as coming soon.
+**Not yet implemented:** Gmail/Outlook OAuth and synchronized inbox, chat attachments, calendar, meetings, files, tasks, MFA, payments, audit trails, distributed login throttling, mandatory verification enforcement, password change while signed in, notification preferences and advanced admin workflows. Sidebar items for later phases are intentionally marked as coming soon.
 
 ## Requirements
 
@@ -116,6 +118,20 @@ Migration `0006_channel_read_cursors` records each team member's join date and a
 
 Channel unread counts exclude a user's own messages and messages before joining a team. The browser marks a channel read only after it has loaded a displayed message. Channel notifications currently refresh about every 20 seconds; live delivery continues for an open channel over WebSockets. System alerts, desktop pushes and notification preferences are future enhancements.
 
+## Email verification and password recovery
+
+New registrations send a verification email. In local development, the configured console mail backend prints the complete message (including the one-time link) to:
+
+```powershell
+docker compose logs api --tail=100
+```
+
+If an account is unverified, sign in and use the **Resend verification** banner. Visit the email link, click **Verify email**, and return to the workspace. For forgotten passwords, use **Forgot password?** from sign in; the reset link opens a form to enter a replacement password. Reset emails expire in 1 hour; verification emails expire in 24 hours. Password resets invalidate existing authenticated sessions because Django binds sessions to the password hash.
+
+**Upgrade:** Rebuild `api` and `frontend` and apply `workspace.0007_user_email_verified_at`. To prevent accidental lockout, accounts created before this migration are marked verified. New accounts start unverified. **Current policy:** unverified accounts can still access the workspace; a banner encourages verification, and mandatory verification for external mailbox connections remains a planned security gate.
+
+Production requires real SMTP or an approved transactional email provider, HTTPS `FRONTEND_ORIGIN`, an external/shared authentication rate-limit cache, valid SPF/DKIM/DMARC, and proper monitoring of email failures. The local console mail backend is for development only. Secret keys and SMTP passwords belong in server secrets/`.env`, never in Git.
+
 ## Run without Docker (advanced)
 
 Run MySQL 8.4 and Redis first; create a MySQL database and user. Create `.env`, change `MYSQL_HOST=127.0.0.1`, `REDIS_URL=redis://127.0.0.1:6379/0`.
@@ -152,6 +168,10 @@ For WebSocket support, the backend must use ASGI (Daphne is installed and expose
 | POST | `/api/auth/login/` | Session login |
 | POST | `/api/auth/logout/` | Session logout |
 | GET | `/api/auth/me/` | Logged-in user and memberships |
+| POST | `/api/auth/verify-email/` | Confirm one-time signed verification token (24-hour expiry) |
+| POST | `/api/auth/verify-email/resend/` | Signed-in user: resend verification email (rate-limited) |
+| POST | `/api/auth/password-reset/request/` | Request reset link with non-enumerating response |
+| POST | `/api/auth/password-reset/confirm/` | Set new password using expiring reset token |
 | POST | `/api/organizations/{id}/activate/` | Select active company membership |
 | GET | `/api/organizations/{id}/members/` | List active company's members |
 | PATCH | `/api/organizations/{id}/members/{member_id}/` | Owner: promote/demote member (admin/member) |
