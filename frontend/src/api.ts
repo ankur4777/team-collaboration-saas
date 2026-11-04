@@ -3,6 +3,10 @@ export interface Org { id: string; name: string; slug: string; role: 'owner' | '
 export interface Session { user: Person; organizations: Org[]; active_organization_id: string | null }
 export interface Team { id: string; name: string; description: string; created_at: string }
 export interface Channel { id: string; name: string; description: string; created_at: string }
+export interface ChannelNotice {
+  channel_id: string; channel_name: string; team_id: string; team_name: string;
+  joined_at: string; unread_count: number; last_read_at: string|null;
+}
 export interface Message { id: string; body: string; created_at: string; sender: Person }
 export interface ChatThread {
   id: string; kind: 'direct'|'group'; title: string;
@@ -73,6 +77,8 @@ export const api = {
   removeGroupParticipant: (chatId:string,userId:string) => request<void>(`chats/${chatId}/participants/${userId}/`,'DELETE'),
   teams: () => request<Team[]>('teams/'),
   createTeam: (name:string) => post<Team>('teams/', {name}),
+  channelNotifications: () => request<ChannelNotice[]>('channel-notifications/'),
+  markChannelRead: (channelId:string, messageId:string) => post<{last_read_at:string}>(`channels/${channelId}/read/`, {message_id:messageId}),
   channels: (teamId:string) => request<Channel[]>(`teams/${teamId}/channels/`),
   createChannel: (teamId:string, name:string) => post<Channel>(`teams/${teamId}/channels/`, {name}),
   teamMembers: (teamId:string) => request<Array<{user:Person;role:string}>>(`teams/${teamId}/members/`),

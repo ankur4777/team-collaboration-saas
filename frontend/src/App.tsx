@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Hash, Inbox, MessageCircle,
   LayoutGrid, LockKeyhole, LogOut, Mail, Menu, Plus, Send,
   Settings2, Sparkles, Users, Video, X, CalendarDays, FolderOpen } from 'lucide-react';
-import { api, csrf, type Channel, type Member, type Message, type Session, type Team } from './api';
+import { api, csrf, type Channel, type ChannelNotice, type Member, type Message, type Session, type Team } from './api';
 import ChatPanel from './ChatPanel';
 import ChatNotificationBell from './ChatNotificationBell';
 
@@ -86,6 +86,11 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   const [view,setView] = useState('teams'); const [teams,setTeams] = useState<Team[]>([]);
   const [openChatRequest,setOpenChatRequest] = useState<{id:string;nonce:number}|null>(null);
   const [notificationRefresh,setNotificationRefresh] = useState(0);
+  const [channelNotices,setChannelNotices] = useState<ChannelNotice[]>([]);
+  const currentOrgRef = useRef(session.active_organization_id);
+  currentOrgRef.current = session.active_organization_id;
+  const lastChannelReadRef = useRef<string|null>(null);
+  const [loadedChannelId,setLoadedChannelId] = useState<string|null>(null);
   const [selectedTeam,setSelectedTeam] = useState<string|null>(null);
   const [channels,setChannels] = useState<Channel[]>([]);const [selectedChannel,setSelectedChannel] = useState<string|null>(null);
   const [messages,setMessages] = useState<Message[]>([]); const [members,setMembers] = useState<Member[]>([]);
@@ -102,11 +107,43 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   const activeTeam = teams.find(t=>t.id===selectedTeam);
   const activeChannel = channels.find(c=>c.id===selectedChannel);
   const canInvite = activeOrg?.role === 'owner' || activeOrg?.role === 'admin';
+  const channelUnread = (id:string) => channelNotices.find(n=>n.channel_id===id)?.unread_count || 0;
+  const loadChannelNotices = useCallback(async()=>{
+    const organizationId = session.active_organization_id;
+    if(!organizationId){setChannelNotices([]);return;}
+    try{
+      const rows=await api.channelNotifications();
+      if(currentOrgRef.current===organizationId)setChannelNotices(rows);
+    }catch{/* Retain the last safe count until the next refresh. */}
+  },[session.active_organization_id]);
+
+  useEffect(()=>{
+    setChannelNotices([]);
+    void loadChannelNotices();
+    const timer=window.setInterval(()=>{void loadChannelNotices();},20000);
+    const focus=()=>{void loadChannelNotices();};
+    window.addEventListener('focus',focus);
+    return()=>{window.clearInterval(timer);window.removeEventListener('focus',focus);};
+  },[loadChannelNotices]);
 
   const loadTeams = useCallback(async()=>{ try {const rows=await api.teams();setTeams(rows);setSelectedTeam(current=>current && rows.some(t=>t.id===current)?current:(rows[0]?.id||null));}catch(e){setError(errorText(e));}},[]);
   useEffect(()=>{setTeams([]);setChannels([]);setSelectedTeam(null);setSelectedChannel(null);setMessages([]);loadTeams();if(session.active_organization_id)api.members(session.active_organization_id).then(setMembers).catch(()=>{});},[session.active_organization_id,loadTeams]);
   useEffect(()=>{if(!selectedTeam){setChannels([]);setSelectedChannel(null);return;}let valid=true;api.channels(selectedTeam).then(rows=>{if(!valid)return;setChannels(rows);setSelectedChannel(current=>current&&rows.some(c=>c.id===current)?current:rows[0]?.id||null);}).catch(e=>valid&&setError(errorText(e)));return()=>{valid=false;};},[selectedTeam]);
-  useEffect(()=>{if(!selectedChannel){setMessages([]);return;}let valid=true;setMessages([]);api.messages(selectedChannel).then(rows=>{if(valid)setMessages(rows);}).catch(e=>valid&&setError(errorText(e)));return()=>{valid=false;};},[selectedChannel]);
+  useEffect(()=>{
+    if(!selectedChannel){setMessages([]);setLoadedChannelId(null);return;}
+    let valid=true;
+    setMessages([]);
+    setLoadedChannelId(null);
+    api.messages(selectedChannel).then(rows=>{
+      if(!valid)return;
+      setMessages(previous=>{
+        const all=new Map([...rows,...previous].map(m=>[m.id,m]));
+        return [...all.values()].sort((a,b)=>a.created_at.localeCompare(b.created_at));
+      });
+      setLoadedChannelId(selectedChannel);
+    }).catch(e=>valid&&setError(errorText(e)));
+    return()=>{valid=false;};
+  },[selectedChannel]);
   useEffect(()=>{if(!selectedChannel)return;let open=true;setConnected(false);const protocol=location.protocol==='https:'?'wss:':'ws:';
     const socket=new WebSocket(`${protocol}//${location.host}/ws/channels/${selectedChannel}/`);
     socket.onopen=()=>{if(open)setConnected(true);};socket.onclose=()=>{if(open)setConnected(false);};
@@ -115,9 +152,38 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   },[selectedChannel]);
   useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:'smooth'});},[messages.length]);
 
+  const latestChannelMessage = messages[messages.length-1];
+  const latestChannelMessageId = latestChannelMessage?.id;
+  const currentChannelNotice = channelNotices.find(n=>n.channel_id===selectedChannel);
+  const currentChannelJoinDate = currentChannelNotice?.joined_at;
+  const markVisibleChannelRead=useCallback(()=>{
+    if(view!=='teams'||!selectedChannel||loadedChannelId!==selectedChannel||
+       !latestChannelMessageId||!latestChannelMessage||!currentChannelJoinDate||
+       document.visibilityState!=='visible')return;
+    if(new Date(latestChannelMessage.created_at).getTime()<new Date(currentChannelJoinDate).getTime())return;
+    const key=`${selectedChannel}:${latestChannelMessageId}`;
+    if(lastChannelReadRef.current===key)return;
+    lastChannelReadRef.current=key;
+    void api.markChannelRead(selectedChannel,latestChannelMessageId).then(()=>{
+      void loadChannelNotices();
+      setNotificationRefresh(v=>v+1);
+    }).catch(e=>{lastChannelReadRef.current=null;setError(errorText(e));});
+  },[view,selectedChannel,loadedChannelId,latestChannelMessageId,latestChannelMessage,currentChannelJoinDate,loadChannelNotices]);
+
+  useEffect(()=>{markVisibleChannelRead();},[markVisibleChannelRead]);
+  useEffect(()=>{
+    const onVisible=()=>markVisibleChannelRead();
+    document.addEventListener('visibilitychange',onVisible);
+    window.addEventListener('focus',onVisible);
+    return()=>{
+      document.removeEventListener('visibilitychange',onVisible);
+      window.removeEventListener('focus',onVisible);
+    };
+  },[markVisibleChannelRead]);
+
   async function action(fn:()=>Promise<unknown>, close=true){setError('');setPending(true);try{await fn();if(close)setModal(null);}catch(e){setError(errorText(e));}finally{setPending(false);}}
-  function createTeam(e:FormEvent){e.preventDefault();void action(async()=>{const team=await api.createTeam(newTeam);setNewTeam('');await loadTeams();setSelectedTeam(team.id);});}
-  function createChannel(e:FormEvent){e.preventDefault();if(!selectedTeam)return;void action(async()=>{const channel=await api.createChannel(selectedTeam,newChannel);setNewChannel('');const rows=await api.channels(selectedTeam);setChannels(rows);setSelectedChannel(channel.id);});}
+  function createTeam(e:FormEvent){e.preventDefault();void action(async()=>{const team=await api.createTeam(newTeam);setNewTeam('');await loadTeams();setSelectedTeam(team.id);void loadChannelNotices();});}
+  function createChannel(e:FormEvent){e.preventDefault();if(!selectedTeam)return;void action(async()=>{const channel=await api.createChannel(selectedTeam,newChannel);setNewChannel('');const rows=await api.channels(selectedTeam);setChannels(rows);setSelectedChannel(channel.id);void loadChannelNotices();});}
   function inviteEmployee(e:FormEvent){e.preventDefault();if(!activeOrg)return;void action(async()=>{const result=await api.invite(activeOrg.id,inviteEmail,inviteRole);setInviteResult(result.development_invite_url||'Invitation sent. Check the email (or backend console in development).');setInviteEmail('');await api.members(activeOrg.id).then(setMembers);},false);}
   function addTeamMember(e:FormEvent){e.preventDefault();if(!selectedTeam)return;void action(async()=>{await api.addTeamMember(selectedTeam,teamMemberEmail);setTeamMemberEmail('');});}
   async function changeMemberRole(member:Member, role:'admin'|'member') {if(!activeOrg || member.role===role)return;setError('');setMemberBusyId(member.id);try {await api.updateMemberRole(activeOrg.id,member.id,role);setMembers(await api.members(activeOrg.id));}catch(e){setError(errorText(e));}finally{setMemberBusyId(null);}}
@@ -133,16 +199,18 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
     <div className="sidebar-title">WORKSPACE</div><nav className="nav-list">{navItems.map(item=><button key={item.id} className={`nav-item ${view===item.id?'active':''}`} onClick={()=>{setView(item.id);setSidebarOpen(false);}}><item.icon size={18}/><span>{item.label}</span>{!item.ready&&<span className="soon-dot" title="Coming next"/>}</button>)}</nav>
     <div className="sidebar-title teams-title">YOUR TEAMS <button className="icon-button" aria-label="Create team" onClick={()=>{setError('');setModal('team');setView('teams');}}><Plus size={17}/></button></div>
     <div className="team-tree">{teams.map(team=><div key={team.id}><button className={`tree-team ${selectedTeam===team.id&&view==='teams'?'selected':''}`} onClick={()=>{setSelectedTeam(team.id);setView('teams');setSidebarOpen(false);}}><span className="tree-team-icon">{initials(team.name)}</span><span>{team.name}</span><ChevronDown size={13}/></button>
-      {selectedTeam===team.id&&view==='teams'&&channels.map(channel=><button className={`tree-channel ${selectedChannel===channel.id?'selected':''}`} key={channel.id} onClick={()=>setSelectedChannel(channel.id)}><Hash size={14}/>{channel.name}</button>)}</div>)}
+      {selectedTeam===team.id&&view==='teams'&&channels.map(channel=><button className={`tree-channel ${selectedChannel===channel.id?'selected':''}`} key={channel.id} onClick={()=>setSelectedChannel(channel.id)}><Hash size={14}/>{channel.name}{channelUnread(channel.id)>0&&<span className="channel-unread-count" aria-label={`${channelUnread(channel.id)} unread messages`}>{channelUnread(channel.id)>99?'99+':channelUnread(channel.id)}</span>}</button>)}</div>)}
     {teams.length===0&&<div className="sidebar-empty">Your teams will appear here.</div>}</div>
     <div className="sidebar-bottom"><button className="nav-item" onClick={()=>setModal('members')}><Users size={18}/>Members <span className="count-chip">{members.length}</span></button><button className="nav-item" onClick={()=>setView('settings')}><Settings2 size={18}/>Settings <span className="soon-dot"/></button><div className="profile"><div className="avatar">{initials(session.user.full_name)}</div><div className="profile-name"><strong>{session.user.full_name}</strong><small>{session.user.email}</small></div><button className="icon-button" aria-label="Log out" title="Log out" onClick={signOut}><LogOut size={18}/></button></div></div>
   </aside>
   {sidebarOpen&&<div className="mobile-shade" onClick={()=>setSidebarOpen(false)}/>}
-  <main className="main-panel"><header className="top-bar"><div className="top-bar-left"><button className="mobile-menu icon-button" onClick={()=>setSidebarOpen(true)}><Menu/></button><span className="crumb">Workspace</span><span className="crumb-divider">/</span><strong>{view==='teams'?(activeTeam?.name||'Teams'):navItems.find(n=>n.id===view)?.label||'Settings'}</strong></div><div className="top-bar-right"><span className="preview-pill"><span/> PHASE 2 PREVIEW</span><ChatNotificationBell workspaceId={session.active_organization_id} userId={session.user.id} refreshVersion={notificationRefresh} onOpenChat={id=>{setOpenChatRequest({id,nonce:Date.now()});setView('chats');setSidebarOpen(false);}}/><div className="top-avatar">{initials(session.user.full_name)}</div></div></header>
+  <main className="main-panel"><header className="top-bar"><div className="top-bar-left"><button className="mobile-menu icon-button" onClick={()=>setSidebarOpen(true)}><Menu/></button><span className="crumb">Workspace</span><span className="crumb-divider">/</span><strong>{view==='teams'?(activeTeam?.name||'Teams'):navItems.find(n=>n.id===view)?.label||'Settings'}</strong></div><div className="top-bar-right"><span className="preview-pill"><span/> PHASE 2 PREVIEW</span><ChatNotificationBell workspaceId={session.active_organization_id} userId={session.user.id} refreshVersion={notificationRefresh}
+          onOpenChat={id=>{setOpenChatRequest({id,nonce:Date.now()});setView('chats');setSidebarOpen(false);}}
+          onOpenChannel={(teamId,channelId)=>{setSelectedTeam(teamId);setSelectedChannel(channelId);setView('teams');setSidebarOpen(false);}}/><div className="top-avatar">{initials(session.user.full_name)}</div></div></header>
   {error&&<div className="floating-error"><ErrorBanner message={error} onClose={()=>setError('')}/></div>}
   {view==='teams' ? <>{!activeTeam?<div className="hero-empty"><Empty icon={<Users size={32}/>} title="Bring your team together" description="Create your first team to begin organizing conversations and projects." action={<button className="primary-button" onClick={()=>setModal('team')}><Plus size={17}/>Create your first team</button>}/></div>:
     <><div className="workspace-heading"><div><div className="eyebrow">YOUR WORKSPACE / TEAMS</div><h1>{activeTeam.name}</h1><p className="muted">Collaborate, share updates, and keep your team in sync.</p></div><div className="heading-actions"><button className="outline-button" onClick={()=>setModal('members')}><Users size={16}/> Manage members</button><button className="primary-button" onClick={()=>setModal('channel')}><Plus size={17}/> New channel</button></div></div>
-      <div className="chat-workspace"><section className="channels-panel"><div className="panel-title">CHANNELS <button className="icon-button" title="New channel" onClick={()=>setModal('channel')}><Plus size={17}/></button></div>{channels.map(ch=><button className={`channel-card ${selectedChannel===ch.id?'active':''}`} key={ch.id} onClick={()=>setSelectedChannel(ch.id)}><span className="channel-symbol"><Hash size={17}/></span><span>{ch.name}</span>{selectedChannel===ch.id&&<span className="selected-indicator"/>}</button>)}<div className="channel-help"><Sparkles size={18}/><strong>A place for every topic</strong><p>Create channels to keep discussions organized.</p></div></section>
+      <div className="chat-workspace"><section className="channels-panel"><div className="panel-title">CHANNELS <button className="icon-button" title="New channel" onClick={()=>setModal('channel')}><Plus size={17}/></button></div>{channels.map(ch=><button className={`channel-card ${selectedChannel===ch.id?'active':''}`} key={ch.id} onClick={()=>setSelectedChannel(ch.id)}><span className="channel-symbol"><Hash size={17}/></span><span>{ch.name}</span>{channelUnread(ch.id)>0&&<span className="channel-unread-count" aria-label={`${channelUnread(ch.id)} unread messages`}>{channelUnread(ch.id)>99?'99+':channelUnread(ch.id)}</span>}{selectedChannel===ch.id&&<span className="selected-indicator"/>}</button>)}<div className="channel-help"><Sparkles size={18}/><strong>A place for every topic</strong><p>Create channels to keep discussions organized.</p></div></section>
         <section className="conversation-panel">{activeChannel?<><div className="conversation-top"><div className="channel-avatar"><Hash size={23}/></div><div><h3>{activeChannel.name}</h3><p>{activeTeam.name} · {connected?'Live updates connected':'Messages are saved securely'}</p></div><span className={`connection-light ${connected?'online':''}`} title={connected?'WebSocket connected':'WebSocket disconnected'}/></div>
           <div className="message-area"><div className="channel-intro"><div className="channel-intro-mark"><Hash size={26}/></div><h2>Welcome to #{activeChannel.name}</h2><p>This is the beginning of the conversation in this channel.</p></div>
           <div className="message-list">{messages.map((message,index)=>{const previous=messages[index-1];const samePerson=previous?.sender.id===message.sender.id;return <div className={`message ${samePerson?'consecutive':''}`} key={message.id}>{!samePerson?<div className="msg-avatar">{initials(message.sender.full_name)}</div>:<div className="msg-avatar-placeholder"/>}<div className="msg-content">{!samePerson&&<div className="msg-meta"><strong>{message.sender.full_name}</strong><span>{relativeTime(message.created_at)}</span></div>}<div className="msg-body">{message.body}</div></div></div>;})}<div ref={bottomRef}/></div></div>
