@@ -1,4 +1,5 @@
 export interface Person { id: string; email: string; full_name: string; email_verified: boolean }
+export interface NotificationPreferences { direct_chats: boolean; group_chats: boolean; team_channels: boolean }
 export interface Org { id: string; name: string; slug: string; role: 'owner' | 'admin' | 'member' }
 export interface Session { user: Person; organizations: Org[]; active_organization_id: string | null }
 export interface Team { id: string; name: string; description: string; created_at: string }
@@ -62,6 +63,11 @@ export const api = {
   requestPasswordReset: (email:string) => post<{detail:string}>('auth/password-reset/request/', {email}),
   confirmPasswordReset: (uid:string, token:string, password:string) =>
     post<{detail:string}>('auth/password-reset/confirm/', {uid,token,password}),
+  changePassword: (current_password:string,new_password:string) =>
+    post<{detail:string}>('auth/password-change/',{current_password,new_password}),
+  notificationPreferences: () => request<NotificationPreferences>('notification-preferences/'),
+  saveNotificationPreferences: (values:Partial<NotificationPreferences>) =>
+    request<NotificationPreferences>('notification-preferences/','PATCH',values),
   logout: async () => { await post('auth/logout/', {}); await csrf(); },
   activate: (id: string) => post<Session>(`organizations/${id}/activate/`, {}),
   members: (id:string) => request<Member[]>(`organizations/${id}/members/`),
