@@ -145,3 +145,46 @@
 .verify-banner small{display:block;font-size:11px;margin-top:4px;color:#3c7e54}
 .verify-banner button{flex-shrink:0;font-size:11px}
 @media(max-width:600px){.recovery-card{padding:24px}.recovery-card h1{font-size:23px}.verify-banner{margin:9px 12px;align-items:flex-start;flex-wrap:wrap}.verify-banner button{margin-left:25px}}
+
+
+/* Employee account security and notification settings */
+.settings-page{padding:30px;overflow:auto;flex:1;color:#2b4d3c}
+.settings-title{margin-bottom:24px}
+.settings-title h1{font-size:27px;margin:7px 0 9px;color:#1c4836}
+.settings-title p{font-size:12px;color:#889d91}
+.settings-layout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start;max-width:1120px}
+.settings-card{padding:25px;border-radius:16px;border:1px solid #deebe3;background:#fff;box-shadow:0 6px 24px #1c493408}
+.settings-card-head{display:flex;gap:13px;align-items:flex-start;border-bottom:1px solid #e9f0eb;padding-bottom:19px}
+.settings-card-head>svg{color:#228b72;flex-shrink:0;margin-top:3px}
+.settings-card-head h2{font-size:16px;color:#254b3d}
+.settings-card-head p{font-size:11px;color:#8d9f94;margin-top:6px}
+.settings-options{display:flex;flex-direction:column}
+.settings-option{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:19px 0;border-bottom:1px solid #edf2ee;cursor:pointer}
+.settings-option span{min-width:0}
+.settings-option strong{display:block;font-size:13px;color:#2d503e}
+.settings-option small{display:block;font-size:11px;line-height:1.6;color:#8d9e93;margin-top:6px}
+.settings-option input[type=checkbox]{width:20px;height:20px;flex-shrink:0;accent-color:#299c7e;cursor:pointer}
+.settings-help{font-size:11px;color:#839a8b;line-height:1.7;margin:17px 0}
+.settings-card form>.primary-button{margin-top:7px}
+.settings-error,.settings-success{padding:11px;margin:10px 0;border-radius:9px;font-size:12px;line-height:1.6}
+.settings-error{color:#ac4b3a;background:#fff0ed}
+.settings-success{color:#257f61;background:#e9f6ee;display:flex;align-items:center;gap:7px}
+.settings-account{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:19px 0;border-bottom:1px solid #edf2ee}
+.settings-account strong,.settings-account small{display:block}
+.settings-account strong{font-size:13px}
+.settings-account small{font-size:11px;color:#8d9e93;margin-top:5px}
+.settings-verified{border-radius:16px;padding:6px 10px;display:inline-flex;align-items:center;gap:5px;font-size:10px;background:#fff4df;color:#a26d35}
+.settings-verified.yes{background:#e8f5ed;color:#238463}
+.settings-verify{padding:13px;margin-top:12px;background:#fbf9eb;border-radius:10px}
+.settings-verify p{font-size:12px;margin-bottom:10px}
+.settings-verify small{display:block;font-size:11px;color:#56765d;margin-top:8px}
+.settings-password-heading{display:flex;align-items:center;gap:9px;margin:21px 0 14px;color:#278569}
+.settings-password-heading h3{font-size:14px;color:#2b4e3a}
+.settings-password-form{display:flex;flex-direction:column;gap:12px}
+.settings-password-form label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:#415d4e}
+.settings-password-form input{border:1px solid #d8e7dd;border-radius:9px;padding:11px 12px;font-size:12px;outline:none;font-weight:400}
+.settings-password-form input:focus{border-color:#319c81}
+.settings-security-note{display:flex;align-items:center;gap:8px;border-top:1px solid #edf2ee;padding-top:15px}
+.settings-security-note svg{flex-shrink:0}
+@media(max-width:1000px){.settings-layout{grid-template-columns:1fr;max-width:680px}}
+@media(max-width:600px){.settings-page{padding:16px}.settings-card{padding:17px}.settings-title h1{font-size:22px}}
