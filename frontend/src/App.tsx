@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Check, ChevronDown, Hash, Inbox, MessageCircle,
 import { api, csrf, type Channel, type ChannelNotice, type Member, type Message, type Session, type Team } from './api';
 import ChatPanel from './ChatPanel';
 import ChatNotificationBell from './ChatNotificationBell';
+import AccountRecoveryScreen from './AccountRecoveryScreen';
 
 function initials(name: string) { return name.split(' ').filter(Boolean).slice(0, 2).map(t => t[0].toUpperCase()).join('') || 'TW'; }
 function errorText(error: unknown) { return error instanceof Error ? error.message : 'Something went wrong'; }
@@ -48,10 +49,11 @@ function AuthScreen({ onAuth }: {onAuth:(session:Session)=>void}) {
       {mode==='register' && <><label>Full name<input required maxLength={150} value={fullName} onChange={e=>setFullName(e.target.value)} placeholder="Your full name"/></label><label>Organization name<input required maxLength={140} value={orgName} onChange={e=>setOrgName(e.target.value)} placeholder="e.g. Acme Studio"/></label></>}
       <label>Work email<input type="email" autoComplete="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@company.com"/></label>
       <label>Password<input type="password" autoComplete={mode==='login'?'current-password':'new-password'} minLength={mode==='register'?10:undefined} required value={password} onChange={e=>setPassword(e.target.value)} placeholder={mode==='register'?'At least 10 characters':'Enter your password'}/></label>
+      {mode==='login'&&<div className="forgot-password-link"><a href="/forgot-password">Forgot password?</a></div>}
       <button type="submit" className="primary-button wide" disabled={busy}>{busy?<Spinner/>:mode==='register'?'Create workspace':'Sign in'} <ArrowRight size={17}/></button>
       <div className="auth-note"><LockKeyhole size={14}/> Your workspace data stays separate and protected.</div>
       <p className="auth-switch">{mode==='register'?'Have an account already?':'New to TeamWorkspace?'} <button type="button" className="text-link" onClick={()=>{setMode(mode==='login'?'register':'login');setError('');}}>{mode==='register'?'Sign in':'Create a workspace'}</button></p>
-    </form><div className="auth-footer">© 2026 TeamWorkspace · Phase 1 development preview</div>
+    </form><div className="auth-footer">© 2026 TeamWorkspace · Account security preview</div>
   </section></main>;
 }
 
@@ -72,6 +74,22 @@ function InviteScreen({ session, onDone, onBack }: {session:Session|null;onDone:
   {session && <p className="muted small">You are signed in as {session.user.email}. The invitation must match your account email.</p>}
   <button className="primary-button wide" disabled={busy}>{busy?<Spinner/>:'Accept invitation'} <ArrowRight size={16}/></button></form></>}
   </div></div>;
+}
+
+function EmailVerificationBanner() {
+  const [sending,setSending] = useState(false);
+  const [notice,setNotice] = useState('');
+  async function resend() {
+    setSending(true);
+    try { const result=await api.resendVerification();setNotice(result.detail); }
+    catch(e) { setNotice(errorText(e)); }
+    finally { setSending(false); }
+  }
+  return <div className="verify-banner">
+    <Mail size={18}/>
+    <div><strong>Please verify your email address</strong><p>We sent a confirmation link to your inbox. In development, check API container logs.</p>{notice&&<small role="status">{notice}</small>}</div>
+    <button type="button" className="outline-button" disabled={sending} onClick={()=>void resend()}>{sending?'Sending…':'Resend verification'}</button>
+  </div>;
 }
 
 const navItems = [
@@ -208,6 +226,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
           onOpenChat={id=>{setOpenChatRequest({id,nonce:Date.now()});setView('chats');setSidebarOpen(false);}}
           onOpenChannel={(teamId,channelId)=>{setSelectedTeam(teamId);setSelectedChannel(channelId);setView('teams');setSidebarOpen(false);}}/><div className="top-avatar">{initials(session.user.full_name)}</div></div></header>
   {error&&<div className="floating-error"><ErrorBanner message={error} onClose={()=>setError('')}/></div>}
+  {!session.user.email_verified&&<EmailVerificationBanner/>}
   {view==='teams' ? <>{!activeTeam?<div className="hero-empty"><Empty icon={<Users size={32}/>} title="Bring your team together" description="Create your first team to begin organizing conversations and projects." action={<button className="primary-button" onClick={()=>setModal('team')}><Plus size={17}/>Create your first team</button>}/></div>:
     <><div className="workspace-heading"><div><div className="eyebrow">YOUR WORKSPACE / TEAMS</div><h1>{activeTeam.name}</h1><p className="muted">Collaborate, share updates, and keep your team in sync.</p></div><div className="heading-actions"><button className="outline-button" onClick={()=>setModal('members')}><Users size={16}/> Manage members</button><button className="primary-button" onClick={()=>setModal('channel')}><Plus size={17}/> New channel</button></div></div>
       <div className="chat-workspace"><section className="channels-panel"><div className="panel-title">CHANNELS <button className="icon-button" title="New channel" onClick={()=>setModal('channel')}><Plus size={17}/></button></div>{channels.map(ch=><button className={`channel-card ${selectedChannel===ch.id?'active':''}`} key={ch.id} onClick={()=>setSelectedChannel(ch.id)}><span className="channel-symbol"><Hash size={17}/></span><span>{ch.name}</span>{channelUnread(ch.id)>0&&<span className="channel-unread-count" aria-label={`${channelUnread(ch.id)} unread messages`}>{channelUnread(ch.id)>99?'99+':channelUnread(ch.id)}</span>}{selectedChannel===ch.id&&<span className="selected-indicator"/>}</button>)}<div className="channel-help"><Sparkles size={18}/><strong>A place for every topic</strong><p>Create channels to keep discussions organized.</p></div></section>
@@ -235,8 +254,12 @@ export default function App() {
   const [session,setSession] = useState<Session|null|undefined>(undefined);
   const [bootError,setBootError] = useState('');
   const inviteMode = location.pathname === '/invite';
+  const recoveryMode = location.pathname === '/forgot-password' ? 'forgot'
+    : location.pathname === '/reset-password' ? 'reset'
+    : location.pathname === '/verify-email' ? 'verify' : null;
   useEffect(()=>{let active=true;csrf().then(()=>api.me()).then(s=>{if(active)setSession(s);}).catch(e=>{if(!active)return;if('status' in (e as object) && (e as {status:number}).status===401) setSession(null);else {setBootError(errorText(e));setSession(null);}});return()=>{active=false;};},[]);
   if(session===undefined)return <div className="page-loader"><Brand/><Spinner/><span>Preparing your workspace...</span></div>;
+  if(recoveryMode)return <AccountRecoveryScreen mode={recoveryMode}/>;
   if(inviteMode)return <InviteScreen session={session} onDone={s=>{setSession(s);history.replaceState({},'','/');}} onBack={()=>{location.href='/';}}/>;
   if(!session)return <>{bootError&&<div className="boot-error"><ErrorBanner message={bootError}/></div>}<AuthScreen onAuth={setSession}/></>;
   return <Workspace session={session} onSession={setSession} onLogout={()=>setSession(null)}/>;
