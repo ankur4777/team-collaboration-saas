@@ -122,6 +122,7 @@ class TeamMember(models.Model):
     team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='members')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='team_memberships')
     role = models.CharField(max_length=16, choices=Role.choices, default=Role.MEMBER)
+    joined_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=['team', 'user'], name='uq_team_user')]
@@ -147,6 +148,23 @@ class Message(models.Model):
 
     class Meta:
         ordering = ['created_at', 'id']
+
+
+class ChannelReadCursor(models.Model):
+    """Per-user read position in a team channel.
+
+    Membership of the team and organization is independently checked before
+    reading or updating this cursor. Old cursors never grant access.
+    """
+    id = models.UUIDField(primary_key=True, default=make_id, editable=False)
+    channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name='read_cursors')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='channel_read_cursors')
+    last_read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['channel', 'user'], name='uq_channel_read_user'),
+        ]
 
 
 class ChatConversation(models.Model):
