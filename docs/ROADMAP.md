@@ -21,7 +21,7 @@
 ## Phase 1 — Finish authentication + access controls
 
 1. Verify migrations on real MySQL and all integration tests in Docker.
-2. Implemented: signed email verification, registration/resend UI and password reset; still to do: authenticated password change, mandatory verified-email gate for mailbox connection and production SMTP.
+2. Implemented: signed email verification, registration/resend UI, password reset and authenticated change-password with old-session invalidation; still to do: mandatory verified-email gate for mailbox connection and production SMTP.
 3. Add organization-member disable/remove, role changes, owner transfer and offboarding.
 4. Add organization settings, audit log, invite resend/revoke and tenant-specific quotas.
 5. Add distributed Redis authentication throttles and device/session management.
@@ -36,6 +36,7 @@
 - Implemented: private-message edit and soft-delete, group creator management of participants, and join-time filtering of prior group messages.
 - Implemented: unread private-chat counts, per-member read cursors, read receipts, WebSocket typing indicators, and chat-only in-app notification bell.
 - Implemented: per-member channel read cursors, channel unread counts, channel badges and combined channel/chat in-app alerts with periodic refresh.
+- Implemented: per-user/per-workspace in-app bell preferences for direct messages, group chats and channels; account security Settings page.
 - Still planned: group creator transfer, group exit flow, push/email notifications, real-time global notification feed, richer persistent notification preferences, attachments, search, retention and file previews.
 
 ## Phase 2 — Real-time communication
@@ -81,4 +82,4 @@
 
 ## High-priority next task
 
-**Validate email verification and password reset links in local Docker, including console-email delivery;** next build notification preferences and authenticated password-change flow. Production SMTP, distributed throttles and verified-address enforcement must be completed before external mailbox integration.
+**Validate the new Settings page, password change and notification preferences with two users and two organizations in local Docker;** next work on production-grade notification delivery, session/device management, verified-address enforcement and Gmail/Outlook OAuth groundwork.
