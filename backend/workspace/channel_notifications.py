@@ -49,6 +49,7 @@ class ChannelNotificationsView(APIView):
                 'channel_name': channel.name,
                 'team_id': str(channel.team_id),
                 'team_name': channel.team.name,
+                'joined_at': joined_teams[channel.team_id].isoformat(),
                 'unread_count': count,
                 'last_read_at': last_read.isoformat() if last_read else None,
             })
