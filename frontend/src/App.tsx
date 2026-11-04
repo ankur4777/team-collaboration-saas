@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Hash, Inbox, MessageCircle,
   LayoutGrid, LockKeyhole, LogOut, Mail, Menu, Plus, Send,
   Settings2, Sparkles, Users, Video, X, CalendarDays, FolderOpen } from 'lucide-react';
-import { api, csrf, type Channel, type Member, type Message, type Session, type Team } from './api';
+import { api, csrf, type Channel, type ChannelNotice, type Member, type Message, type Session, type Team } from './api';
 import ChatPanel from './ChatPanel';
 import ChatNotificationBell from './ChatNotificationBell';
 
@@ -86,6 +86,11 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   const [view,setView] = useState('teams'); const [teams,setTeams] = useState<Team[]>([]);
   const [openChatRequest,setOpenChatRequest] = useState<{id:string;nonce:number}|null>(null);
   const [notificationRefresh,setNotificationRefresh] = useState(0);
+  const [channelNotices,setChannelNotices] = useState<ChannelNotice[]>([]);
+  const currentOrgRef = useRef(session.active_organization_id);
+  currentOrgRef.current = session.active_organization_id;
+  const lastChannelReadRef = useRef<string|null>(null);
+  const [loadedChannelId,setLoadedChannelId] = useState<string|null>(null);
   const [selectedTeam,setSelectedTeam] = useState<string|null>(null);
   const [channels,setChannels] = useState<Channel[]>([]);const [selectedChannel,setSelectedChannel] = useState<string|null>(null);
   const [messages,setMessages] = useState<Message[]>([]); const [members,setMembers] = useState<Member[]>([]);
@@ -102,11 +107,43 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   const activeTeam = teams.find(t=>t.id===selectedTeam);
   const activeChannel = channels.find(c=>c.id===selectedChannel);
   const canInvite = activeOrg?.role === 'owner' || activeOrg?.role === 'admin';
+  const channelUnread = (id:string) => channelNotices.find(n=>n.channel_id===id)?.unread_count || 0;
+  const loadChannelNotices = useCallback(async()=>{
+    const organizationId = session.active_organization_id;
+    if(!organizationId){setChannelNotices([]);return;}
+    try{
+      const rows=await api.channelNotifications();
+      if(currentOrgRef.current===organizationId)setChannelNotices(rows);
+    }catch{/* Retain the last safe count until the next refresh. */}
+  },[session.active_organization_id]);
+
+  useEffect(()=>{
+    setChannelNotices([]);
+    void loadChannelNotices();
+    const timer=window.setInterval(()=>{void loadChannelNotices();},20000);
+    const focus=()=>{void loadChannelNotices();};
+    window.addEventListener('focus',focus);
+    return()=>{window.clearInterval(timer);window.removeEventListener('focus',focus);};
+  },[loadChannelNotices]);
 
   const loadTeams = useCallback(async()=>{ try {const rows=await api.teams();setTeams(rows);setSelectedTeam(current=>current && rows.some(t=>t.id===current)?current:(rows[0]?.id||null));}catch(e){setError(errorText(e));}},[]);
   useEffect(()=>{setTeams([]);setChannels([]);setSelectedTeam(null);setSelectedChannel(null);setMessages([]);loadTeams();if(session.active_organization_id)api.members(session.active_organization_id).then(setMembers).catch(()=>{});},[session.active_organization_id,loadTeams]);
   useEffect(()=>{if(!selectedTeam){setChannels([]);setSelectedChannel(null);return;}let valid=true;api.channels(selectedTeam).then(rows=>{if(!valid)return;setChannels(rows);setSelectedChannel(current=>current&&rows.some(c=>c.id===current)?current:rows[0]?.id||null);}).catch(e=>valid&&setError(errorText(e)));return()=>{valid=false;};},[selectedTeam]);
-  useEffect(()=>{if(!selectedChannel){setMessages([]);return;}let valid=true;setMessages([]);api.messages(selectedChannel).then(rows=>{if(valid)setMessages(rows);}).catch(e=>valid&&setError(errorText(e)));return()=>{valid=false;};},[selectedChannel]);
+  useEffect(()=>{
+    if(!selectedChannel){setMessages([]);setLoadedChannelId(null);return;}
+    let valid=true;
+    setMessages([]);
+    setLoadedChannelId(null);
+    api.messages(selectedChannel).then(rows=>{
+      if(!valid)return;
+      setMessages(previous=>{
+        const all=new Map([...rows,...previous].map(m=>[m.id,m]));
+        return [...all.values()].sort((a,b)=>a.created_at.localeCompare(b.created_at));
+      });
+      setLoadedChannelId(selectedChannel);
+    }).catch(e=>valid&&setError(errorText(e)));
+    return()=>{valid=false;};
+  },[selectedChannel]);
   useEffect(()=>{if(!selectedChannel)return;let open=true;setConnected(false);const protocol=location.protocol==='https:'?'wss:':'ws:';
     const socket=new WebSocket(`${protocol}//${location.host}/ws/channels/${selectedChannel}/`);
     socket.onopen=()=>{if(open)setConnected(true);};socket.onclose=()=>{if(open)setConnected(false);};
@@ -114,6 +151,35 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
     return()=>{open=false;socket.close();};
   },[selectedChannel]);
   useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:'smooth'});},[messages.length]);
+
+  const latestChannelMessage = messages[messages.length-1];
+  const latestChannelMessageId = latestChannelMessage?.id;
+  const currentChannelNotice = channelNotices.find(n=>n.channel_id===selectedChannel);
+  const currentChannelJoinDate = currentChannelNotice?.joined_at;
+  const markVisibleChannelRead=useCallback(()=>{
+    if(view!=='teams'||!selectedChannel||loadedChannelId!==selectedChannel||
+       !latestChannelMessageId||!latestChannelMessage||!currentChannelJoinDate||
+       document.visibilityState!=='visible')return;
+    if(new Date(latestChannelMessage.created_at).getTime()<new Date(currentChannelJoinDate).getTime())return;
+    const key=`${selectedChannel}:${latestChannelMessageId}`;
+    if(lastChannelReadRef.current===key)return;
+    lastChannelReadRef.current=key;
+    void api.markChannelRead(selectedChannel,latestChannelMessageId).then(()=>{
+      void loadChannelNotices();
+      setNotificationRefresh(v=>v+1);
+    }).catch(e=>{lastChannelReadRef.current=null;setError(errorText(e));});
+  },[view,selectedChannel,loadedChannelId,latestChannelMessageId,latestChannelMessage,currentChannelJoinDate,loadChannelNotices]);
+
+  useEffect(()=>{markVisibleChannelRead();},[markVisibleChannelRead]);
+  useEffect(()=>{
+    const onVisible=()=>markVisibleChannelRead();
+    document.addEventListener('visibilitychange',onVisible);
+    window.addEventListener('focus',onVisible);
+    return()=>{
+      document.removeEventListener('visibilitychange',onVisible);
+      window.removeEventListener('focus',onVisible);
+    };
+  },[markVisibleChannelRead]);
 
   async function action(fn:()=>Promise<unknown>, close=true){setError('');setPending(true);try{await fn();if(close)setModal(null);}catch(e){setError(errorText(e));}finally{setPending(false);}}
   function createTeam(e:FormEvent){e.preventDefault();void action(async()=>{const team=await api.createTeam(newTeam);setNewTeam('');await loadTeams();setSelectedTeam(team.id);});}
