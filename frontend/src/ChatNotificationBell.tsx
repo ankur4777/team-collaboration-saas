@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Bell, Hash, MessageCircle, X } from 'lucide-react';
-import { api, type ChannelNotice, type ChatThread } from './api';
+import { api, type ChannelNotice, type ChatThread, type NotificationPreferences } from './api';
 
 interface Props {
   workspaceId: string|null;
@@ -18,6 +18,7 @@ function chatTitle(thread:ChatThread,userId:string) {
 export default function ChatNotificationBell({workspaceId,userId,onOpenChat,onOpenChannel,refreshVersion=0}:Props) {
   const [threads,setThreads] = useState<ChatThread[]>([]);
   const [channels,setChannels] = useState<ChannelNotice[]>([]);
+  const [preferences,setPreferences] = useState<NotificationPreferences>({direct_chats:true,group_chats:true,team_channels:true});
   const [open,setOpen] = useState(false);
   const [error,setError] = useState('');
   const latestId = useRef(workspaceId);
@@ -26,10 +27,11 @@ export default function ChatNotificationBell({workspaceId,userId,onOpenChat,onOp
   const refresh = useCallback(async()=>{
     if(!workspaceId){setThreads([]);setChannels([]);return;}
     try{
-      const [chatRows,channelRows] = await Promise.all([api.chats(),api.channelNotifications()]);
+      const [chatRows,channelRows,settings] = await Promise.all([api.chats(),api.channelNotifications(),api.notificationPreferences()]);
       if(latestId.current!==workspaceId)return;
       setThreads(chatRows);
       setChannels(channelRows);
+      setPreferences(settings);
       setError('');
     }catch(e){
       if(latestId.current===workspaceId)setError(e instanceof Error?e.message:'Could not load notifications');
@@ -39,6 +41,7 @@ export default function ChatNotificationBell({workspaceId,userId,onOpenChat,onOp
   useEffect(()=>{
     setThreads([]);
     setChannels([]);
+    setPreferences({direct_chats:true,group_chats:true,team_channels:true});
     setOpen(false);
     void refresh();
     const interval = window.setInterval(()=>{void refresh();},20000);
@@ -49,8 +52,8 @@ export default function ChatNotificationBell({workspaceId,userId,onOpenChat,onOp
 
   useEffect(()=>{if(refreshVersion>0)void refresh();},[refreshVersion,refresh]);
 
-  const unreadChats=threads.filter(t=>t.unread_count>0);
-  const unreadChannels=channels.filter(c=>c.unread_count>0);
+  const unreadChats=threads.filter(t=>t.unread_count>0 && (t.kind==='direct'?preferences.direct_chats:preferences.group_chats));
+  const unreadChannels=channels.filter(c=>c.unread_count>0&&preferences.team_channels);
   const unreadCount=unreadChats.reduce((sum,t)=>sum+t.unread_count,0)
     +unreadChannels.reduce((sum,c)=>sum+c.unread_count,0);
 
@@ -71,7 +74,7 @@ export default function ChatNotificationBell({workspaceId,userId,onOpenChat,onOp
           <Hash size={18}/><span><strong>#{c.channel_name}</strong><small>{c.team_name} · Team channel</small></span><b>{c.unread_count}</b>
         </button>)}
       </div> : <div className="notification-empty">No unread conversations in this workspace.</div>}
-      <div className="notification-foot">Notifications refresh about every 20 seconds.</div>
+      <div className="notification-foot">In-app alerts refresh about every 20 seconds. Manage alert types in Settings.</div>
     </div>}
   </div>;
 }
