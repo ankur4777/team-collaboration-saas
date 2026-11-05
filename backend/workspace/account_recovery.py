@@ -193,6 +193,8 @@ def password_reset_confirm(request):
                 return bad(' '.join(exc.messages))
             user.set_password(password)
             user.save(update_fields=['password'])
+            from .device_sessions import revoke_every_session_for_user
+            revoke_every_session_for_user(user)
     except (ValueError, TypeError, UnicodeDecodeError, OverflowError):
         return bad('Invalid or expired password reset link')
     return JsonResponse({'detail': 'Password updated. Sign in using your new password.'})

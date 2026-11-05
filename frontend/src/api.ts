@@ -1,5 +1,9 @@
 export interface Person { id: string; email: string; full_name: string; email_verified: boolean }
 export interface NotificationPreferences { direct_chats: boolean; group_chats: boolean; team_channels: boolean }
+export interface AccountDeviceSession {
+  id:string; user_agent:string; ip_address:string|null;
+  created_at:string; last_seen_at:string; current:boolean;
+}
 export interface Org { id: string; name: string; slug: string; role: 'owner' | 'admin' | 'member' }
 export interface Session { user: Person; organizations: Org[]; active_organization_id: string | null }
 export interface Team { id: string; name: string; description: string; created_at: string }
@@ -63,6 +67,9 @@ export const api = {
   requestPasswordReset: (email:string) => post<{detail:string}>('auth/password-reset/request/', {email}),
   confirmPasswordReset: (uid:string, token:string, password:string) =>
     post<{detail:string}>('auth/password-reset/confirm/', {uid,token,password}),
+  activeSessions: () => request<AccountDeviceSession[]>('auth/sessions/'),
+  signOutDevice: (id:string) => request<void>(`auth/sessions/${id}/`,'DELETE'),
+  signOutOtherDevices: () => post<{detail:string}>('auth/sessions/sign-out-others/', {}),
   changePassword: (current_password:string,new_password:string) =>
     post<{detail:string}>('auth/password-change/',{current_password,new_password}),
   notificationPreferences: () => request<NotificationPreferences>('notification-preferences/'),

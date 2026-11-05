@@ -3,6 +3,7 @@ from channels.db import database_sync_to_async
 from django.utils.dateparse import parse_datetime
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from .models import Channel, TeamMember, OrganizationMember, ChatConversation, ChatParticipant
+from .device_sessions import GENERATION_KEY, live_websocket_session
 
 
 class ChannelConsumer(AsyncJsonWebsocketConsumer):
@@ -42,6 +43,11 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def allowed(self, user_id, channel_id, organization_id):
+        session = self.scope.get('session')
+        if not session or not live_websocket_session(
+            user_id, session.session_key, session.get(GENERATION_KEY),
+        ):
+            return False
         return (Channel.objects.filter(
             id=channel_id, team__organization_id=organization_id,
             team__members__user_id=user_id,
@@ -163,6 +169,11 @@ class PrivateChatConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def allowed(self, user_id, chat_id, organization_id):
+        session = self.scope.get('session')
+        if not session or not live_websocket_session(
+            user_id, session.session_key, session.get(GENERATION_KEY),
+        ):
+            return False
         return ChatConversation.objects.filter(
             pk=chat_id,
             organization_id=organization_id,

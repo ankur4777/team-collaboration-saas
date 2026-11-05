@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Bell, CheckCircle2, KeyRound, LockKeyhole, MailCheck, ShieldCheck } from 'lucide-react';
-import { api, type NotificationPreferences, type Person } from './api';
+import { Bell, CheckCircle2, KeyRound, LockKeyhole, MailCheck, ShieldCheck, Laptop, RefreshCw } from 'lucide-react';
+import { api, type AccountDeviceSession, type NotificationPreferences, type Person } from './api';
 
 const initialPrefs:NotificationPreferences={direct_chats:true,group_chats:true,team_channels:true};
 const options: Array<{key:keyof NotificationPreferences;title:string;description:string}>=[
@@ -16,6 +16,12 @@ interface Props{
   onPreferencesSaved:()=>void;
 }
 function errorText(err:unknown) {return err instanceof Error?err.message:'Something went wrong';}
+function deviceName(agent:string){
+  const browser = /Edg\//.test(agent)?'Edge':/Firefox\//.test(agent)?'Firefox':/Chrome\//.test(agent)?'Chrome':/Safari\//.test(agent)?'Safari':'Browser';
+  const platform = /Windows/.test(agent)?'Windows':/Macintosh/.test(agent)?'macOS':/Android/.test(agent)?'Android':/iPhone|iPad/.test(agent)?'iOS':'Unknown device';
+  return `${browser} · ${platform}`;
+}
+function dateTime(value:string){return new Date(value).toLocaleString();}
 
 export default function SettingsPanel({workspaceId,workspaceName,user,onPreferencesSaved}:Props){
   const [prefs,setPrefs]=useState<NotificationPreferences>(initialPrefs);
@@ -31,6 +37,11 @@ export default function SettingsPanel({workspaceId,workspaceName,user,onPreferen
   const [passwordError,setPasswordError]=useState('');
   const [resending,setResending]=useState(false);
   const [verifyMessage,setVerifyMessage]=useState('');
+  const [devices,setDevices]=useState<AccountDeviceSession[]>([]);
+  const [devicesLoading,setDevicesLoading]=useState(true);
+  const [deviceBusy,setDeviceBusy]=useState<string|null>(null);
+  const [deviceMessage,setDeviceMessage]=useState('');
+  const [deviceError,setDeviceError]=useState('');
 
   useEffect(()=>{
     let active=true;
@@ -42,6 +53,41 @@ export default function SettingsPanel({workspaceId,workspaceName,user,onPreferen
     return()=>{active=false;};
   },[workspaceId]);
 
+  useEffect(()=>{
+    let active=true;
+    void api.activeSessions().then(rows=>{if(active)setDevices(rows);})
+      .catch(e=>{if(active)setDeviceError(errorText(e));})
+      .finally(()=>{if(active)setDevicesLoading(false);});
+    return()=>{active=false;};
+  },[]);
+
+  async function refreshDevices(){
+    try{
+      const rows=await api.activeSessions();
+      setDevices(rows);
+      setDeviceError('');
+    }catch(e){setDeviceError(errorText(e));}
+  }
+  async function endDevice(device:AccountDeviceSession){
+    if(device.current||deviceBusy||!window.confirm('Sign out this device?'))return;
+    setDeviceBusy(device.id);setDeviceError('');setDeviceMessage('');
+    try{
+      await api.signOutDevice(device.id);
+      setDeviceMessage('The selected device was signed out.');
+      await refreshDevices();
+    }catch(e){setDeviceError(errorText(e));}
+    finally{setDeviceBusy(null);}
+  }
+  async function endOtherDevices(){
+    if(deviceBusy||!window.confirm('Sign out all other browsers and devices?'))return;
+    setDeviceBusy('others');setDeviceError('');setDeviceMessage('');
+    try{
+      const result=await api.signOutOtherDevices();
+      setDeviceMessage(result.detail);
+      await refreshDevices();
+    }catch(e){setDeviceError(errorText(e));}
+    finally{setDeviceBusy(null);}
+  }
   async function savePreferences(e:FormEvent){
     e.preventDefault();if(saving||loading)return;
     setSaving(true);setPreferencesError('');setPreferencesMessage('');
@@ -63,6 +109,7 @@ export default function SettingsPanel({workspaceId,workspaceName,user,onPreferen
       const result=await api.changePassword(currentPassword,newPassword);
       setPasswordMessage(result.detail);
       setCurrentPassword('');setNewPassword('');setRepeatPassword('');
+      void refreshDevices();
     }catch(e){setPasswordError(errorText(e));}
     finally{setChanging(false);}
   }
@@ -113,5 +160,33 @@ export default function SettingsPanel({workspaceId,workspaceName,user,onPreferen
         <div className="settings-help settings-security-note"><LockKeyhole size={15}/>Your current session stays signed in after updating your password. Other sessions must sign in again.</div>
       </section>
     </div>
+    <section className="settings-card settings-devices">
+      <div className="settings-card-head"><Laptop size={19}/><div><h2>Active sessions & devices</h2>
+        <p>Review browsers signed in to your account, across all company workspaces.</p></div></div>
+      <div className="devices-actions">
+        <button type="button" className="outline-button" onClick={()=>void refreshDevices()} disabled={deviceBusy!==null}><RefreshCw size={15}/> Refresh</button>
+        <button type="button" className="outline-button" onClick={()=>void endOtherDevices()} disabled={deviceBusy!==null}>
+          {deviceBusy==='others'?'Signing out…':'Sign out other devices'}
+        </button>
+      </div>
+      {deviceError&&<p className="settings-error" role="alert">{deviceError}</p>}
+      {deviceMessage&&<p className="settings-success" role="status">{deviceMessage}</p>}
+      <div className="devices-list">
+        {devicesLoading&&<p className="settings-help">Loading signed-in devices…</p>}
+        {!devicesLoading&&devices.length===0&&<p className="settings-help">No active sessions found. Refresh after signing in.</p>}
+        {devices.map(device=><div className="device-row" key={device.id}>
+          <div className="device-icon"><Laptop size={18}/></div>
+          <div className="device-details"><strong>{deviceName(device.user_agent)}</strong>
+            {device.current&&<span className="device-current">This device</span>}
+            <small>Last seen: {dateTime(device.last_seen_at)} · Signed in: {dateTime(device.created_at)}</small>
+            {device.ip_address&&<small>IP: {device.ip_address}</small>}
+          </div>
+          {!device.current&&<button type="button" className="device-revoke" disabled={deviceBusy!==null} onClick={()=>void endDevice(device)}>
+            {deviceBusy===device.id?'Signing out…':'Sign out'}
+          </button>}
+        </div>)}
+      </div>
+      <p className="settings-help">Device names are estimated from browser information. Sessions are tracked from their first use after this feature is installed. Signing out other devices invalidates previous sessions, even those not listed here.</p>
+    </section>
   </div>;
 }

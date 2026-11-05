@@ -24,7 +24,7 @@
 2. Implemented: signed email verification, registration/resend UI, password reset and authenticated change-password with old-session invalidation; still to do: mandatory verified-email gate for mailbox connection and production SMTP.
 3. Add organization-member disable/remove, role changes, owner transfer and offboarding.
 4. Add organization settings, audit log, invite resend/revoke and tenant-specific quotas.
-5. Add distributed Redis authentication throttles and device/session management.
+5. Implemented: account-wide session registry, individual device sign-out, revoke-all-others and authorization-generation checks for WebSockets. Still planned: Redis-distributed authentication throttles, device names from trusted clients, automatic expired-session cleanup and advanced session history.
 6. Add MFA and SSO groundwork for later enterprise plans.
 
 **Acceptance:** Company A cannot query, mutate or subscribe to Company B resources; a removed member immediately loses data and WebSocket access; CSRF and permission tests pass.
@@ -82,4 +82,4 @@
 
 ## High-priority next task
 
-**Validate the new Settings page, password change and notification preferences with two users and two organizations in local Docker;** next work on production-grade notification delivery, session/device management, verified-address enforcement and Gmail/Outlook OAuth groundwork.
+**Validate account-wide device lists and remote sign-out in two browsers, including live chats, after migration 0009.** Then prioritize production notification delivery, trusted proxy configuration, verified-address enforcement, MFA groundwork and Gmail/Outlook OAuth.

@@ -46,6 +46,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     email_verified_at = models.DateTimeField(null=True, blank=True)
+    # Rotating this number invalidates every prior session, including pre-upgrade ones.
+    session_generation = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     objects = UserManager()
     USERNAME_FIELD = 'email'
@@ -237,3 +239,22 @@ class NotificationPreference(models.Model):
                 fields=['organization', 'user'], name='uq_notification_preference_user_org',
             ),
         ]
+
+
+class AccountSession(models.Model):
+    """A login session belonging to a user, never scoped to only one company.
+
+    The Django session in django_session remains the source of authentication.
+    This metadata record only enables listing and revocation by the user.
+    """
+    id = models.UUIDField(primary_key=True, default=make_id, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='account_sessions')
+    session_key = models.CharField(max_length=40, unique=True)
+    user_agent = models.CharField(max_length=255, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-last_seen_at', '-created_at']

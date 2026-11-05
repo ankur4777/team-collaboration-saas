@@ -115,6 +115,8 @@ def sign_in(request):
 @require_http_methods(['POST'])
 @csrf_protect
 def sign_out(request):
+    from .device_sessions import signed_out
+    signed_out(request)
     logout(request)
     return JsonResponse({'detail': 'Signed out'})
 
