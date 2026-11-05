@@ -110,3 +110,22 @@ class SessionSecurityMiddleware:
             request.session[GENERATION_KEY] = request.user.session_generation
             register_activity(request)
         return response
+
+
+def live_websocket_session(user_id, session_key, generation):
+    """Recheck session validity before publishing messages to a socket.
+
+    The ASGI auth scope persists after handshake; revoked sessions must not
+    continue receiving channel/chat events merely because membership remains.
+    """
+    if not session_key:
+        return False
+    if not Session.objects.filter(
+        session_key=session_key, expire_date__gt=timezone.now(),
+    ).exists():
+        return False
+    effective_generation = 0 if generation is None else generation
+    return User.objects.filter(
+        pk=user_id, is_active=True,
+        session_generation=effective_generation,
+    ).exists()
