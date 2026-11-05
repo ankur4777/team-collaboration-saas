@@ -188,3 +188,19 @@
 .settings-security-note svg{flex-shrink:0}
 @media(max-width:1000px){.settings-layout{grid-template-columns:1fr;max-width:680px}}
 @media(max-width:600px){.settings-page{padding:16px}.settings-card{padding:17px}.settings-title h1{font-size:22px}}
+
+
+/* Account-wide active sessions and device management */
+.settings-devices{max-width:1120px;margin-top:20px}
+.devices-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;margin:17px 0}
+.devices-actions button{display:inline-flex;align-items:center;gap:7px;font-size:11px}
+.devices-list{border-top:1px solid #e7efe9}
+.device-row{display:flex;align-items:center;gap:12px;padding:17px 4px;border-bottom:1px solid #edf2ee}
+.device-icon{flex:0 0 auto;width:36px;height:36px;border-radius:10px;background:#ebf7f0;display:grid;place-items:center;color:#24866b}
+.device-details{flex:1;min-width:0}
+.device-details strong{font-size:12px;color:#2a5945}
+.device-details small{display:block;margin-top:5px;font-size:10px;color:#83988d;overflow-wrap:anywhere}
+.device-current{display:inline-flex;border-radius:12px;margin-left:9px;background:#e4f4e9;color:#258363;font-size:10px;padding:4px 7px;font-weight:700}
+.device-revoke{border:1px solid #f0d2cc;background:#fff7f4;color:#a75a48;padding:8px 10px;border-radius:9px;font-size:11px;font-weight:700;white-space:nowrap}
+.device-revoke:hover{background:#ffebe5}
+@media(max-width:600px){.settings-devices{margin-top:14px}.device-row{align-items:flex-start;flex-wrap:wrap}.device-details{min-width:170px}.device-revoke{margin-left:47px}.devices-actions{justify-content:flex-start}.device-current{margin-left:4px}}
