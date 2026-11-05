@@ -12,6 +12,11 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.AddField(
+            model_name='user',
+            name='session_generation',
+            field=models.PositiveIntegerField(default=0),
+        ),
         migrations.CreateModel(
             name='AccountSession',
             fields=[
