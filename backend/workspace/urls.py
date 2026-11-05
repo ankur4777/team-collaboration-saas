@@ -1,5 +1,5 @@
 from django.urls import path
-from . import auth_views, views, member_views, chat_views, channel_notifications, account_recovery, settings_views
+from . import auth_views, views, member_views, chat_views, channel_notifications, account_recovery, settings_views, session_views
 
 urlpatterns = [
     path('auth/csrf/', auth_views.csrf),
