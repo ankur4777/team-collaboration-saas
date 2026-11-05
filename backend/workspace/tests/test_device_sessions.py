@@ -80,8 +80,11 @@ class AccountSessionTests(TestCase):
         old_session = second.session
         old_session.pop(GENERATION_KEY, None)
         old_session.save()
+        # Older browsers also may not have a metadata registry row.
+        AccountSession.objects.filter(session_key=old_key).delete()
         entry = self.client.get('/api/auth/sessions/').json()
-        self.assertEqual(len(entry), 2)
+        self.assertEqual(len(entry), 1)
+        self.assertTrue(Session.objects.filter(session_key=old_key).exists())
         response = self.write(
             self.client, 'POST', '/api/auth/sessions/sign-out-others/',
             csrf='bad',
@@ -98,6 +101,10 @@ class AccountSessionTests(TestCase):
         ))
         self.assertEqual(len(self.client.get('/api/auth/sessions/').json()), 1)
         self.assertEqual(get_user_model().objects.get(email=self.email).session_generation, 1)
+        # The same credentials can create a fresh, valid post-rotation session.
+        new_client = self.other_client('Edge Fresh Browser')
+        self.assertEqual(new_client.get('/api/auth/me/').status_code, 200)
+        self.assertEqual(len(self.client.get('/api/auth/sessions/').json()), 2)
 
     def test_revoke_self_rejected_and_other_account_isolated(self):
         self.register()
