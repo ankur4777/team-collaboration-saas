@@ -9,6 +9,7 @@ This is a runnable **React + TypeScript frontend** and **Python Django + Django 
 - Company/workspace registration creates an organization and owner account.
 - Email + password login, CSRF-protected session authentication, logout and active workspace switching.
 - Signed-in employees can change their password after entering the current password, preserving the current session while invalidating other old-password sessions.
+- Account security now lists active browser sessions used since the session-tracking upgrade, shows approximate browser/device labels and last activity, and lets users sign out a selected device or every other session (including pre-upgrade sessions not displayed).
 - New accounts receive a signed, expiring email-verification link; existing accounts are marked verified during migration 0007 to preserve access. Invitation redemption verifies its invited address.
 - Request a password reset without revealing whether an account exists; use an expiring, single-use reset link to choose a new password.
 - Company membership roles: **owner**, **admin**, and **member**.
@@ -144,6 +145,16 @@ The update includes migration `0008_notification_preferences`. Run `git pull ori
 
 This is not a full notification-delivery service: desktop push, sound alerts, email digests, session management and MFA are still planned.
 
+## Account-wide active sessions and device management
+
+Migration `0009_account_sessions` adds per-user session metadata and a session-generation counter. The session-generation counter ensures that **Sign out other devices** invalidates even login sessions created before this release. It applies to all organizations for an account. Revoked sessions can no longer access API resources or receive new private/channel messages on their old WebSocket connections. Individual sign-outs delete the underlying database-backed Django session.
+
+Open **Settings → Active sessions & devices** to see browser information, last activity, and **This device**. The device label is only a best-effort approximation from the User-Agent string; IP address comes from the request's direct connection and may be a reverse proxy's address. The device list shows sessions that have interacted with the application since this version was deployed, not an exhaustive historical list. `Sign out other devices` invalidates all older sessions, including untracked ones.
+
+Django **database-backed sessions** are required for per-device sign-out in this implementation. Changing to a different session backend (cache-only or cookie-based sessions) requires updating the revocation implementation. No browser session keys are sent in API responses. Session passwords and private company data are not included in metadata.
+
+Apply the migration by running `git pull origin main`, rebuilding the API and frontend, and running `docker compose exec api python manage.py migrate`. This migration preserves all users and company data. Password reset and password change also rotate session authorization so previous HTTP and WebSocket connections are rejected.
+
 ## Run without Docker (advanced)
 
 Run MySQL 8.4 and Redis first; create a MySQL database and user. Create `.env`, change `MYSQL_HOST=127.0.0.1`, `REDIS_URL=redis://127.0.0.1:6379/0`.
@@ -181,6 +192,9 @@ For WebSocket support, the backend must use ASGI (Daphne is installed and expose
 | POST | `/api/auth/logout/` | Session logout |
 | GET | `/api/auth/me/` | Logged-in user and memberships |
 | POST | `/api/auth/password-change/` | Verify current password, update password and preserve current session |
+| GET | `/api/auth/sessions/` | List current and other tracked account sessions (no session keys exposed) |
+| DELETE | `/api/auth/sessions/{id}/` | Sign out a selected other device |
+| POST | `/api/auth/sessions/sign-out-others/` | Invalidate all other account sessions, including pre-upgrade ones |
 | GET/PATCH | `/api/notification-preferences/` | Active company's personal in-app alert preferences |
 | POST | `/api/auth/verify-email/` | Confirm one-time signed verification token (24-hour expiry) |
 | POST | `/api/auth/verify-email/resend/` | Signed-in user: resend verification email (rate-limited) |
