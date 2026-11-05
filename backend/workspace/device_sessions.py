@@ -73,16 +73,21 @@ def revoke_other_sessions(request):
 
 
 def after_password_change(request):
-    """Keep the new session from update_session_auth_hash; revoke tracked old keys."""
-    key = request.session.session_key
-    user = request.user
-    others = AccountSession.objects.filter(user=user, revoked_at__isnull=True)
-    if key:
-        others = others.exclude(session_key=key)
-    other_keys = list(others.values_list('session_key', flat=True))
-    others.update(revoked_at=timezone.now())
-    if other_keys:
-        Session.objects.filter(session_key__in=other_keys).delete()
+    """Rotate the account-wide session generation, keeping the new local session."""
+    revoke_other_sessions(request)
+
+
+def revoke_every_session_for_user(user):
+    """Password reset invalidates all sessions, including pre-upgrade cookies."""
+    with transaction.atomic():
+        User.objects.filter(pk=user.pk).update(
+            session_generation=F('session_generation') + 1,
+        )
+        others = AccountSession.objects.filter(user=user, revoked_at__isnull=True)
+        other_keys = list(others.values_list('session_key', flat=True))
+        others.update(revoked_at=timezone.now())
+        if other_keys:
+            Session.objects.filter(session_key__in=other_keys).delete()
 
 
 class SessionSecurityMiddleware:
