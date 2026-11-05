@@ -46,6 +46,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     email_verified_at = models.DateTimeField(null=True, blank=True)
+    # Rotating this number invalidates every prior session, including pre-upgrade ones.
+    session_generation = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     objects = UserManager()
     USERNAME_FIELD = 'email'
