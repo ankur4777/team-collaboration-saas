@@ -78,4 +78,6 @@ def change_password(request):
     request.user.set_password(new)
     request.user.save(update_fields=['password'])
     update_session_auth_hash(request, request.user)
+    from .device_sessions import after_password_change
+    after_password_change(request)
     return JsonResponse({'detail': 'Password changed. Other sessions must sign in again.'})
