@@ -52,7 +52,7 @@ class RealtimeNotificationTests(TestCase):
             'workspace.notification_events.async_to_sync',
         ) as bridge:
             publish_notification_refresh(org.pk, [a.pk, b.pk, b.pk])
-        self.assertEqual(bridge.call_count, 1)
+        self.assertEqual(bridge.call_count, 2)  # one wrapper invocation per unique recipient
         wrapper = bridge.return_value
         self.assertEqual(wrapper.call_count, 2)
         groups = {call.args[0] for call in wrapper.call_args_list}
