@@ -25,6 +25,7 @@ This is a runnable **React + TypeScript frontend** and **Python Django + Django 
 - Live typing indicators use authenticated, rate-limited WebSocket signals; the workspace bell shows unread-chat notifications, refreshed periodically (approximately 20 seconds).
 - Team channels now have independent per-member unread badges and explicit read cursors, scoped to current team and organization membership.
 - The notification bell includes unread team channels alongside private/group chats; clicking a channel notice opens the appropriate team and channel.
+- A per-user, per-company authenticated WebSocket now sends **refresh-only** signals for newly sent direct/group/channel messages. It refreshes the bell and channel unread sidebar immediately, with automatic reconnect and 20-second polling fallback. Notification events carry no message text or private data.
 - A real Settings page lets employees choose direct-chat, group-chat and channel alert visibility separately for each organization. Muting a bell category does not erase unread counts or disable messaging.
 - Removing a workspace member revokes their chat participation; if re-invited later, they start a new direct conversation rather than regaining previous private history.
 - Responsive React screens for registration, login, workspace, team navigation, channels, messages, member management, and invitations.
@@ -144,6 +145,14 @@ Under **Account security**, check your verified email status and change your pas
 The update includes migration `0008_notification_preferences`. Run `git pull origin main`, rebuild `api` and `frontend`, and apply `python manage.py migrate` using Docker Compose. Existing users, messages, workspaces and notification counts are preserved.
 
 This is not a full notification-delivery service: desktop push, sound alerts, email digests, session management and MFA are still planned.
+
+## Live notification feed (Phase 2)
+
+The notification bell establishes `/ws/notifications/` after login. On a new private or team channel message, the backend pushes a small `refresh` event to members of the same organization/chat or team. The browser re-fetches existing protected APIs to calculate unread counts. Event payloads carry no message text, email address or sensitive metadata. Personal notification settings still determine which categories appear in the bell.
+
+The socket authenticates with the existing Django session, validates the current company membership, checks session revocation, and revalidates on delivery. A socket becomes unauthorized if the active workspace changes in another tab. On temporary disconnect the client retries with exponential backoff while retaining the 20-second polling fallback.
+
+This is an ephemeral **in-app update channel**, not persistent push notifications, device OS alerts or email delivery. Open messages and all notification history still use the existing database-backed APIs.
 
 ## Account-wide active sessions and device management
 
