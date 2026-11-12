@@ -84,7 +84,7 @@ export default function MessageSearchPanel({onOpenChat,onOpenChannel}:Props) {
         <h2>Search across your workspace</h2>
         <p>Enter at least two characters to find matching messages.</p>
       </div>}
-      {results.map(result=><button className="message-search-result" type="button"
+      {searched&&results.map(result=><button className="message-search-result" type="button"
         key={`${result.source}:${result.id}`} onClick={()=>openResult(result)}>
         <span className="message-search-result-icon">{result.source==='chat'?<MessageCircle size={18}/>:<Hash size={18}/>}</span>
         <span className="message-search-result-content">
