@@ -37,7 +37,8 @@
 - Implemented: unread private-chat counts, per-member read cursors, read receipts, WebSocket typing indicators, and chat-only in-app notification bell.
 - Implemented: per-member channel read cursors, channel unread counts, channel badges and combined channel/chat in-app alerts with periodic refresh.
 - Implemented: per-user/per-workspace in-app bell preferences for direct messages, group chats and channels; account security Settings page.
-- Still planned: group creator transfer, group exit flow, push/email notifications, real-time global notification feed, richer persistent notification preferences, attachments, search, retention and file previews.
+- Implemented: authenticated per-user/per-company notification WebSocket with on-message access rechecks, immediate unread refresh, reconnect and polling fallback.
+- Still planned: group creator transfer, group exit flow, desktop/mobile push and email notifications, persistent notification history, advanced preferences, attachments, search, retention and file previews.
 
 ## Phase 2 — Real-time communication
 

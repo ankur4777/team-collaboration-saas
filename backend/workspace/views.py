@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 from .auth_views import auth_payload
 from .models import Channel, Invitation, Message, Organization, OrganizationMember, Team, TeamMember, User
 from .permissions import get_active_membership, require_channel_access, require_team_access
+from .notification_events import publish_notification_refresh
 from .serializers import OrganizationMemberSerializer, TeamSerializer, ChannelSerializer, MessageSerializer
 
 logger = logging.getLogger(__name__)
@@ -182,4 +183,12 @@ class ChannelMessagesView(APIView):
         message = Message.objects.create(channel=channel, sender=request.user, body=body)
         payload = MessageSerializer(message).data
         transaction.on_commit(lambda: broadcast_message(channel.id, payload))
+        recipients = list(TeamMember.objects.filter(
+            team=channel.team,
+            user__organization_memberships__organization_id=channel.team.organization_id,
+            user__is_active=True,
+        ).values_list('user_id', flat=True).distinct())
+        transaction.on_commit(
+            lambda: publish_notification_refresh(channel.team.organization_id, recipients)
+        )
         return Response(payload, status=status.HTTP_201_CREATED)

@@ -8,6 +8,7 @@ interface Props {
   onOpenChat: (chatId:string)=>void;
   onOpenChannel: (teamId:string, channelId:string)=>void;
   refreshVersion?: number;
+  onRealtimeNotification?: ()=>void;
 }
 
 function chatTitle(thread:ChatThread,userId:string) {
@@ -15,11 +16,14 @@ function chatTitle(thread:ChatThread,userId:string) {
   return thread.participants.find(p=>p.user.id!==userId)?.user.full_name || 'Direct chat';
 }
 
-export default function ChatNotificationBell({workspaceId,userId,onOpenChat,onOpenChannel,refreshVersion=0}:Props) {
+export default function ChatNotificationBell({workspaceId,userId,onOpenChat,onOpenChannel,onRealtimeNotification,refreshVersion=0}:Props) {
   const [threads,setThreads] = useState<ChatThread[]>([]);
   const [channels,setChannels] = useState<ChannelNotice[]>([]);
   const [preferences,setPreferences] = useState<NotificationPreferences>({direct_chats:true,group_chats:true,team_channels:true});
   const [open,setOpen] = useState(false);
+  const [live,setLive] = useState(false);
+  const onRealtimeRef = useRef(onRealtimeNotification);
+  onRealtimeRef.current=onRealtimeNotification;
   const [error,setError] = useState('');
   const latestId = useRef(workspaceId);
   latestId.current = workspaceId;
@@ -52,6 +56,48 @@ export default function ChatNotificationBell({workspaceId,userId,onOpenChat,onOp
 
   useEffect(()=>{if(refreshVersion>0)void refresh();},[refreshVersion,refresh]);
 
+  useEffect(()=>{
+    if(!workspaceId){setLive(false);return;}
+    let active=true;
+    let socket:WebSocket|null=null;
+    let reconnect:ReturnType<typeof setTimeout>|undefined;
+    let debounce:ReturnType<typeof setTimeout>|undefined;
+    let failures=0;
+    function connect(){
+      if(!active)return;
+      const protocol=location.protocol==='https:'?'wss:':'ws:';
+      socket=new WebSocket(`${protocol}//${location.host}/ws/notifications/`);
+      socket.onopen=()=>{if(active){failures=0;setLive(true);void refresh();}};
+      socket.onmessage=event=>{
+        try{
+          const message=JSON.parse(event.data) as {type:string};
+          if(message.type!=='refresh'||!active)return;
+          if(debounce)clearTimeout(debounce);
+          debounce=setTimeout(()=>{
+            if(!active)return;
+            void refresh();
+            onRealtimeRef.current?.();
+          },200);
+        }catch{/* Ignore unrecognized socket messages. */}
+      };
+      socket.onerror=()=>socket?.close();
+      socket.onclose=event=>{
+        if(!active)return;
+        setLive(false);
+        if(event.code===4401||event.code===4403)return;
+        failures=Math.min(failures+1,5);
+        reconnect=setTimeout(connect,Math.min(15000,1000*2**(failures-1)));
+      };
+    }
+    connect();
+    return()=>{
+      active=false;
+      if(reconnect)clearTimeout(reconnect);
+      if(debounce)clearTimeout(debounce);
+      socket?.close();
+    };
+  },[workspaceId,refresh]);
+
   const unreadChats=threads.filter(t=>t.unread_count>0 && (t.kind==='direct'?preferences.direct_chats:preferences.group_chats));
   const unreadChannels=channels.filter(c=>c.unread_count>0&&preferences.team_channels);
   const unreadCount=unreadChats.reduce((sum,t)=>sum+t.unread_count,0)
@@ -74,7 +120,7 @@ export default function ChatNotificationBell({workspaceId,userId,onOpenChat,onOp
           <Hash size={18}/><span><strong>#{c.channel_name}</strong><small>{c.team_name} · Team channel</small></span><b>{c.unread_count}</b>
         </button>)}
       </div> : <div className="notification-empty">No unread conversations in this workspace.</div>}
-      <div className="notification-foot">In-app alerts refresh about every 20 seconds. Manage alert types in Settings.</div>
+      <div className="notification-foot">{live?'Live notifications connected':'Checking for updates every 20 seconds'} · Manage alerts in Settings.</div>
     </div>}
   </div>;
 }
