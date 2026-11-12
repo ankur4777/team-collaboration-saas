@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Hash, Inbox, MessageCircle,
   LayoutGrid, LockKeyhole, LogOut, Mail, Menu, Plus, Send,
-  Settings2, Sparkles, Users, Video, X, CalendarDays, FolderOpen } from 'lucide-react';
+  Settings2, Sparkles, Users, Video, X, CalendarDays, FolderOpen, Search } from 'lucide-react';
 import { api, csrf, type Channel, type ChannelNotice, type Member, type Message, type Session, type Team } from './api';
 import ChatPanel from './ChatPanel';
+import MessageSearchPanel from './MessageSearchPanel';
 import ChatNotificationBell from './ChatNotificationBell';
 import SettingsPanel from './SettingsPanel';
 import AccountRecoveryScreen from './AccountRecoveryScreen';
@@ -96,6 +97,7 @@ function EmailVerificationBanner() {
 const navItems = [
   {id:'teams', label:'Teams & Channels', icon:Users, ready:true},
   {id:'chats', label:'Chats & Groups', icon:MessageCircle, ready:true},
+  {id:'search', label:'Search messages', icon:Search, ready:true},
   {id:'inbox', label:'Email inbox', icon:Mail, ready:false},
   {id:'meetings', label:'Meetings', icon:Video, ready:false},
   {id:'calendar', label:'Calendar', icon:CalendarDays, ready:false},
@@ -239,6 +241,9 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
     </>}
   </>:view==='chats' ? <ChatPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id} currentUser={session.user} members={members} requestedChat={openChatRequest} onRead={()=>setNotificationRefresh(current=>current+1)}/>
    :view==='settings' ? <SettingsPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id} workspaceName={activeOrg?.name||'your workspace'} user={session.user} onPreferencesSaved={()=>setNotificationRefresh(v=>v+1)}/>
+   :view==='search' ? <MessageSearchPanel key={session.active_organization_id||'none'}
+        onOpenChat={id=>{setOpenChatRequest({id,nonce:Date.now()});setView('chats');setSidebarOpen(false);}}
+        onOpenChannel={(teamId,channelId)=>{setSelectedTeam(teamId);setSelectedChannel(channelId);setView('teams');setSidebarOpen(false);}}/>
    : <div className="future-page"><div className="future-icon">{view==='inbox'?<Inbox size={32}/>:view==='meetings'?<Video size={32}/>:view==='calendar'?<CalendarDays size={32}/>:view==='files'?<FolderOpen size={32}/>:<Settings2 size={32}/>}</div><div className="eyebrow">COMING IN A FUTURE PHASE</div><h1>{navItems.find(n=>n.id===view)?.label||'Workspace settings'}</h1><p>{view==='inbox'?'Connect Gmail and Outlook accounts, read inbox threads and send, reply or forward emails from your own mailbox.':view==='meetings'?'Schedule secure team meetings with audio, video and screen sharing.':'This module is planned after the authentication and real-time team chat foundation.'}</p><button className="outline-button" onClick={()=>setView('teams')}><ArrowLeft size={16}/>Back to Teams</button></div>}
   </main>
   {modal&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setModal(null);}}><div className="modal" role="dialog" aria-modal="true"><div className="modal-head"><div><div className="eyebrow">TEAMWORKSPACE</div><h2>{modal==='team'?'Create a team':modal==='channel'?'Create a channel':modal==='invite'?'Invite an employee':'Workspace members'}</h2></div><button className="icon-button" onClick={()=>setModal(null)} aria-label="Close"><X size={21}/></button></div>
