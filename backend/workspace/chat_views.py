@@ -19,6 +19,7 @@ from rest_framework.views import APIView
 
 from .models import ChatConversation, ChatMessage, ChatParticipant, OrganizationMember
 from .permissions import get_active_membership
+from .notification_events import publish_notification_refresh
 from .serializers import ChatConversationSerializer, ChatMessageSerializer
 
 
@@ -153,6 +154,8 @@ class ChatsView(APIView):
                         ChatParticipant(conversation=chat, user=target.user),
                     ])
             chat = ChatConversation.objects.prefetch_related('participants__user').get(pk=chat.pk)
+            if created:
+                publish_notification_refresh(chat.organization_id, [request.user.pk, target.user_id])
             return Response(
                 ChatConversationSerializer(chat).data,
                 status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
@@ -192,6 +195,9 @@ class ChatsView(APIView):
                     [ChatParticipant(conversation=chat, user=m.user) for m in members]
                 )
             chat = ChatConversation.objects.prefetch_related('participants__user').get(pk=chat.pk)
+            publish_notification_refresh(
+                chat.organization_id, [request.user.pk] + [m.user_id for m in members],
+            )
             return Response(ChatConversationSerializer(chat).data, status=status.HTTP_201_CREATED)
 
         raise ValidationError({'kind': 'Choose direct or group chat'})
@@ -226,6 +232,14 @@ class ChatMessagesView(APIView):
             ChatConversation.objects.filter(pk=chat.pk).update(updated_at=timezone.now())
             payload = ChatMessageSerializer(message).data
             transaction.on_commit(lambda: publish_chat_message(chat.pk, payload))
+            recipients = list(ChatParticipant.objects.filter(
+                conversation=chat,
+                user__organization_memberships__organization_id=chat.organization_id,
+                user__is_active=True,
+            ).values_list('user_id', flat=True).distinct())
+            transaction.on_commit(
+                lambda: publish_notification_refresh(chat.organization_id, recipients)
+            )
         return Response(payload, status=status.HTTP_201_CREATED)
 
 
