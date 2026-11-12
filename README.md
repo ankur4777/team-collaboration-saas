@@ -26,6 +26,7 @@ This is a runnable **React + TypeScript frontend** and **Python Django + Django 
 - Team channels now have independent per-member unread badges and explicit read cursors, scoped to current team and organization membership.
 - The notification bell includes unread team channels alongside private/group chats; clicking a channel notice opens the appropriate team and channel.
 - A per-user, per-company authenticated WebSocket now sends **refresh-only** signals for newly sent direct/group/channel messages. It refreshes the bell and channel unread sidebar immediately, with automatic reconnect and 20-second polling fallback. Notification events carry no message text or private data.
+- **Search messages** sidebar page: keyword search in current-company direct/group chats and accessible team channels, with chat/channel filters, newest-first results and navigation to the conversation. Deleted private messages, inaccessible conversations and pre-join message history are excluded.
 - A real Settings page lets employees choose direct-chat, group-chat and channel alert visibility separately for each organization. Muting a bell category does not erase unread counts or disable messaging.
 - Removing a workspace member revokes their chat participation; if re-invited later, they start a new direct conversation rather than regaining previous private history.
 - Responsive React screens for registration, login, workspace, team navigation, channels, messages, member management, and invitations.
@@ -154,6 +155,14 @@ The socket authenticates with the existing Django session, validates the current
 
 This is an ephemeral **in-app update channel**, not persistent push notifications, device OS alerts or email delivery. Open messages and all notification history still use the existing database-backed APIs.
 
+## Workspace message search (Phase 2)
+
+Open **Search messages** in the sidebar. Enter a phrase of 2–100 characters, select All messages, Chats & groups or Team channels, and click Search. Results are most recent first, at most 50, and are scoped to the current active organization and current user. Only chats the user participates in and channels from teams they belong to can appear. Group and channel messages preceding the user's join time are excluded; deleted private chat messages are never returned.
+
+Clicking a result opens the corresponding conversation. Search does not yet scroll to a historical message; chats and channels load the latest 50 messages by default, so navigating to an old result may require later history navigation. Full-text indexing, pagination, phrase ranking and message-highlight navigation are later improvements.
+
+Search uses the current MySQL database and Django REST API; **no new migration** is required.
+
 ## Account-wide active sessions and device management
 
 Migration `0009_account_sessions` adds per-user session metadata and a session-generation counter. The session-generation counter ensures that **Sign out other devices** invalidates even login sessions created before this release. It applies to all organizations for an account. Revoked sessions can no longer access API resources or receive new private/channel messages on their old WebSocket connections. Individual sign-outs delete the underlying database-backed Django session.
@@ -216,6 +225,7 @@ For WebSocket support, the backend must use ASGI (Daphne is installed and expose
 | POST | `/api/organizations/{id}/invitations/` | Invite company employee (admin/owner) |
 | GET | `/api/invitations/{token}/` | Preview an invitation |
 | POST | `/api/invitations/{token}/accept/` | Join company; existing accounts must log in |
+| GET | `/api/search/messages/?q=term&scope=all` | Search accessible chat/channel messages (`scope`: all, chats, channels; latest 50 matches) |
 | GET/POST | `/api/chats/` | List participating chats / create direct or group chat |
 | GET/POST | `/api/chats/{id}/messages/` | Read latest 50 / send private message |
 | PATCH/DELETE | `/api/chats/{id}/messages/{message_id}/` | Author edits or soft-deletes own message |
