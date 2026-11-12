@@ -44,7 +44,7 @@ jobs:
           MYSQL_USER: root
           MYSQL_PASSWORD: test-root-password
           REDIS_URL: redis://127.0.0.1:6379/0
-      - run: 'python -c "from config.asgi import application; from workspace.routing import websocket_urlpatterns; assert len(websocket_urlpatterns) == 2"'
+      - run: 'python -c "from config.asgi import application; from workspace.routing import websocket_urlpatterns; assert len(websocket_urlpatterns) == 3"'
         env: *env
       - run: python manage.py test workspace --verbosity 2
         env: *env
