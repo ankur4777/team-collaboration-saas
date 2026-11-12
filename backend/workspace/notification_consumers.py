@@ -1,6 +1,7 @@
 """One authenticated WebSocket per user/workspace to invalidate bell data."""
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
+from django.contrib.sessions.models import Session
 
 from .device_sessions import GENERATION_KEY, live_websocket_session
 from .models import OrganizationMember
@@ -55,7 +56,12 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
             user_id, session.session_key, session.get(GENERATION_KEY),
         ):
             return False
-        # The browser may have switched workspaces after the socket opened.
+        # A different tab may switch the active workspace while this socket
+        # remains open. Check the current persisted session rather than trusting
+        # the copied ASGI scope from the original handshake.
+        stored = Session.objects.filter(session_key=session.session_key).first()
+        if stored is None or str(stored.get_decoded().get('active_organization_id')) != str(organization_id):
+            return False
         if not OrganizationMember.objects.filter(
             user_id=user_id, organization_id=organization_id,
             user__is_active=True,
