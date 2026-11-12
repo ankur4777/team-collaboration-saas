@@ -204,3 +204,30 @@
 .device-revoke{border:1px solid #f0d2cc;background:#fff7f4;color:#a75a48;padding:8px 10px;border-radius:9px;font-size:11px;font-weight:700;white-space:nowrap}
 .device-revoke:hover{background:#ffebe5}
 @media(max-width:600px){.settings-devices{margin-top:14px}.device-row{align-items:flex-start;flex-wrap:wrap}.device-details{min-width:170px}.device-revoke{margin-left:47px}.devices-actions{justify-content:flex-start}.device-current{margin-left:4px}}
+
+
+/* Tenant-scoped workspace message search */
+.message-search-page{padding:30px;flex:1;overflow-y:auto;background:#f9fbf9;color:#294a3d}
+.message-search-intro{max-width:970px;margin-bottom:24px}
+.message-search-intro h1{font-size:26px;color:#204a38;margin:7px 0 8px}
+.message-search-intro p{font-size:13px;color:#84998b;line-height:1.7}
+.message-search-form{display:flex;gap:10px;align-items:stretch;max-width:970px;background:#fff;border:1px solid #dfebe3;border-radius:14px;padding:12px;box-shadow:0 8px 24px #1349320a}
+.message-search-field{display:flex;align-items:center;gap:11px;min-width:170px;flex:1;border:1px solid #deebe2;border-radius:9px;padding:0 12px;color:#26866a}
+.message-search-field input{flex:1;min-width:0;min-height:40px;border:0;outline:none;color:#294a3d;background:transparent;font-size:13px}
+.message-search-filter select{height:100%;min-height:40px;border:1px solid #deebe2;border-radius:9px;background:#fff;color:#355949;padding:0 12px;font-size:12px}
+.message-search-form .primary-button{white-space:nowrap;display:inline-flex;align-items:center;gap:7px}
+.message-search-results{max-width:970px;margin-top:24px}
+.message-search-summary{font-size:12px;color:#708b7d;font-weight:600;margin-bottom:12px}
+.message-search-empty{min-height:200px;border:1px dashed #cfe0d4;border-radius:15px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:#fff;color:#6a9682;padding:24px;text-align:center}
+.message-search-empty h2{font-size:16px;color:#315843}
+.message-search-empty p{font-size:12px;color:#849b8e;line-height:1.6}
+.message-search-result{width:100%;display:flex;align-items:flex-start;gap:14px;text-align:left;border:1px solid #e2ece5;background:#fff;border-radius:12px;padding:16px;margin-bottom:10px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.message-search-result:hover,.message-search-result:focus-visible{border-color:#4ca28b;box-shadow:0 5px 16px #185b3d17;outline:none}
+.message-search-result-icon{flex:0 0 auto;display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:#edf7f1;color:#33896e}
+.message-search-result-content{min-width:0;flex:1;display:flex;flex-direction:column;gap:6px}
+.message-search-result-title{font-weight:700;font-size:13px;color:#275941}
+.message-search-result-body{font-size:13px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;color:#3f5a4b}
+.message-search-result-meta{font-size:11px;color:#879d90}
+.message-search-error{margin-top:12px;color:#af4842;border:1px solid #e8cbc5;background:#fff4f0;padding:12px;border-radius:9px;max-width:970px;font-size:12px}
+.message-search-note{margin-top:13px;font-size:11px;color:#84998b;line-height:1.6}
+@media(max-width:660px){.message-search-page{padding:17px}.message-search-form{flex-wrap:wrap}.message-search-field{flex-basis:100%;min-height:42px}.message-search-filter{flex:1}.message-search-form .primary-button{min-height:42px}}
