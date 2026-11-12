@@ -1,5 +1,5 @@
 from django.urls import path
-from . import auth_views, views, member_views, chat_views, channel_notifications, account_recovery, settings_views, session_views
+from . import auth_views, views, member_views, chat_views, channel_notifications, account_recovery, settings_views, session_views, message_search
 
 urlpatterns = [
     path('auth/csrf/', auth_views.csrf),
@@ -29,6 +29,7 @@ urlpatterns = [
     path('chats/<uuid:chat_id>/messages/<uuid:message_id>/', chat_views.ChatMessageDetailView.as_view()),
     path('chats/<uuid:chat_id>/participants/', chat_views.ChatParticipantsView.as_view()),
     path('chats/<uuid:chat_id>/participants/<uuid:user_id>/', chat_views.ChatParticipantDetailView.as_view()),
+    path('search/messages/', message_search.MessageSearchView.as_view()),
     path('channel-notifications/', channel_notifications.ChannelNotificationsView.as_view()),
     path('channels/<uuid:channel_id>/read/', channel_notifications.ChannelReadView.as_view()),
     path('teams/', views.TeamsView.as_view()),
