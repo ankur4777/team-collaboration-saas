@@ -39,6 +39,7 @@
 - Implemented: per-user/per-workspace in-app bell preferences for direct messages, group chats and channels; account security Settings page.
 - Implemented: authenticated per-user/per-company notification WebSocket with on-message access rechecks, immediate unread refresh, reconnect and polling fallback.
 - Implemented: authenticated, tenant-scoped keyword message search for direct/group chat and joined team channels, including join-time and soft-delete filters, a React Search page and newest-first bounded results.
+- Implemented: five emoji reactions for direct and group chat messages, secure user-scoped toggle endpoint, React controls, broadcast updates and deletion cleanup.
 - Still planned: group creator transfer, group exit flow, desktop/mobile push and email notifications, persistent notification history, advanced preferences, attachments, indexed/full-text search, historical result navigation, retention and file previews.
 
 ## Phase 2 — Real-time communication
