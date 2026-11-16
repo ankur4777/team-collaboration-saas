@@ -17,7 +17,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import ChatConversation, ChatMessage, ChatParticipant, OrganizationMember
+from .models import ChatConversation, ChatMessage, ChatParticipant, ChatReaction, OrganizationMember
 from .permissions import get_active_membership
 from .notification_events import publish_notification_refresh
 from .serializers import ChatConversationSerializer, ChatMessageSerializer
@@ -206,7 +206,7 @@ class ChatsView(APIView):
 class ChatMessagesView(APIView):
     def get(self, request, chat_id):
         chat = accessible_chat(request, chat_id)
-        records = ChatMessage.objects.filter(conversation=chat).select_related('sender')
+        records = ChatMessage.objects.filter(conversation=chat).select_related('sender').prefetch_related('reactions')
         # Newly invited group participants see messages from their join date,
         # not the historical conversation that existed before their invitation.
         if chat.kind == ChatConversation.Kind.GROUP:
@@ -283,11 +283,44 @@ class ChatMessageDetailView(APIView):
                 message.body = ''
                 message.deleted_at = timezone.now()
                 message.save(update_fields=['body', 'deleted_at'])
+                message.reactions.all().delete()
                 payload = ChatMessageSerializer(message).data
                 transaction.on_commit(
                     lambda: publish_chat_message(chat.pk, payload, action='message.deleted')
                 )
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ChatReactionView(APIView):
+    """Toggle a supported emoji on a message visible to the active chat member."""
+    ALLOWED_EMOJIS = ('👍', '❤️', '😂', '🎉', '👀')
+
+    def post(self, request, chat_id, message_id):
+        chat = accessible_chat(request, chat_id)
+        emoji = request.data.get('emoji')
+        if not isinstance(emoji, str) or emoji not in self.ALLOWED_EMOJIS:
+            raise ValidationError({'emoji': 'Choose one of the supported reaction emojis'})
+        with transaction.atomic():
+            message = get_object_or_404(
+                ChatMessage.objects.select_for_update(), pk=message_id, conversation=chat,
+            )
+            if message.deleted_at is not None:
+                raise ValidationError({'detail': 'Cannot react to a deleted message'})
+            if chat.kind == ChatConversation.Kind.GROUP:
+                participant = ChatParticipant.objects.get(conversation=chat, user=request.user)
+                if message.created_at < participant.joined_at:
+                    raise PermissionDenied('This message predates your group membership')
+            existing = ChatReaction.objects.filter(message=message, user=request.user, emoji=emoji)
+            if existing.exists():
+                existing.delete()
+            else:
+                ChatReaction.objects.create(message=message, user=request.user, emoji=emoji)
+            updated = ChatMessage.objects.select_related('sender').prefetch_related('reactions').get(pk=message.pk)
+            payload = ChatMessageSerializer(updated).data
+            transaction.on_commit(
+                lambda: publish_chat_message(chat.pk, payload, action='message.updated')
+            )
+        return Response(payload)
 
 
 class ChatReadView(APIView):
