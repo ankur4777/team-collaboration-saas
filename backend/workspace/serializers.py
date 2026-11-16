@@ -67,7 +67,20 @@ class ChatConversationSerializer(serializers.ModelSerializer):
 
 class ChatMessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
+    reactions = serializers.SerializerMethodField()
+
+    def get_reactions(self, obj):
+        if obj.deleted_at is not None:
+            return []
+        groups = {}
+        for reaction in obj.reactions.all():
+            row = groups.setdefault(
+                reaction.emoji, {'emoji': reaction.emoji, 'count': 0, 'user_ids': []}
+            )
+            row['count'] += 1
+            row['user_ids'].append(str(reaction.user_id))
+        return sorted(groups.values(), key=lambda row: row['emoji'])
 
     class Meta:
         model = ChatMessage
-        fields = ('id', 'body', 'created_at', 'edited_at', 'deleted_at', 'sender')
+        fields = ('id', 'body', 'created_at', 'edited_at', 'deleted_at', 'sender', 'reactions')
