@@ -231,3 +231,14 @@
 .message-search-error{margin-top:12px;color:#af4842;border:1px solid #e8cbc5;background:#fff4f0;padding:12px;border-radius:9px;max-width:970px;font-size:12px}
 .message-search-note{margin-top:13px;font-size:11px;color:#84998b;line-height:1.6}
 @media(max-width:660px){.message-search-page{padding:17px}.message-search-form{flex-wrap:wrap}.message-search-field{flex-basis:100%;min-height:42px}.message-search-filter{flex:1}.message-search-form .primary-button{min-height:42px}}
+
+
+/* Private and group chat emoji reactions */
+.chat-reaction-bar{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin:7px 0 4px}
+.chat-reaction-button{border:1px solid #d7e6dc;background:#fff;border-radius:16px;padding:3px 7px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:14px;line-height:1.4}
+.chat-reaction-button:hover,.chat-reaction-button:focus-visible{border-color:#68ab92;background:#f1f8f3;outline:2px solid transparent}
+.chat-reaction-button:focus-visible{outline:2px solid #32856a;outline-offset:1px}
+.chat-reaction-button.mine{border-color:#54a785;background:#e6f6ed}
+.chat-reaction-button:disabled{opacity:.55;cursor:wait}
+.chat-reaction-button small{font-size:11px;color:#547869}
+.chat-reaction-error{font-size:11px;color:#a33838}
