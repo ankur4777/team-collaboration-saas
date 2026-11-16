@@ -219,6 +219,23 @@ class ChatMessage(models.Model):
         ordering = ['created_at', 'id']
 
 
+class ChatReaction(models.Model):
+    """One emoji by one user per private/group message."""
+    id = models.UUIDField(primary_key=True, default=make_id, editable=False)
+    message = models.ForeignKey(ChatMessage, on_delete=models.CASCADE, related_name='reactions')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_reactions')
+    emoji = models.CharField(max_length=8)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['message', 'user', 'emoji'],
+                name='uq_chat_reaction_message_user_emoji',
+            ),
+        ]
+
+
 class NotificationPreference(models.Model):
     """In-app notification visibility per employee and organization.
 
