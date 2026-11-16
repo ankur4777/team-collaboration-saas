@@ -18,7 +18,8 @@ export interface ChatThread {
   created_at: string; updated_at: string; created_by: Person; unread_count: number;
   participants: Array<{user: Person; joined_at: string; last_read_at: string|null}>;
 }
-export type ChatMessage = Message & { edited_at: string|null; deleted_at: string|null };
+export interface ReactionSummary {emoji:string; count:number; user_ids:string[]}
+export type ChatMessage = Message & { edited_at: string|null; deleted_at: string|null; reactions:ReactionSummary[] };
 export type SearchScope = 'all'|'chats'|'channels';
 export interface MessageSearchResult {
   id:string;
@@ -105,6 +106,7 @@ export const api = {
   startGroupChat: (title:string,emails:string[]) => post<ChatThread>('chats/', {kind:'group',title,emails}),
   chatMessages: (id:string) => request<ChatMessage[]>(`chats/${id}/messages/`),
   sendChatMessage: (id:string, body:string) => post<ChatMessage>(`chats/${id}/messages/`,{body}),
+  toggleChatReaction: (chatId:string,messageId:string,emoji:string) => post<ChatMessage>(`chats/${chatId}/messages/${messageId}/reactions/`,{emoji}),
   markChatRead: (id:string, messageId:string) => post<{last_read_at:string}>(`chats/${id}/read/`,{message_id:messageId}),
   editChatMessage: (chatId:string, messageId:string, body:string) => request<ChatMessage>(`chats/${chatId}/messages/${messageId}/`, 'PATCH', {body}),
   deleteChatMessage: (chatId:string, messageId:string) => request<void>(`chats/${chatId}/messages/${messageId}/`, 'DELETE'),

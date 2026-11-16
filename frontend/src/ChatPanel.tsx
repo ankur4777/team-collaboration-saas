@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, MessageCircle, Plus, RefreshCw, Send, Users, X } from 'lucide-react';
 import { api, type ChatMessage, type ChatThread, type Member, type Person } from './api';
+import ChatReactionBar from './ChatReactionBar';
 
 function titleFor(chat: ChatThread, userId: string) {
   if (chat.kind === 'group') return chat.title;
@@ -329,6 +330,8 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
                   ? (active.kind==='direct' ? 'Seen' : `Seen by ${active.participants.filter(p=>p.user.id!==currentUser.id && p.last_read_at && new Date(p.last_read_at).getTime()>=new Date(message.created_at).getTime()).length}`)
                   : 'Sent'
               }</div>}
+              <ChatReactionBar chatId={selected!} message={message} currentUserId={currentUser.id}
+                onUpdated={updated=>setMessages(current=>current.map(item=>item.id===updated.id?updated:item))}/>
               {message.sender.id===currentUser.id && !message.deleted_at && editingId!==message.id && <div className="private-message-actions"><button type="button" disabled={working} onClick={() => {setEditingId(message.id);setEditDraft(message.body);}}>Edit</button><button type="button" disabled={working} onClick={() => void deleteMessage(message)}>Delete</button></div>}
             </div>)}
             <div ref={bottomRef}/>
