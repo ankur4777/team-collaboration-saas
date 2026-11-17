@@ -225,7 +225,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   function switchOrg(id:string){void action(async()=>{const next=await api.activate(id);onSession(next);setOpenChatRequest(null);setView('teams');},false);}
   async function signOut(){try{await api.logout();onLogout();}catch(e){setError(errorText(e));}}
 
-  return <div className="app-layout"><aside className={`sidebar ${sidebarOpen?'mobile-visible':''}`}><div className="sidebar-header"><Brand/><button className="mobile-close icon-button" onClick={()=>setSidebarOpen(false)}><X size={20}/></button></div>
+  return <div className={`app-layout${view==='inbox'?' mail-view':''}`}><aside className={`sidebar ${sidebarOpen?'mobile-visible':''}`}><div className="sidebar-header"><Brand/><button className="mobile-close icon-button" onClick={()=>setSidebarOpen(false)}><X size={20}/></button></div>
     <div className="org-picker"><div className="org-icon">{initials(activeOrg?.name||'TW')}</div><div className="org-label"><strong>{activeOrg?.name||'Choose workspace'}</strong><small>{activeOrg?.role||'No organization'}</small></div><ChevronDown size={16}/>
       <select aria-label="Switch organization" value={session.active_organization_id||''} onChange={e=>switchOrg(e.target.value)}>{session.organizations.map(org=><option key={org.id} value={org.id}>{org.name}</option>)}</select>
     </div>
