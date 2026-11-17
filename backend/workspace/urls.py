@@ -1,5 +1,5 @@
 from django.urls import path
-from . import auth_views, views, member_views, chat_views, channel_notifications, account_recovery, settings_views, session_views, message_search
+from . import auth_views, views, member_views, chat_views, channel_notifications, account_recovery, settings_views, session_views, message_search, mentions
 
 urlpatterns = [
     path('auth/csrf/', auth_views.csrf),
@@ -12,6 +12,8 @@ urlpatterns = [
     path('auth/sessions/sign-out-others/', session_views.SignOutOtherDevicesView.as_view()),
     path('auth/sessions/<uuid:session_id>/', session_views.AccountSessionDetailView.as_view()),
     path('notification-preferences/', settings_views.NotificationPreferencesView.as_view()),
+    path('mentions/', mentions.MentionsView.as_view()),
+    path('mentions/<uuid:mention_id>/read/', mentions.MentionReadView.as_view()),
     path('auth/verify-email/', account_recovery.verify_email),
     path('auth/verify-email/resend/', account_recovery.resend_verification),
     path('auth/password-reset/request/', account_recovery.password_reset_request),
