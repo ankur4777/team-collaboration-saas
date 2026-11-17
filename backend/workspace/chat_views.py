@@ -20,6 +20,7 @@ from rest_framework.views import APIView
 from .models import ChatConversation, ChatMessage, ChatParticipant, ChatReaction, OrganizationMember
 from .permissions import get_active_membership
 from .notification_events import publish_notification_refresh
+from .mentions import create_mentions
 from .serializers import ChatConversationSerializer, ChatMessageSerializer
 
 
@@ -232,11 +233,17 @@ class ChatMessagesView(APIView):
             ChatConversation.objects.filter(pk=chat.pk).update(updated_at=timezone.now())
             payload = ChatMessageSerializer(message).data
             transaction.on_commit(lambda: publish_chat_message(chat.pk, payload))
-            recipients = list(ChatParticipant.objects.filter(
+            active_participants = list(ChatParticipant.objects.filter(
                 conversation=chat,
                 user__organization_memberships__organization_id=chat.organization_id,
                 user__is_active=True,
-            ).values_list('user_id', flat=True).distinct())
+            ).select_related('user').distinct())
+            create_mentions(
+                organization_id=chat.organization_id, sender_id=request.user.pk,
+                body=body, eligible_users=[participant.user for participant in active_participants],
+                chat_message=message,
+            )
+            recipients = [participant.user_id for participant in active_participants]
             transaction.on_commit(
                 lambda: publish_notification_refresh(chat.organization_id, recipients)
             )

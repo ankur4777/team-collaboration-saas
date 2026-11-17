@@ -242,3 +242,15 @@
 .chat-reaction-button:disabled{opacity:.55;cursor:wait}
 .chat-reaction-button small{font-size:11px;color:#547869}
 .chat-reaction-error{font-size:11px;color:#a33838}
+
+
+/* Keyboard-accessible teammate mentions in channel and chat composers. */
+.mention-input{position:relative;flex:1 1 0;min-width:0}
+.mention-input>input,.compose-box .mention-input>input{width:100%;box-sizing:border-box}
+.mention-options{position:absolute;left:0;right:0;bottom:calc(100% + 8px);z-index:45;max-height:250px;overflow-y:auto;background:#fff;border:1px solid #d8eae0;border-radius:10px;box-shadow:0 12px 28px #1f4b371c;padding:5px}
+.mention-options button{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;min-width:0;border:0;border-radius:7px;background:transparent;text-align:left;padding:10px;cursor:pointer}
+.mention-options button.selected,.mention-options button:hover{background:#e7f6ed}
+.mention-options button strong{font-size:12px;color:#315e49;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mention-options button small{font-size:10px;color:#799385;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.notification-item.mention-item{background:#f5fbf7}
+.notification-item.mention-item:hover{background:#e9f7ee}

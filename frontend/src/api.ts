@@ -12,6 +12,17 @@ export interface ChannelNotice {
   channel_id: string; channel_name: string; team_id: string; team_name: string;
   joined_at: string; unread_count: number; last_read_at: string|null;
 }
+export interface MentionNotification {
+  id:string;
+  kind:'chat'|'channel';
+  chat_kind:'direct'|'group'|null;
+  source_id:string;
+  source_name:string;
+  team_id:string|null;
+  sender_name:string;
+  created_at:string;
+  read_at:string|null;
+}
 export interface Message { id: string; body: string; created_at: string; sender: Person }
 export interface ChatThread {
   id: string; kind: 'direct'|'group'; title: string;
@@ -88,6 +99,8 @@ export const api = {
   signOutOtherDevices: () => post<{detail:string}>('auth/sessions/sign-out-others/', {}),
   changePassword: (current_password:string,new_password:string) =>
     post<{detail:string}>('auth/password-change/',{current_password,new_password}),
+  mentionNotifications: () => request<{results:MentionNotification[]}>('mentions/'),
+  markMentionRead: (id:string) => post<{read_at:string}>(`mentions/${id}/read/`, {}),
   notificationPreferences: () => request<NotificationPreferences>('notification-preferences/'),
   saveNotificationPreferences: (values:Partial<NotificationPreferences>) =>
     request<NotificationPreferences>('notification-preferences/','PATCH',values),

@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Hash, Inbox, MessageCircle,
   LayoutGrid, LockKeyhole, LogOut, Mail, Menu, Plus, Send,
   Settings2, Sparkles, Users, Video, X, CalendarDays, FolderOpen, Search } from 'lucide-react';
-import { api, csrf, type Channel, type ChannelNotice, type Member, type Message, type Session, type Team } from './api';
+import { api, csrf, type Channel, type ChannelNotice, type Member, type Message, type Person, type Session, type Team } from './api';
 import ChatPanel from './ChatPanel';
+import MentionInput from './MentionInput';
 import EmailPanel from './EmailPanel';
 import MessageSearchPanel from './MessageSearchPanel';
 import ChatNotificationBell from './ChatNotificationBell';
@@ -122,6 +123,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   const [inviteResult,setInviteResult] = useState('');
   const [memberBusyId,setMemberBusyId] = useState<string|null>(null);
   const [draft,setDraft] = useState(''); const [pending,setPending] = useState(false);
+  const [teamMentionPeople,setTeamMentionPeople] = useState<Person[]>([]);
   const [error,setError] = useState('');const [modal,setModal] = useState<null|'team'|'channel'|'invite'|'members'>(null);
   const [sidebarOpen,setSidebarOpen] = useState(false);const [connected,setConnected] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -150,6 +152,15 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
 
   const loadTeams = useCallback(async()=>{ try {const rows=await api.teams();setTeams(rows);setSelectedTeam(current=>current && rows.some(t=>t.id===current)?current:(rows[0]?.id||null));}catch(e){setError(errorText(e));}},[]);
   useEffect(()=>{setTeams([]);setChannels([]);setSelectedTeam(null);setSelectedChannel(null);setMessages([]);loadTeams();if(session.active_organization_id)api.members(session.active_organization_id).then(setMembers).catch(()=>{});},[session.active_organization_id,loadTeams]);
+  useEffect(()=>{
+    setTeamMentionPeople([]);
+    if(!selectedTeam)return;
+    let valid=true;
+    api.teamMembers(selectedTeam).then(rows=>{
+      if(valid)setTeamMentionPeople(rows.map(row=>row.user));
+    }).catch(()=>{});
+    return()=>{valid=false;};
+  },[selectedTeam,session.active_organization_id]);
   useEffect(()=>{if(!selectedTeam){setChannels([]);setSelectedChannel(null);return;}let valid=true;api.channels(selectedTeam).then(rows=>{if(!valid)return;setChannels(rows);setSelectedChannel(current=>current&&rows.some(c=>c.id===current)?current:rows[0]?.id||null);}).catch(e=>valid&&setError(errorText(e)));return()=>{valid=false;};},[selectedTeam]);
   useEffect(()=>{
     if(!selectedChannel){setMessages([]);setLoadedChannelId(null);return;}
@@ -237,7 +248,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
         <section className="conversation-panel">{activeChannel?<><div className="conversation-top"><div className="channel-avatar"><Hash size={23}/></div><div><h3>{activeChannel.name}</h3><p>{activeTeam.name} · {connected?'Live updates connected':'Messages are saved securely'}</p></div><span className={`connection-light ${connected?'online':''}`} title={connected?'WebSocket connected':'WebSocket disconnected'}/></div>
           <div className="message-area"><div className="channel-intro"><div className="channel-intro-mark"><Hash size={26}/></div><h2>Welcome to #{activeChannel.name}</h2><p>This is the beginning of the conversation in this channel.</p></div>
           <div className="message-list">{messages.map((message,index)=>{const previous=messages[index-1];const samePerson=previous?.sender.id===message.sender.id;return <div className={`message ${samePerson?'consecutive':''}`} key={message.id}>{!samePerson?<div className="msg-avatar">{initials(message.sender.full_name)}</div>:<div className="msg-avatar-placeholder"/>}<div className="msg-content">{!samePerson&&<div className="msg-meta"><strong>{message.sender.full_name}</strong><span>{relativeTime(message.created_at)}</span></div>}<div className="msg-body">{message.body}</div></div></div>;})}<div ref={bottomRef}/></div></div>
-          <form className="message-compose" onSubmit={send}><div className="compose-box"><input value={draft} maxLength={4000} onChange={e=>setDraft(e.target.value)} placeholder={`Message #${activeChannel.name}`} aria-label="New message"/><button type="submit" className="send-button" disabled={!draft.trim()} aria-label="Send message"><Send size={18}/></button></div><div className="compose-caption">Enter to send · Only team members can read this channel</div></form>
+          <form className="message-compose" onSubmit={send}><div className="compose-box"><MentionInput value={draft} onChange={setDraft} people={teamMentionPeople.filter(person=>person.id!==session.user.id)} placeholder={`Message #${activeChannel.name}`} ariaLabel="New message"/><button type="submit" className="send-button" disabled={!draft.trim()} aria-label="Send message"><Send size={18}/></button></div><div className="compose-caption">Type @ to mention a teammate · Enter to send · Only team members can read this channel</div></form>
         </>:<Empty icon={<Hash size={32}/>} title="Choose a channel" description="Select a channel to see its conversations."/>}</section></div>
     </>}
   </>:view==='chats' ? <ChatPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id} currentUser={session.user} members={members} requestedChat={openChatRequest} onRead={()=>setNotificationRefresh(current=>current+1)}/>
