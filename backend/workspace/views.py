@@ -17,6 +17,7 @@ from .auth_views import auth_payload
 from .models import Channel, Invitation, Message, Organization, OrganizationMember, Team, TeamMember, User
 from .permissions import get_active_membership, require_channel_access, require_team_access
 from .notification_events import publish_notification_refresh
+from .mentions import create_mentions
 from .serializers import OrganizationMemberSerializer, TeamSerializer, ChannelSerializer, MessageSerializer
 
 logger = logging.getLogger(__name__)
@@ -180,15 +181,22 @@ class ChannelMessagesView(APIView):
         body = str(request.data.get('body', '')).strip()
         if not body or len(body) > 4000:
             raise ValidationError({'body': 'Message must contain 1–4000 characters'})
-        message = Message.objects.create(channel=channel, sender=request.user, body=body)
-        payload = MessageSerializer(message).data
-        transaction.on_commit(lambda: broadcast_message(channel.id, payload))
-        recipients = list(TeamMember.objects.filter(
-            team=channel.team,
-            user__organization_memberships__organization_id=channel.team.organization_id,
-            user__is_active=True,
-        ).values_list('user_id', flat=True).distinct())
-        transaction.on_commit(
-            lambda: publish_notification_refresh(channel.team.organization_id, recipients)
-        )
+        with transaction.atomic():
+            message = Message.objects.create(channel=channel, sender=request.user, body=body)
+            eligible_members = list(TeamMember.objects.filter(
+                team=channel.team,
+                user__organization_memberships__organization_id=channel.team.organization_id,
+                user__is_active=True,
+            ).select_related('user').distinct())
+            create_mentions(
+                organization_id=channel.team.organization_id, sender_id=request.user.pk,
+                body=body, eligible_users=[member.user for member in eligible_members],
+                channel_message=message,
+            )
+            payload = MessageSerializer(message).data
+            transaction.on_commit(lambda: broadcast_message(channel.id, payload))
+            recipients = [member.user_id for member in eligible_members]
+            transaction.on_commit(
+                lambda: publish_notification_refresh(channel.team.organization_id, recipients)
+            )
         return Response(payload, status=status.HTTP_201_CREATED)
