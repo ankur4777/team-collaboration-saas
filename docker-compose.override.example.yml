@@ -1,0 +1,7 @@
+services:
+  frontend:
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+    environment:
+      CHOKIDAR_USEPOLLING: "true"

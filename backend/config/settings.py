@@ -22,7 +22,7 @@ FRONTEND_ORIGIN = os.getenv('FRONTEND_ORIGIN', 'http://localhost:5173').rstrip('
 INSTALLED_APPS = [
     'daphne', 'django.contrib.admin', 'django.contrib.auth', 'django.contrib.contenttypes',
     'django.contrib.sessions', 'django.contrib.messages', 'django.contrib.staticfiles',
-    'rest_framework', 'channels', 'workspace',
+    'rest_framework', 'channels', 'workspace', 'mailbox_app',
 ]
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -78,7 +78,7 @@ REDIS_URL = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/0')
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {'hosts': [REDIS_URL]},
+        'CONFIG': {'hosts': [{'address': REDIS_URL, 'socket_timeout': None, 'socket_connect_timeout': 5}]},
     }
 }
 WEBSOCKET_ALLOWED_ORIGINS = [v.strip() for v in os.getenv('WEBSOCKET_ALLOWED_ORIGINS', 'http://localhost:5173').split(',') if v.strip()]
@@ -105,3 +105,15 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'TeamWorkspace <noreply@exa
 PASSWORD_RESET_TIMEOUT = int(os.getenv('PASSWORD_RESET_TIMEOUT', '3600'))
 SECURE_REFERRER_POLICY = 'no-referrer'  # Account recovery links must not leak via Referer.
 # For first-party SPA via the Vite proxy; no wildcard credentialed CORS.
+
+
+# Personal, organization-scoped mailbox connections. Keep encryption keys stable.
+MAIL_LOCAL_ENABLED = os.getenv('MAIL_LOCAL_ENABLED', str(DEBUG)).lower() == 'true'
+MAIL_TOKEN_ENCRYPTION_KEY = os.getenv('MAIL_TOKEN_ENCRYPTION_KEY', '')
+MAIL_GOOGLE_CLIENT_ID = os.getenv('MAIL_GOOGLE_CLIENT_ID', '')
+MAIL_GOOGLE_CLIENT_SECRET = os.getenv('MAIL_GOOGLE_CLIENT_SECRET', '')
+MAIL_MICROSOFT_CLIENT_ID = os.getenv('MAIL_MICROSOFT_CLIENT_ID', '')
+MAIL_MICROSOFT_CLIENT_SECRET = os.getenv('MAIL_MICROSOFT_CLIENT_SECRET', '')
+MAIL_MICROSOFT_TENANT = os.getenv('MAIL_MICROSOFT_TENANT', 'common')
+MAIL_CALLBACK_ORIGIN = os.getenv('MAIL_CALLBACK_ORIGIN', FRONTEND_ORIGIN)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 16 * 1024 * 1024
