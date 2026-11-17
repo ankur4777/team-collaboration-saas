@@ -31,7 +31,7 @@ jobs:
         with: {python-version: '3.12'}
       - run: sudo apt-get update && sudo apt-get install -y pkg-config default-libmysqlclient-dev
       - run: pip install -r requirements.txt
-      - run: python -m compileall -q config workspace
+      - run: python -m compileall -q config workspace mailbox_app
       - run: python manage.py makemigrations --check --dry-run
         env: &env
           DJANGO_DEBUG: 'true'
@@ -46,7 +46,7 @@ jobs:
           REDIS_URL: redis://127.0.0.1:6379/0
       - run: 'python -c "from config.asgi import application; from workspace.routing import websocket_urlpatterns; assert len(websocket_urlpatterns) == 3"'
         env: *env
-      - run: python manage.py test workspace --verbosity 2
+      - run: python manage.py test workspace mailbox_app --verbosity 2
         env: *env
   react-build:
     runs-on: ubuntu-latest
@@ -58,4 +58,6 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
       - run: npm install --no-audit --no-fund
+      - run: npm run test:mail
       - run: npm run build
+

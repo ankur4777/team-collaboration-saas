@@ -54,6 +54,8 @@
 
 ## Phase 3 — Gmail + Outlook mailbox integration
 
+**Implemented in this update:** Outlook-style inbox/composer, local workspace mail, delegated Gmail/Graph OAuth adapters, folders/search/drafts/send/reply/forward/attachments, encrypted tokens and idempotent sends. Live provider consent, background incremental sync/webhooks and release verification remain pending; see EMAIL_SETUP.md.
+
 1. Register separate provider OAuth applications, review scope requirements and callback security.
 2. Connect accounts with OAuth Authorization Code + PKCE, state/nonce checks, encrypted tokens and refresh handling.
 3. Implement account listing, inbox/search/thread views and attachment download controls.
@@ -86,3 +88,4 @@
 ## High-priority next task
 
 **Validate account-wide device lists and remote sign-out in two browsers, including live chats, after migration 0009.** Then prioritize production notification delivery, trusted proxy configuration, verified-address enforcement, MFA groundwork and Gmail/Outlook OAuth.
+

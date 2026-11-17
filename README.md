@@ -1,3 +1,5 @@
+> **Email inbox:** Core email workflows, local workspace mail and delegated Gmail/Outlook connections are implemented. See [Email setup](docs/EMAIL_SETUP.md) for configuration and [validation notes](docs/EMAIL_VALIDATION.md) for testing limits.
+
 # TeamWorkspace — Multi-company collaboration SaaS
 
 **Development milestone:** Starter implementation, Phase 0 + first part of Phases 1–2.
@@ -32,7 +34,7 @@ This is a runnable **React + TypeScript frontend** and **Python Django + Django 
 - Responsive React screens for registration, login, workspace, team navigation, channels, messages, member management, and invitations.
 - First automated Django API tests for registration/CSRF/logout, invitations, and cross-company isolation.
 
-**Not yet implemented:** Gmail/Outlook OAuth and synchronized inbox, chat attachments, calendar, meetings, files, tasks, MFA, payments, audit trails, distributed login throttling, mandatory verification enforcement, password change while signed in, notification preferences and advanced admin workflows. Sidebar items for later phases are intentionally marked as coming soon.
+**Still planned:** Background Gmail/Outlook synchronization and push webhooks, rich HTML email editing, chat attachments, calendar, meetings, files, tasks, MFA, payments, audit trails, distributed login throttling and advanced admin workflows. See the email setup guide for the implemented mail features.
 
 ## Requirements
 
@@ -287,3 +289,4 @@ git push -u origin main
 ```
 
 Do not push the `.env` file or reuse the unrelated LMS repository.
+
