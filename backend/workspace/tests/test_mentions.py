@@ -113,8 +113,9 @@ class MentionsTests(TestCase):
     def test_group_mention_only_appears_to_participants(self):
         alice = self.add_person('alice@first.test', 'Alice Smith')
         outsider = self.add_person('outsider@first.test', 'Outsider')
+        helper = self.add_person('helper@first.test', 'Helper')
         response = self.post('/api/chats/', {
-            'kind': 'group', 'title': 'Announcements', 'emails': [alice.email],
+            'kind': 'group', 'title': 'Announcements', 'emails': [alice.email, helper.email],
         })
         self.assertEqual(response.status_code, 201, response.content)
         chat = response.json()
@@ -137,8 +138,9 @@ class MentionsTests(TestCase):
 
     def test_removed_chat_participant_cannot_see_old_mentions(self):
         alice = self.add_person('alice@first.test', 'Alice Smith')
+        helper = self.add_person('helper@first.test', 'Helper')
         chat = self.post('/api/chats/', {
-            'kind': 'group', 'title': 'Chat', 'emails': [alice.email],
+            'kind': 'group', 'title': 'Chat', 'emails': [alice.email, helper.email],
         }).json()
         self.post(f"/api/chats/{chat['id']}/messages/", {'body': 'Ping @Alice Smith'})
         notification = MentionNotification.objects.get()
@@ -182,8 +184,9 @@ class MentionsTests(TestCase):
 
     def test_soft_deleted_group_message_is_not_a_visible_mention(self):
         alice = self.add_person('alice@first.test', 'Alice Smith')
+        helper = self.add_person('helper@first.test', 'Helper')
         chat = self.post('/api/chats/', {
-            'kind': 'group', 'title': 'Chat', 'emails': [alice.email],
+            'kind': 'group', 'title': 'Chat', 'emails': [alice.email, helper.email],
         }).json()
         message = self.post(f"/api/chats/{chat['id']}/messages/", {
             'body': '@Alice Smith please see this',
