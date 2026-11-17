@@ -29,10 +29,13 @@ class MentionsTests(TestCase):
         self.channel = Channel.objects.create(team=self.team, name='General')
 
     def post(self, url, data=None):
-        return self.client.post(
+        result = self.client.post(
             url, data=json.dumps(data or {}), content_type='application/json',
             HTTP_X_CSRFTOKEN=self.csrf,
         )
+        if result.status_code < 300:
+            self.csrf = self.client.get('/api/auth/csrf/').json()['csrf_token']
+        return result
 
     def add_person(self, email, name, *, organization=None, team=False):
         organization = organization or self.org
