@@ -236,6 +236,39 @@ class ChatReaction(models.Model):
         ]
 
 
+class MentionNotification(models.Model):
+    """Durable, recipient-specific mention in an accessible chat or channel."""
+    id = models.UUIDField(primary_key=True, default=make_id, editable=False)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='mention_notifications')
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='mention_notifications')
+    chat_message = models.ForeignKey(
+        ChatMessage, on_delete=models.CASCADE, related_name='mention_notifications',
+        null=True, blank=True,
+    )
+    channel_message = models.ForeignKey(
+        Message, on_delete=models.CASCADE, related_name='mention_notifications',
+        null=True, blank=True,
+    )
+    read_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(chat_message__isnull=False, channel_message__isnull=True)
+                    | models.Q(chat_message__isnull=True, channel_message__isnull=False)
+                ),
+                name='ck_mention_single_message',
+            ),
+            models.UniqueConstraint(fields=['recipient', 'chat_message'], name='uq_mention_chat_recipient'),
+            models.UniqueConstraint(fields=['recipient', 'channel_message'], name='uq_mention_channel_recipient'),
+        ]
+        indexes = [
+            models.Index(fields=['organization', 'recipient', 'created_at'], name='idx_mention_org_user_date'),
+        ]
+
+
 class NotificationPreference(models.Model):
     """In-app notification visibility per employee and organization.
 
