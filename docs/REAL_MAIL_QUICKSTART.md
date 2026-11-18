@@ -25,9 +25,9 @@ For a Google **Web application** client JSON downloaded outside the repository, 
 .\tools\setup-mail.ps1 -Provider gmail -GoogleClientJson "$env:USERPROFILE\Downloads\client_secret.json"
 ```
 
-The JSON must include the matching Web redirect URI. The file is mounted read-only for import; its contents are not copied into the repository. Do not commit credential JSON or `.env` files.
+The JSON must include the matching Web redirect URI. The file is mounted read-only for import; credential values are saved only in the ignored local `.env`. Do not commit credential JSON or `.env` files.
 
-If running without the PowerShell wrapper, install `python-dotenv` and run `python tools/setup_mail.py --provider gmail` from an interactive local terminal, then recreate the API with `docker compose up -d --force-recreate api`.
+If running without the PowerShell wrapper, install `python-dotenv` and run `python tools/setup_mail.py --provider gmail` from an interactive local terminal, then rebuild/recreate the API with `docker compose up -d --build --force-recreate api`.
 
 ## Values required from your provider
 

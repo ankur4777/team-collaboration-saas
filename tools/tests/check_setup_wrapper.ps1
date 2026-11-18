@@ -35,6 +35,7 @@ try {
     Assert-Check ($global:MailSetupCalls.Count -eq 2) 'Do not restart the API after a failed wizard.'
     Assert-Check ((Get-Location).Path -eq $originalLocation.Path) 'Restore the caller location after failure.'
     Write-Host 'PowerShell wrapper checks passed.'
+    $global:LASTEXITCODE = 0
 }
 finally {
     Set-Location $originalLocation
