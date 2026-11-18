@@ -4,7 +4,7 @@ import tempfile
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, TestCase, override_settings
+from django.test import Client, TransactionTestCase, override_settings
 
 from workspace.models import (
     Channel, Organization, OrganizationMember, PrivateAttachment, Team, TeamMember,
@@ -12,7 +12,9 @@ from workspace.models import (
 
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
-class PrivateAttachmentTests(TestCase):
+class PrivateAttachmentTests(TransactionTestCase):
+    # Streaming FileResponse cleanup emits request_finished and closes DB connections.
+    # TransactionTestCase avoids invalidating TestCase's outer atomic transaction.
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
