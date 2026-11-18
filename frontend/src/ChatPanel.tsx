@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { ArrowRight, MessageCircle, Plus, RefreshCw, Send, Users, X } from 'lucide-react';
 import { api, type ChatMessage, type ChatThread, type Member, type Person } from './api';
 import ChatReactionBar from './ChatReactionBar';
+import AttachmentPanel from './AttachmentPanel';
 import MentionInput from './MentionInput';
 
 function titleFor(chat: ChatThread, userId: string) {
@@ -338,6 +339,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
             <div ref={bottomRef}/>
           </div>
           {Object.keys(typingUsers).length>0&&<div className="chat-typing-indicator" aria-live="polite">{Object.values(typingUsers).join(', ')} {Object.keys(typingUsers).length>1?'are':'is'} typing…</div>}
+          <AttachmentPanel key={selected!} kind="chat" parentId={selected!}/>
           <form className="private-chat-compose" onSubmit={send}><MentionInput ariaLabel="Write a message" value={draft} placeholder="Write a message... (@ to mention)" people={active.participants.map(p=>p.user).filter(user=>user.id!==currentUser.id)} onChange={changeDraft} onBlur={()=>emitTyping(false)}/><button className="send-button" aria-label="Send message" disabled={!draft.trim()||working}><Send size={18}/></button></form>
         </> : <div className="private-chat-welcome"><MessageCircle size={32}/><h3>Connect with your team</h3><p>Choose a conversation or start a new one.</p></div>}
       </div>
