@@ -24,6 +24,8 @@ services:
       retries: 10
   api:
     build: ./backend
+    volumes:
+      - attachment_data:/app/private_uploads
     restart: unless-stopped
     env_file: .env
     ports:
@@ -39,4 +41,5 @@ services:
       - "127.0.0.1:5173:5173"
     depends_on: [api]
 volumes:
+  attachment_data:
   mysql_data:

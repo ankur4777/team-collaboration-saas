@@ -18,3 +18,6 @@ backend/staticfiles/
 *.tsbuildinfo
 .email-backups/
 qa/
+
+# Private uploaded files must never be committed.
+backend/private_uploads/

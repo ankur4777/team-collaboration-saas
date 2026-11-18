@@ -23,6 +23,10 @@ export interface MentionNotification {
   created_at:string;
   read_at:string|null;
 }
+export interface PrivateAttachment {
+  id:string; name:string; size:number; content_type:string;
+  created_at:string; uploaded_by:Pick<Person,'id'|'full_name'|'email'>;
+}
 export interface Message { id: string; body: string; created_at: string; sender: Person }
 export interface ChatThread {
   id: string; kind: 'direct'|'group'; title: string;
@@ -85,7 +89,45 @@ async function secureLogin(path: string, body: unknown) {
   await csrf(); // Django rotates CSRF secret after login.
   return session;
 }
+async function uploadPrivateFile(path:string,file:File): Promise<PrivateAttachment> {
+  if(!csrfToken)await csrf();
+  const body=new FormData();
+  body.append('file',file);
+  const response=await fetch(`/api/${path}`,{
+    method:'POST',credentials:'same-origin',
+    headers:{'X-CSRFToken':csrfToken},body,
+  });
+  if(!response.ok){
+    const details=await response.json().catch(()=>null);
+    const message=typeof details?.file==='string'?details.file:
+      Array.isArray(details?.file)?details.file.join(', '):'Could not upload attachment';
+    throw new Error(message);
+  }
+  return response.json() as Promise<PrivateAttachment>;
+}
+
+async function downloadPrivateFile(row:PrivateAttachment): Promise<void> {
+  const response=await fetch(`/api/attachments/${encodeURIComponent(row.id)}/download/`,{
+    credentials:'same-origin',cache:'no-store',
+  });
+  if(!response.ok)throw new Error('File unavailable or access denied');
+  const blob=await response.blob();
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement('a');
+  link.href=url;
+  link.download=row.name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
+
 export const api = {
+  chatAttachments: (chatId:string) => request<PrivateAttachment[]>(`chats/${chatId}/attachments/`),
+  channelAttachments: (channelId:string) => request<PrivateAttachment[]>(`channels/${channelId}/attachments/`),
+  uploadChatAttachment: (chatId:string,file:File) => uploadPrivateFile(`chats/${chatId}/attachments/`,file),
+  uploadChannelAttachment: (channelId:string,file:File) => uploadPrivateFile(`channels/${channelId}/attachments/`,file),
+  downloadPrivateAttachment: (row:PrivateAttachment) => downloadPrivateFile(row),
   me: () => request<Session>('auth/me/'),
   register: (body: {email:string; password:string;full_name:string;organization_name:string}) => secureLogin('auth/register/', body),
   login: (email: string, password: string) => secureLogin('auth/login/', {email, password}),

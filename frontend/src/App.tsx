@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check, ChevronDown, Hash, Inbox, MessageCircle,
   Settings2, Sparkles, Users, Video, X, CalendarDays, FolderOpen, Search } from 'lucide-react';
 import { api, csrf, type Channel, type ChannelNotice, type Member, type Message, type Person, type Session, type Team } from './api';
 import ChatPanel from './ChatPanel';
+import AttachmentPanel from './AttachmentPanel';
 import MentionInput from './MentionInput';
 import EmailPanel from './EmailPanel';
 import MessageSearchPanel from './MessageSearchPanel';
@@ -248,7 +249,8 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
         <section className="conversation-panel">{activeChannel?<><div className="conversation-top"><div className="channel-avatar"><Hash size={23}/></div><div><h3>{activeChannel.name}</h3><p>{activeTeam.name} · {connected?'Live updates connected':'Messages are saved securely'}</p></div><span className={`connection-light ${connected?'online':''}`} title={connected?'WebSocket connected':'WebSocket disconnected'}/></div>
           <div className="message-area"><div className="channel-intro"><div className="channel-intro-mark"><Hash size={26}/></div><h2>Welcome to #{activeChannel.name}</h2><p>This is the beginning of the conversation in this channel.</p></div>
           <div className="message-list">{messages.map((message,index)=>{const previous=messages[index-1];const samePerson=previous?.sender.id===message.sender.id;return <div className={`message ${samePerson?'consecutive':''}`} key={message.id}>{!samePerson?<div className="msg-avatar">{initials(message.sender.full_name)}</div>:<div className="msg-avatar-placeholder"/>}<div className="msg-content">{!samePerson&&<div className="msg-meta"><strong>{message.sender.full_name}</strong><span>{relativeTime(message.created_at)}</span></div>}<div className="msg-body">{message.body}</div></div></div>;})}<div ref={bottomRef}/></div></div>
-          <form className="message-compose" onSubmit={send}><div className="compose-box"><MentionInput value={draft} onChange={setDraft} people={teamMentionPeople.filter(person=>person.id!==session.user.id)} placeholder={`Message #${activeChannel.name}`} ariaLabel="New message"/><button type="submit" className="send-button" disabled={!draft.trim()} aria-label="Send message"><Send size={18}/></button></div><div className="compose-caption">Type @ to mention a teammate · Enter to send · Only team members can read this channel</div></form>
+          <AttachmentPanel key={selectedChannel!} kind="channel" parentId={selectedChannel!}/>
+           <form className="message-compose" onSubmit={send}><div className="compose-box"><MentionInput value={draft} onChange={setDraft} people={teamMentionPeople.filter(person=>person.id!==session.user.id)} placeholder={`Message #${activeChannel.name}`} ariaLabel="New message"/><button type="submit" className="send-button" disabled={!draft.trim()} aria-label="Send message"><Send size={18}/></button></div><div className="compose-caption">Type @ to mention a teammate · Enter to send · Only team members can read this channel</div></form>
         </>:<Empty icon={<Hash size={32}/>} title="Choose a channel" description="Select a channel to see its conversations."/>}</section></div>
     </>}
   </>:view==='chats' ? <ChatPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id} currentUser={session.user} members={members} requestedChat={openChatRequest} onRead={()=>setNotificationRefresh(current=>current+1)}/>

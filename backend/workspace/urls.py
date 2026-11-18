@@ -1,4 +1,5 @@
 from django.urls import path
+from . import private_attachments
 from . import auth_views, views, member_views, chat_views, channel_notifications, account_recovery, settings_views, session_views, message_search, mentions
 
 urlpatterns = [
@@ -27,6 +28,7 @@ urlpatterns = [
     path('invitations/<str:token>/accept/', auth_views.invitation_accept),
     path('chats/', chat_views.ChatsView.as_view()),
     path('chats/<uuid:chat_id>/messages/', chat_views.ChatMessagesView.as_view()),
+    path('chats/<uuid:chat_id>/attachments/', private_attachments.ChatAttachmentsView.as_view()),
     path('chats/<uuid:chat_id>/read/', chat_views.ChatReadView.as_view()),
     path('chats/<uuid:chat_id>/messages/<uuid:message_id>/', chat_views.ChatMessageDetailView.as_view()),
     path('chats/<uuid:chat_id>/messages/<uuid:message_id>/reactions/', chat_views.ChatReactionView.as_view()),
@@ -39,4 +41,6 @@ urlpatterns = [
     path('teams/<uuid:team_id>/channels/', views.TeamChannelsView.as_view()),
     path('teams/<uuid:team_id>/members/', views.TeamMembersView.as_view()),
     path('channels/<uuid:channel_id>/messages/', views.ChannelMessagesView.as_view()),
+    path('channels/<uuid:channel_id>/attachments/', private_attachments.ChannelAttachmentsView.as_view()),
+    path('attachments/<uuid:attachment_id>/download/', private_attachments.AttachmentDownloadView.as_view()),
 ]
