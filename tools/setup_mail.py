@@ -57,7 +57,8 @@ def validate_key(value):
 def literal(value, label):
     if not value or any(ord(c) < 32 or ord(c) == 127 for c in value):
         raise SetupError(label + " is required and must be a single-line value.")
-    # Compose and python-dotenv both support escaped quotes/backslashes in single quotes.
+    # Single quotes keep dollar signs literal. Secret values are encoded before
+    # reaching this function because dotenv parsers differ on backslash handling.
     return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
 
 
