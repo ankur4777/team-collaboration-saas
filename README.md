@@ -290,3 +290,7 @@ git push -u origin main
 
 Do not push the `.env` file or reuse the unrelated LMS repository.
 
+# Real mailbox setup helper
+
+To configure Gmail or Outlook locally after creating your OAuth application, run `./tools/setup-mail.ps1 -Provider gmail` or `-Provider outlook` in VS Code PowerShell. The helper preserves existing settings, generates the mail encryption key when needed, securely prompts for provider credentials and checks the restarted API configuration. See [Real mail quickstart](docs/REAL_MAIL_QUICKSTART.md). Provider registration and user consent are required before live delivery can be tested.
+

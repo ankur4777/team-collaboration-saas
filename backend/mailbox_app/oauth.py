@@ -1,7 +1,6 @@
 import hashlib
 import json
 import secrets
-import re
 from datetime import timedelta
 from urllib.parse import urlencode
 import httpx
@@ -13,6 +12,7 @@ from django.utils.crypto import salted_hmac
 from rest_framework.exceptions import ValidationError
 from .common import MailError, ReconnectRequired, b64encode
 from .models import MailAccount, OAuthAttempt
+from .configuration import provider_status, valid_tenant
 
 GOOGLE_SCOPE = "https://www.googleapis.com/auth/gmail.modify"
 MICROSOFT_SCOPE = "offline_access User.Read Mail.ReadWrite Mail.Send"
@@ -45,7 +45,7 @@ def provider_config(provider):
         }
     if provider == "outlook":
         tenant = settings.MAIL_MICROSOFT_TENANT
-        if not re.fullmatch(r"(common|organizations|consumers|[0-9a-fA-F-]{36})", tenant):
+        if not valid_tenant(tenant):
             raise MailError("Invalid Microsoft tenant configuration.")
         base = "https://login.microsoftonline.com/" + tenant + "/oauth2/v2.0/"
         return {"client_id": settings.MAIL_MICROSOFT_CLIENT_ID, "client_secret": settings.MAIL_MICROSOFT_CLIENT_SECRET,
@@ -58,11 +58,9 @@ def redirect_uri(provider):
 
 
 def configured(provider):
-    c = provider_config(provider)
-    if not c["client_id"] or not c["client_secret"] or not settings.MAIL_TOKEN_ENCRYPTION_KEY:
-        return False
-    cipher()
-    return True
+    if provider not in ("gmail", "outlook"):
+        raise ValidationError("Unknown mailbox provider.")
+    return provider_status(provider)["ready"]
 
 
 def session_hash(request):
