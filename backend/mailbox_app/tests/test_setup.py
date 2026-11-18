@@ -1,5 +1,7 @@
 import io
 import json
+import base64
+import os
 from types import SimpleNamespace
 from unittest.mock import patch
 from cryptography.fernet import Fernet
@@ -10,6 +12,7 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 from mailbox_app.configuration import provider_status
 from mailbox_app.oauth import configured
 from mailbox_app.views import ConfigurationView
+from config.settings import mail_client_secret
 
 
 @override_settings(MAIL_GOOGLE_CLIENT_ID="test-client", MAIL_GOOGLE_CLIENT_SECRET="test-client-secret",
@@ -59,6 +62,20 @@ class ProviderSetupTests(SimpleTestCase):
         self.assertTrue(json.loads(output.getvalue())["providers"][0]["ready"])
         for secret in ("test-client-secret", "test-microsoft-secret"):
             self.assertNotIn(secret, output.getvalue())
+
+    def test_encoded_provider_secret_preserves_literal_characters(self):
+        secret = "test-only-$literal#quote's\\path"
+        encoded = base64.b64encode(secret.encode()).decode()
+        with patch.dict(os.environ, {"MAIL_GOOGLE_CLIENT_SECRET_BASE64": encoded, "MAIL_GOOGLE_CLIENT_SECRET": "stale"}):
+            self.assertEqual(mail_client_secret("MAIL_GOOGLE_CLIENT_SECRET"), secret)
+
+    def test_plaintext_configuration_remains_compatible(self):
+        with patch.dict(os.environ, {"MAIL_GOOGLE_CLIENT_SECRET_BASE64": "", "MAIL_GOOGLE_CLIENT_SECRET": "test-secret"}):
+            self.assertEqual(mail_client_secret("MAIL_GOOGLE_CLIENT_SECRET"), "test-secret")
+
+    def test_invalid_encoded_secret_cannot_fall_back_to_stale_credentials(self):
+        with patch.dict(os.environ, {"MAIL_GOOGLE_CLIENT_SECRET_BASE64": "not-base64", "MAIL_GOOGLE_CLIENT_SECRET": "stale"}):
+            self.assertEqual(mail_client_secret("MAIL_GOOGLE_CLIENT_SECRET"), "")
 
     @override_settings(MAIL_GOOGLE_CLIENT_ID="", MAIL_TOKEN_ENCRYPTION_KEY="not-a-secret-key")
     def test_command_fails_with_actionable_nonsecret_issues(self):

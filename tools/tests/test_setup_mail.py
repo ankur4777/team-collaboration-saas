@@ -46,7 +46,8 @@ class MailSetupTests(unittest.TestCase):
         values = dotenv_values(self.env, interpolate=False)
         self.assertEqual(values["MYSQL_PASSWORD"], "db-$literal")
         self.assertEqual(values["OTHER"], "first\nsecond")
-        self.assertEqual(values["MAIL_GOOGLE_CLIENT_SECRET"], CLIENT_SECRET)
+        self.assertEqual(base64.b64decode(values["MAIL_GOOGLE_CLIENT_SECRET_BASE64"]).decode(), CLIENT_SECRET)
+        self.assertNotIn("MAIL_GOOGLE_CLIENT_SECRET", values)
         self.assertEqual(len(base64.urlsafe_b64decode(values["MAIL_TOKEN_ENCRYPTION_KEY"])), 32)
         self.assertEqual(redirect, "http://localhost:5173/api/mail/oauth/gmail/callback/")
 
@@ -54,7 +55,7 @@ class MailSetupTests(unittest.TestCase):
         self.configure()
         values = dotenv_values(self.env, interpolate=False)
         self.configure(["", ""], secret="")
-        self.assertEqual(dotenv_values(self.env, interpolate=False), values)
+        self.assertEqual(dict(dotenv_values(self.env, interpolate=False)), dict(values))
         self.assertEqual(self.env.read_text().count("MAIL_TOKEN_ENCRYPTION_KEY="), 1)
 
     def test_existing_invalid_key_is_not_rotated(self):
@@ -63,6 +64,13 @@ class MailSetupTests(unittest.TestCase):
         with self.assertRaises(setup_mail.SetupError):
             self.configure()
         self.assertEqual(self.env.read_bytes(), original)
+
+    def test_existing_plaintext_secret_is_kept_without_reserializing(self):
+        line = "MAIL_GOOGLE_CLIENT_SECRET='original\\\\literal-secret'\r\n"
+        self.env.write_bytes(self.original + line.encode())
+        self.configure(secret="")
+        self.assertIn(line.encode(), self.env.read_bytes())
+        self.assertNotIn("MAIL_GOOGLE_CLIENT_SECRET_BASE64", dotenv_values(self.env))
 
     def test_invalid_client_and_multiline_secret_do_not_change_file(self):
         for answers, secret in [(["", "wrong-client"], CLIENT_SECRET), (["", CLIENT_ID], "secret\nINJECTED=yes")]:
@@ -84,7 +92,7 @@ class MailSetupTests(unittest.TestCase):
                           "redirect_uris": ["http://localhost:5173/api/mail/oauth/gmail/callback/"]}}
         file.write_text(json.dumps(config))
         self.configure([""], client_json=file)
-        self.assertEqual(dotenv_values(self.env, interpolate=False)["MAIL_GOOGLE_CLIENT_SECRET"], CLIENT_SECRET)
+        self.assertEqual(base64.b64decode(dotenv_values(self.env, interpolate=False)["MAIL_GOOGLE_CLIENT_SECRET_BASE64"]).decode(), CLIENT_SECRET)
         config["web"]["redirect_uris"] = ["http://localhost:8000/wrong"]
         file.write_text(json.dumps(config))
         original = self.env.read_bytes()
@@ -95,6 +103,14 @@ class MailSetupTests(unittest.TestCase):
     def test_google_installed_app_json_is_rejected(self):
         file = self.root / "google.json"
         file.write_text(json.dumps({"installed": {"client_id": CLIENT_ID}}))
+        with self.assertRaises(setup_mail.SetupError):
+            self.configure([""], client_json=file)
+        self.assertEqual(self.env.read_bytes(), self.original)
+
+    def test_google_json_missing_secret_cannot_reuse_another_clients_secret(self):
+        file = self.root / "google.json"
+        file.write_text(json.dumps({"web": {"client_id": CLIENT_ID,
+                                          "redirect_uris": ["http://localhost:5173/api/mail/oauth/gmail/callback/"]}}))
         with self.assertRaises(setup_mail.SetupError):
             self.configure([""], client_json=file)
         self.assertEqual(self.env.read_bytes(), self.original)
@@ -149,8 +165,8 @@ class MailSetupTests(unittest.TestCase):
         result = subprocess.run(["docker", "compose", "config", "--format", "json"], cwd=self.root,
                                 capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, "Compose could not parse the fixture environment")
-        value = json.loads(result.stdout)["services"]["test"]["environment"]["MAIL_GOOGLE_CLIENT_SECRET"]
-        self.assertEqual(value, CLIENT_SECRET)
+        value = json.loads(result.stdout)["services"]["test"]["environment"]["MAIL_GOOGLE_CLIENT_SECRET_BASE64"]
+        self.assertEqual(base64.b64decode(value).decode(), CLIENT_SECRET)
 
 
 if __name__ == "__main__":

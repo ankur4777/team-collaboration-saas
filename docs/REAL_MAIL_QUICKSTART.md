@@ -19,6 +19,8 @@ For Outlook/Microsoft 365:
 
 The helper builds/starts the API, prompts for the provider client ID and secret, updates only the selected provider's settings and shared mail settings, generates an encryption key only if one is missing, recreates the API and checks the configuration. Secrets are entered without echo and are not passed as command arguments. Existing database settings, comments, the other provider and valid encryption keys are preserved. A malformed existing encryption key stops setup rather than silently replacing it.
 
+The helper writes the selected client secret in the corresponding `MAIL_GOOGLE_CLIENT_SECRET_BASE64` or `MAIL_MICROSOFT_CLIENT_SECRET_BASE64` variable so Docker preserves all literal characters. The API decodes it before contacting the provider. Base64 is encoding, not encryption; protect this `.env` like any credential file. Existing plaintext `MAIL_*_CLIENT_SECRET` configurations remain supported; a nonempty encoded value takes precedence.
+
 For a Google **Web application** client JSON downloaded outside the repository, import it directly:
 
 ```powershell

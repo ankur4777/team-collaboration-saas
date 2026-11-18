@@ -82,7 +82,7 @@ def save_env(path, raw, bindings, updates):
     text = "".join(b.original.string for b in bindings if b.key not in updates)
     if text and not text.endswith(("\r", "\n")):
         text += newline
-    text += "".join(key + "=" + literal(value, key) + newline for key, value in updates.items())
+    text += "".join(key + "=" + literal(value, key) + newline for key, value in updates.items() if value is not None)
     if raw.startswith(b"\xef\xbb\xbf"):
         text = "\ufeff" + text
     original_stat = path.stat()
@@ -135,8 +135,20 @@ def configure(root, provider, read=input, read_secret=getpass.getpass, client_js
             raise SetupError("Select the Google OAuth Web application client JSON downloaded from Google Cloud.") from None
         if not isinstance(imported.get("redirect_uris"), list) or redirect not in imported["redirect_uris"]:
             raise SetupError("The imported client does not list the redirect URI shown above. Update the client and download it again.")
+        if any(not isinstance(imported.get(name), str) or not imported[name] for name in ("client_id", "client_secret")):
+            raise SetupError("The Google Web-client JSON must contain its client ID and client secret.")
     client_id = imported.get("client_id") if imported else read("Provider client ID (Enter keeps existing): ").strip() or existing.get(id_key, "")
-    client_secret = imported.get("client_secret") if imported else read_secret("Provider client secret (hidden; Enter keeps existing): ") or existing.get(secret_key, "")
+    client_secret = imported.get("client_secret") if imported else read_secret("Provider client secret (hidden; Enter keeps existing): ")
+    write_secret = bool(client_secret)
+    if not client_secret:
+        encoded = existing.get(secret_key + "_BASE64", "")
+        if encoded:
+            try:
+                client_secret = base64.b64decode(encoded, validate=True).decode("utf-8")
+            except (ValueError, UnicodeError):
+                raise SetupError("The saved provider secret is invalid. Enter its original value to replace it.") from None
+        else:
+            client_secret = existing.get(secret_key, "")
     if not isinstance(client_id, str) or not isinstance(client_secret, str):
         raise SetupError("The provider credentials are not valid strings.")
     literal(client_id, id_key)
@@ -157,9 +169,14 @@ def configure(root, provider, read=input, read_secret=getpass.getpass, client_js
                 UUID(tenant)
             except ValueError:
                 raise SetupError("Microsoft tenant must be common, organizations, consumers or a tenant UUID.") from None
-    updates = {id_key: client_id, secret_key: client_secret,
+    # Use a parser-safe encoded form: Compose and python-dotenv have different
+    # escaping rules for literal backslashes. This is encoding, not encryption.
+    updates = {id_key: client_id,
                "MAIL_TOKEN_ENCRYPTION_KEY": current_key or base64.urlsafe_b64encode(secrets.token_bytes(32)).decode(),
                "MAIL_CALLBACK_ORIGIN": origin}
+    if write_secret:
+        updates[secret_key] = None
+        updates[secret_key + "_BASE64"] = base64.b64encode(client_secret.encode("utf-8")).decode()
     if provider == "outlook":
         updates["MAIL_MICROSOFT_TENANT"] = tenant
     save_env(path, raw, bindings, updates)
