@@ -41,6 +41,7 @@
 - Implemented: authenticated, tenant-scoped keyword message search for direct/group chat and joined team channels, including join-time and soft-delete filters, a React Search page and newest-first bounded results.
 - Implemented: five emoji reactions for direct and group chat messages, secure user-scoped toggle endpoint, React controls, broadcast updates and deletion cleanup.
 - Implemented: @Full Name suggestions in team channels and direct/group chats, recipient-scoped durable mention alerts, mark-as-read, membership/privacy checks and notification-bell integration.
+- Implemented: private file attachments for direct/group chats and team channels (5 MiB allowlisted uploads, authorized downloads, persistent Docker storage). Production malware scanning, previews, retention and storage quotas remain planned.
 - Still planned: group creator transfer, group exit flow, desktop/mobile push and email notifications, persistent notification history, advanced preferences, attachments, indexed/full-text search, historical result navigation, retention and file previews.
 
 ## Phase 2 — Real-time communication
