@@ -5,6 +5,7 @@ EMAIL_* and HTTPS settings before putting this service on the internet.
 """
 from pathlib import Path
 import os
+import base64
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -111,9 +112,19 @@ SECURE_REFERRER_POLICY = 'no-referrer'  # Account recovery links must not leak v
 MAIL_LOCAL_ENABLED = os.getenv('MAIL_LOCAL_ENABLED', str(DEBUG)).lower() == 'true'
 MAIL_TOKEN_ENCRYPTION_KEY = os.getenv('MAIL_TOKEN_ENCRYPTION_KEY', '')
 MAIL_GOOGLE_CLIENT_ID = os.getenv('MAIL_GOOGLE_CLIENT_ID', '')
-MAIL_GOOGLE_CLIENT_SECRET = os.getenv('MAIL_GOOGLE_CLIENT_SECRET', '')
+def mail_client_secret(name):
+    """The setup helper uses Base64 to preserve secret characters across dotenv parsers."""
+    encoded = os.getenv(name + '_BASE64', '')
+    if encoded:
+        try:
+            return base64.b64decode(encoded, validate=True).decode('utf-8')
+        except (ValueError, UnicodeError):
+            return ''  # Report unconfigured without breaking startup or exposing the value.
+    return os.getenv(name, '')
+
+MAIL_GOOGLE_CLIENT_SECRET = mail_client_secret('MAIL_GOOGLE_CLIENT_SECRET')
 MAIL_MICROSOFT_CLIENT_ID = os.getenv('MAIL_MICROSOFT_CLIENT_ID', '')
-MAIL_MICROSOFT_CLIENT_SECRET = os.getenv('MAIL_MICROSOFT_CLIENT_SECRET', '')
+MAIL_MICROSOFT_CLIENT_SECRET = mail_client_secret('MAIL_MICROSOFT_CLIENT_SECRET')
 MAIL_MICROSOFT_TENANT = os.getenv('MAIL_MICROSOFT_TENANT', 'common')
 MAIL_CALLBACK_ORIGIN = os.getenv('MAIL_CALLBACK_ORIGIN', FRONTEND_ORIGIN)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 16 * 1024 * 1024

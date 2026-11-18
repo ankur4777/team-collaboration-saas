@@ -61,3 +61,29 @@ jobs:
       - run: npm run test:mail
       - run: npm run build
 
+  mail-setup-helper:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m pip install "python-dotenv>=1.0,<2"
+      - run: python -m unittest discover -s tools/tests -v
+      - name: Validate PowerShell setup script
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $parseErrors = $null
+          $tokens = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'tools/setup-mail.ps1'), [ref]$tokens, [ref]$parseErrors
+          ) | Out-Null
+          if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+      - name: Check setup wrapper orchestration
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tools/tests/check_setup_wrapper.ps1
+
