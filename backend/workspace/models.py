@@ -269,6 +269,42 @@ class MentionNotification(models.Model):
         ]
 
 
+def private_attachment_path(instance, filename):
+    """Return a random key: users cannot choose private storage paths."""
+    from pathlib import Path
+    suffix = Path(instance.original_name).suffix.lower()
+    return f'organizations/{instance.organization_id}/{uuid.uuid4().hex}{suffix}'
+
+
+class PrivateAttachment(models.Model):
+    """An attachment belongs to exactly one company channel or chat."""
+    id = models.UUIDField(primary_key=True, default=make_id, editable=False)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='private_attachments')
+    uploaded_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='uploaded_attachments')
+    chat = models.ForeignKey(ChatConversation, on_delete=models.CASCADE, related_name='attachments', null=True, blank=True)
+    channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name='attachments', null=True, blank=True)
+    file = models.FileField(upload_to=private_attachment_path)
+    original_name = models.CharField(max_length=120)
+    content_type = models.CharField(max_length=100)
+    size = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(chat__isnull=False, channel__isnull=True)
+                    | models.Q(chat__isnull=True, channel__isnull=False)
+                ),
+                name='ck_private_file_single_source',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['organization', 'chat', 'created_at'], name='idx_file_org_chat_date'),
+            models.Index(fields=['organization', 'channel', 'created_at'], name='idx_file_org_chan_date'),
+        ]
+
+
 class NotificationPreference(models.Model):
     """In-app notification visibility per employee and organization.
 
