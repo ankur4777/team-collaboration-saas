@@ -28,6 +28,8 @@ export interface PrivateAttachment {
   created_at:string; uploaded_by:Pick<Person,'id'|'full_name'|'email'>;
 }
 export interface Message { id: string; body: string; created_at: string; edited_at: string|null; deleted_at: string|null; sender: Person }
+export interface ChannelMessageCursor { before:string; before_id:string }
+export interface ChannelMessagePage { items:Message[]; has_more:boolean; next_cursor:ChannelMessageCursor|null }
 export interface ChatThread {
   id: string; kind: 'direct'|'group'; title: string;
   created_at: string; updated_at: string; created_by: Person; unread_count: number;
@@ -176,6 +178,14 @@ export const api = {
   teamMembers: (teamId:string) => request<Array<{user:Person;role:string}>>(`teams/${teamId}/members/`),
   addTeamMember: (teamId:string,email:string) => post(`teams/${teamId}/members/`,{email}),
   messages: (channelId:string) => request<Message[]>(`channels/${channelId}/messages/`),
+  channelMessagePage: (channelId:string, cursor?:ChannelMessageCursor|null) => {
+    const query = new URLSearchParams({page:'1'});
+    if (cursor) {
+      query.set('before',cursor.before);
+      query.set('before_id',cursor.before_id);
+    }
+    return request<ChannelMessagePage>(`channels/${channelId}/messages/?${query.toString()}`);
+  },
   sendMessage: (channelId:string,body:string) => post<Message>(`channels/${channelId}/messages/`,{body}),
   editChannelMessage: (channelId:string,messageId:string,body:string) => request<Message>(`channels/${channelId}/messages/${messageId}/`, 'PATCH', {body}),
   deleteChannelMessage: (channelId:string,messageId:string) => request<void>(`channels/${channelId}/messages/${messageId}/`, 'DELETE'),

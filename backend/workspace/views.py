@@ -1,11 +1,13 @@
 import hashlib
 import logging
+from uuid import UUID
 from urllib.parse import quote
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -168,14 +170,46 @@ class ChannelMessagesView(APIView):
         joined = TeamMember.objects.get(team=channel.team, user=request.user).joined_at
         records = Message.objects.filter(channel=channel, created_at__gte=joined).select_related('sender')
         before = request.query_params.get('before')
-        if before:
+        before_id = request.query_params.get('before_id')
+        paged = request.query_params.get('page')
+        if paged is not None and paged != '1':
+            raise ValidationError({'page': 'Use page=1 to request a paginated response'})
+        if before_id is not None and not before:
+            raise ValidationError({'before_id': 'Provide before with before_id'})
+        if before is not None:
             timestamp = parse_datetime(before)
             if timestamp is None or timezone.is_naive(timestamp):
                 raise ValidationError({'before': 'Use an ISO 8601 timestamp with timezone'})
-            records = records.filter(created_at__lt=timestamp)
-        records = list(records.order_by('-created_at', '-id')[:50])
-        records.reverse()
-        return Response(MessageSerializer(records, many=True).data)
+            if before_id is not None:
+                try:
+                    cursor_id = UUID(before_id)
+                except (TypeError, ValueError, AttributeError):
+                    raise ValidationError({'before_id': 'Provide a valid message UUID'})
+                # Composite cursor avoids missing or repeating posts with identical timestamps.
+                records = records.filter(
+                    Q(created_at__lt=timestamp)
+                    | Q(created_at=timestamp, id__lt=cursor_id)
+                )
+            else:
+                # Preserve compatibility with existing timestamp-only clients.
+                records = records.filter(created_at__lt=timestamp)
+        rows = list(records.order_by('-created_at', '-id')[:51 if paged else 50])
+        if paged:
+            has_more = len(rows) > 50
+            rows = rows[:50]
+            oldest = rows[-1] if rows else None
+            cursor = ({
+                'before': oldest.created_at.isoformat(),
+                'before_id': str(oldest.pk),
+            } if has_more and oldest else None)
+            rows.reverse()
+            return Response({
+                'items': MessageSerializer(rows, many=True).data,
+                'has_more': has_more,
+                'next_cursor': cursor,
+            })
+        rows.reverse()
+        return Response(MessageSerializer(rows, many=True).data)
 
     def post(self, request, channel_id):
         channel = require_channel_access(request, channel_id)

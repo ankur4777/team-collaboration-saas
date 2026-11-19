@@ -281,3 +281,24 @@
 .channel-message-error{color:#b34141;font-size:11px;margin-top:4px}
 .msg-body.deleted{color:#89988e;font-style:italic}
 .channel-edited-note{font-size:10px;color:#8a9c92}
+
+
+/* Channel history pagination - accessible, compact load-older action. */
+.channel-load-older{
+  align-self:center;
+  border:1px solid #b8dec9;
+  background:#f2faf5;
+  border-radius:20px;
+  color:#286b53;
+  font-weight:700;
+  font-size:11px;
+  padding:8px 15px;
+  margin:0 auto 12px;
+  cursor:pointer;
+}
+.channel-load-older:hover:not(:disabled),.channel-load-older:focus-visible{
+  border-color:#58aa7f;
+  background:#e5f4eb;
+}
+.channel-load-older:focus-visible{outline:2px solid #238b6d;outline-offset:2px}
+.channel-load-older:disabled{opacity:.62;cursor:wait}

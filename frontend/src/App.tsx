@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Hash, Inbox, MessageCircle,
   LayoutGrid, LockKeyhole, LogOut, Mail, Menu, Plus, Send,
   Settings2, Sparkles, Users, Video, X, CalendarDays, FolderOpen, Search } from 'lucide-react';
-import { api, csrf, type Channel, type ChannelNotice, type Member, type Message, type Person, type Session, type Team } from './api';
+import { api, csrf, type Channel, type ChannelMessageCursor, type ChannelNotice, type Member, type Message, type Person, type Session, type Team } from './api';
 import ChatPanel from './ChatPanel';
 import ChannelMessageItem from './ChannelMessageItem';
 import AttachmentPanel from './AttachmentPanel';
@@ -115,6 +115,13 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   currentOrgRef.current = session.active_organization_id;
   const lastChannelReadRef = useRef<string|null>(null);
   const [loadedChannelId,setLoadedChannelId] = useState<string|null>(null);
+  const [channelCursor,setChannelCursor] = useState<ChannelMessageCursor|null>(null);
+  const [channelHasMore,setChannelHasMore] = useState(false);
+  const [channelLoadingOlder,setChannelLoadingOlder] = useState(false);
+  const olderRequestRef = useRef(false);
+  const channelScrollRef = useRef<HTMLDivElement>(null);
+  const channelScrollAnchorRef = useRef<{height:number;top:number}|null>(null);
+  const channelAutoScrollRef = useRef(true);
   const [selectedTeam,setSelectedTeam] = useState<string|null>(null);
   const [channels,setChannels] = useState<Channel[]>([]);const [selectedChannel,setSelectedChannel] = useState<string|null>(null);
   const [messages,setMessages] = useState<Message[]>([]); const [members,setMembers] = useState<Member[]>([]);
@@ -127,7 +134,9 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   const [teamMentionPeople,setTeamMentionPeople] = useState<Person[]>([]);
   const [error,setError] = useState('');const [modal,setModal] = useState<null|'team'|'channel'|'invite'|'members'>(null);
   const [sidebarOpen,setSidebarOpen] = useState(false);const [connected,setConnected] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+
+  const selectedChannelRef = useRef(selectedChannel);
+  selectedChannelRef.current = selectedChannel;
   const activeOrg = session.organizations.find(o=>o.id===session.active_organization_id);
   const activeTeam = teams.find(t=>t.id===selectedTeam);
   const activeChannel = channels.find(c=>c.id===selectedChannel);
@@ -164,20 +173,30 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   },[selectedTeam,session.active_organization_id]);
   useEffect(()=>{if(!selectedTeam){setChannels([]);setSelectedChannel(null);return;}let valid=true;api.channels(selectedTeam).then(rows=>{if(!valid)return;setChannels(rows);setSelectedChannel(current=>current&&rows.some(c=>c.id===current)?current:rows[0]?.id||null);}).catch(e=>valid&&setError(errorText(e)));return()=>{valid=false;};},[selectedTeam]);
   useEffect(()=>{
+    channelAutoScrollRef.current=true;
+    channelScrollAnchorRef.current=null;
+    olderRequestRef.current=false;
+    setChannelCursor(null);
+    setChannelHasMore(false);
+    setChannelLoadingOlder(false);
     if(!selectedChannel){setMessages([]);setLoadedChannelId(null);return;}
     let valid=true;
     setMessages([]);
     setLoadedChannelId(null);
-    api.messages(selectedChannel).then(rows=>{
+    api.channelMessagePage(selectedChannel).then(page=>{
       if(!valid)return;
       setMessages(previous=>{
-        const all=new Map([...rows,...previous].map(m=>[m.id,m]));
-        return [...all.values()].sort((a,b)=>a.created_at.localeCompare(b.created_at));
+        // Keep WebSocket messages that arrived while initial history was loading.
+        const all=new Map([...page.items,...previous].map(m=>[m.id,m]));
+        return [...all.values()].sort((a,b)=>
+          a.created_at.localeCompare(b.created_at)||a.id.localeCompare(b.id));
       });
+      setChannelCursor(page.next_cursor);
+      setChannelHasMore(page.has_more);
       setLoadedChannelId(selectedChannel);
     }).catch(e=>valid&&setError(errorText(e)));
     return()=>{valid=false;};
-  },[selectedChannel]);
+  },[selectedChannel,session.active_organization_id]);
   useEffect(()=>{if(!selectedChannel)return;let open=true;setConnected(false);const protocol=location.protocol==='https:'?'wss:':'ws:';
     const socket=new WebSocket(`${protocol}//${location.host}/ws/channels/${selectedChannel}/`);
     socket.onopen=()=>{if(open)setConnected(true);};socket.onclose=()=>{if(open)setConnected(false);};
@@ -189,7 +208,17 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
     }catch{/* Ignore malformed server messages */}};
     return()=>{open=false;socket.close();};
   },[selectedChannel]);
-  useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:'smooth'});},[messages.length]);
+  useLayoutEffect(()=>{
+    const area=channelScrollRef.current;
+    if(!area)return;
+    const anchor=channelScrollAnchorRef.current;
+    if(anchor){
+      channelScrollAnchorRef.current=null;
+      area.scrollTop=anchor.top+(area.scrollHeight-anchor.height);
+    }else if(channelAutoScrollRef.current){
+      area.scrollTop=area.scrollHeight;
+    }
+  },[messages.length,selectedChannel]);
 
   const latestChannelMessage = messages[messages.length-1];
   const latestChannelMessageId = latestChannelMessage?.id;
@@ -227,7 +256,43 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   function addTeamMember(e:FormEvent){e.preventDefault();if(!selectedTeam)return;void action(async()=>{await api.addTeamMember(selectedTeam,teamMemberEmail);setTeamMemberEmail('');});}
   async function changeMemberRole(member:Member, role:'admin'|'member') {if(!activeOrg || member.role===role)return;setError('');setMemberBusyId(member.id);try {await api.updateMemberRole(activeOrg.id,member.id,role);setMembers(await api.members(activeOrg.id));}catch(e){setError(errorText(e));}finally{setMemberBusyId(null);}}
   async function removeEmployee(member:Member) {if(!activeOrg)return;if(!window.confirm(`Remove ${member.user.full_name} from ${activeOrg.name}? They will lose access to its teams and channels.`))return;setError('');setMemberBusyId(member.id);try{await api.removeMember(activeOrg.id,member.id);setMembers(await api.members(activeOrg.id));}catch(e){setError(errorText(e));}finally{setMemberBusyId(null);}}
-  async function send(e:FormEvent){e.preventDefault();if(!selectedChannel||!draft.trim())return;const body=draft;setDraft('');try{const message=await api.sendMessage(selectedChannel,body);setMessages(old=>old.some(m=>m.id===message.id)?old:[...old,message]);}catch(err){setDraft(body);setError(errorText(err));}}
+  async function send(e:FormEvent){e.preventDefault();if(!selectedChannel||!draft.trim())return;const body=draft;setDraft('');try{const message=await api.sendMessage(selectedChannel,body);channelAutoScrollRef.current=true;setMessages(old=>old.some(m=>m.id===message.id)?old:[...old,message]);}catch(err){setDraft(body);setError(errorText(err));}}
+
+  async function loadOlderChannelMessages(){
+    const channelId=selectedChannel;
+    const cursor=channelCursor;
+    if(!channelId||!cursor||!channelHasMore||channelLoadingOlder||olderRequestRef.current)return;
+    olderRequestRef.current=true;
+    setChannelLoadingOlder(true);
+    const area=channelScrollRef.current;
+    channelScrollAnchorRef.current=area?{height:area.scrollHeight,top:area.scrollTop}:null;
+    const organizationId=session.active_organization_id;
+    try{
+      const page=await api.channelMessagePage(channelId,cursor);
+      if(selectedChannelRef.current!==channelId||currentOrgRef.current!==organizationId)return;
+      if(page.items.length){
+        setMessages(current=>{
+          const all=new Map([...page.items,...current].map(m=>[m.id,m]));
+          return [...all.values()].sort((a,b)=>
+            a.created_at.localeCompare(b.created_at)||a.id.localeCompare(b.id));
+        });
+      }else{
+        channelScrollAnchorRef.current=null;
+      }
+      setChannelCursor(page.next_cursor);
+      setChannelHasMore(page.has_more);
+    }catch(e){
+      if(selectedChannelRef.current===channelId){
+        channelScrollAnchorRef.current=null;
+        setError(errorText(e));
+      }
+    }finally{
+      olderRequestRef.current=false;
+      if(selectedChannelRef.current===channelId&&currentOrgRef.current===organizationId){
+        setChannelLoadingOlder(false);
+      }
+    }
+  }
   function switchOrg(id:string){void action(async()=>{const next=await api.activate(id);onSession(next);setOpenChatRequest(null);setView('teams');},false);}
   async function signOut(){try{await api.logout();onLogout();}catch(e){setError(errorText(e));}}
 
@@ -252,8 +317,17 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
     <><div className="workspace-heading"><div><div className="eyebrow">YOUR WORKSPACE / TEAMS</div><h1>{activeTeam.name}</h1><p className="muted">Collaborate, share updates, and keep your team in sync.</p></div><div className="heading-actions"><button className="outline-button" onClick={()=>setModal('members')}><Users size={16}/> Manage members</button><button className="primary-button" onClick={()=>setModal('channel')}><Plus size={17}/> New channel</button></div></div>
       <div className="chat-workspace"><section className="channels-panel"><div className="panel-title">CHANNELS <button className="icon-button" title="New channel" onClick={()=>setModal('channel')}><Plus size={17}/></button></div>{channels.map(ch=><button className={`channel-card ${selectedChannel===ch.id?'active':''}`} key={ch.id} onClick={()=>setSelectedChannel(ch.id)}><span className="channel-symbol"><Hash size={17}/></span><span>{ch.name}</span>{channelUnread(ch.id)>0&&<span className="channel-unread-count" aria-label={`${channelUnread(ch.id)} unread messages`}>{channelUnread(ch.id)>99?'99+':channelUnread(ch.id)}</span>}{selectedChannel===ch.id&&<span className="selected-indicator"/>}</button>)}<div className="channel-help"><Sparkles size={18}/><strong>A place for every topic</strong><p>Create channels to keep discussions organized.</p></div></section>
         <section className="conversation-panel">{activeChannel?<><div className="conversation-top"><div className="channel-avatar"><Hash size={23}/></div><div><h3>{activeChannel.name}</h3><p>{activeTeam.name} · {connected?'Live updates connected':'Messages are saved securely'}</p></div><span className={`connection-light ${connected?'online':''}`} title={connected?'WebSocket connected':'WebSocket disconnected'}/></div>
-          <div className="message-area"><div className="channel-intro"><div className="channel-intro-mark"><Hash size={26}/></div><h2>Welcome to #{activeChannel.name}</h2><p>This is the beginning of the conversation in this channel.</p></div>
-          <div className="message-list">{messages.map((message,index)=><ChannelMessageItem key={message.id} channelId={selectedChannel!} message={message} isMine={message.sender.id===session.user.id} samePerson={messages[index-1]?.sender.id===message.sender.id} onUpdated={updated=>setMessages(current=>current.map(row=>row.id===updated.id?updated:row))}/>)}<div ref={bottomRef}/></div></div>
+          <div className="message-area" ref={channelScrollRef} onScroll={e=>{
+              const el=e.currentTarget;
+              if(!olderRequestRef.current&&!channelScrollAnchorRef.current){
+                channelAutoScrollRef.current=el.scrollHeight-el.scrollTop-el.clientHeight<120;
+              }
+            }}><div className="channel-intro"><div className="channel-intro-mark"><Hash size={26}/></div><h2>Welcome to #{activeChannel.name}</h2><p>This is the beginning of the conversation in this channel.</p></div>
+          <div className="message-list">{loadedChannelId===selectedChannel&&channelHasMore&&
+            <button className="channel-load-older" type="button" disabled={channelLoadingOlder}
+              aria-label="Load older channel messages"
+              onClick={()=>void loadOlderChannelMessages()}>{channelLoadingOlder?'Loading older messages…':'Load older messages'}</button>}
+            {messages.map((message,index)=><ChannelMessageItem key={message.id} channelId={selectedChannel!} message={message} isMine={message.sender.id===session.user.id} samePerson={messages[index-1]?.sender.id===message.sender.id} onUpdated={updated=>setMessages(current=>current.map(row=>row.id===updated.id?updated:row))}/>)}</div></div>
           <AttachmentPanel key={selectedChannel!} kind="channel" parentId={selectedChannel!}/>
            <form className="message-compose" onSubmit={send}><div className="compose-box"><MentionInput value={draft} onChange={setDraft} people={teamMentionPeople.filter(person=>person.id!==session.user.id)} placeholder={`Message #${activeChannel.name}`} ariaLabel="New message"/><button type="submit" className="send-button" disabled={!draft.trim()} aria-label="Send message"><Send size={18}/></button></div><div className="compose-caption">Type @ to mention a teammate · Enter to send · Only team members can read this channel</div></form>
         </>:<Empty icon={<Hash size={32}/>} title="Choose a channel" description="Select a channel to see its conversations."/>}</section></div>
