@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check, ChevronDown, Hash, Inbox, MessageCircle,
   Settings2, Sparkles, Users, Video, X, CalendarDays, FolderOpen, Search } from 'lucide-react';
 import { api, csrf, type Channel, type ChannelNotice, type Member, type Message, type Person, type Session, type Team } from './api';
 import ChatPanel from './ChatPanel';
+import ChannelMessageItem from './ChannelMessageItem';
 import AttachmentPanel from './AttachmentPanel';
 import MentionInput from './MentionInput';
 import EmailPanel from './EmailPanel';
@@ -181,7 +182,12 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   useEffect(()=>{if(!selectedChannel)return;let open=true;setConnected(false);const protocol=location.protocol==='https:'?'wss:':'ws:';
     const socket=new WebSocket(`${protocol}//${location.host}/ws/channels/${selectedChannel}/`);
     socket.onopen=()=>{if(open)setConnected(true);};socket.onclose=()=>{if(open)setConnected(false);};
-    socket.onmessage=event=>{try {const payload=JSON.parse(event.data) as {type:string;message:Message};if(payload.type==='message'&&open)setMessages(old=>old.some(m=>m.id===payload.message.id)?old:[...old,payload.message]);}catch{/* Ignore malformed server messages */}};
+    socket.onmessage=event=>{try {
+      const payload=JSON.parse(event.data) as {type:string;message:Message};
+      if(!open||!payload.message)return;
+      if(payload.type==='message')setMessages(old=>old.some(m=>m.id===payload.message.id)?old:[...old,payload.message]);
+      else if(payload.type==='message.updated'||payload.type==='message.deleted')setMessages(old=>old.map(row=>row.id===payload.message.id?payload.message:row));
+    }catch{/* Ignore malformed server messages */}};
     return()=>{open=false;socket.close();};
   },[selectedChannel]);
   useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:'smooth'});},[messages.length]);
@@ -248,7 +254,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
       <div className="chat-workspace"><section className="channels-panel"><div className="panel-title">CHANNELS <button className="icon-button" title="New channel" onClick={()=>setModal('channel')}><Plus size={17}/></button></div>{channels.map(ch=><button className={`channel-card ${selectedChannel===ch.id?'active':''}`} key={ch.id} onClick={()=>setSelectedChannel(ch.id)}><span className="channel-symbol"><Hash size={17}/></span><span>{ch.name}</span>{channelUnread(ch.id)>0&&<span className="channel-unread-count" aria-label={`${channelUnread(ch.id)} unread messages`}>{channelUnread(ch.id)>99?'99+':channelUnread(ch.id)}</span>}{selectedChannel===ch.id&&<span className="selected-indicator"/>}</button>)}<div className="channel-help"><Sparkles size={18}/><strong>A place for every topic</strong><p>Create channels to keep discussions organized.</p></div></section>
         <section className="conversation-panel">{activeChannel?<><div className="conversation-top"><div className="channel-avatar"><Hash size={23}/></div><div><h3>{activeChannel.name}</h3><p>{activeTeam.name} · {connected?'Live updates connected':'Messages are saved securely'}</p></div><span className={`connection-light ${connected?'online':''}`} title={connected?'WebSocket connected':'WebSocket disconnected'}/></div>
           <div className="message-area"><div className="channel-intro"><div className="channel-intro-mark"><Hash size={26}/></div><h2>Welcome to #{activeChannel.name}</h2><p>This is the beginning of the conversation in this channel.</p></div>
-          <div className="message-list">{messages.map((message,index)=>{const previous=messages[index-1];const samePerson=previous?.sender.id===message.sender.id;return <div className={`message ${samePerson?'consecutive':''}`} key={message.id}>{!samePerson?<div className="msg-avatar">{initials(message.sender.full_name)}</div>:<div className="msg-avatar-placeholder"/>}<div className="msg-content">{!samePerson&&<div className="msg-meta"><strong>{message.sender.full_name}</strong><span>{relativeTime(message.created_at)}</span></div>}<div className="msg-body">{message.body}</div></div></div>;})}<div ref={bottomRef}/></div></div>
+          <div className="message-list">{messages.map((message,index)=><ChannelMessageItem key={message.id} channelId={selectedChannel!} message={message} isMine={message.sender.id===session.user.id} samePerson={messages[index-1]?.sender.id===message.sender.id} onUpdated={updated=>setMessages(current=>current.map(row=>row.id===updated.id?updated:row))}/>)}<div ref={bottomRef}/></div></div>
           <AttachmentPanel key={selectedChannel!} kind="channel" parentId={selectedChannel!}/>
            <form className="message-compose" onSubmit={send}><div className="compose-box"><MentionInput value={draft} onChange={setDraft} people={teamMentionPeople.filter(person=>person.id!==session.user.id)} placeholder={`Message #${activeChannel.name}`} ariaLabel="New message"/><button type="submit" className="send-button" disabled={!draft.trim()} aria-label="Send message"><Send size={18}/></button></div><div className="compose-caption">Type @ to mention a teammate · Enter to send · Only team members can read this channel</div></form>
         </>:<Empty icon={<Hash size={32}/>} title="Choose a channel" description="Select a channel to see its conversations."/>}</section></div>
