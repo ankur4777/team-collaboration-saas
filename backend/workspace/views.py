@@ -14,7 +14,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .auth_views import auth_payload
-from .models import Channel, Invitation, Message, Organization, OrganizationMember, Team, TeamMember, User
+from .models import Channel, Invitation, MentionNotification, Message, Organization, OrganizationMember, Team, TeamMember, User
 from .permissions import get_active_membership, require_channel_access, require_team_access
 from .notification_events import publish_notification_refresh
 from .mentions import create_mentions
@@ -152,10 +152,10 @@ class TeamMembersView(APIView):
         return Response({'user_id': str(member.user.id), 'role': obj.role}, status=status.HTTP_201_CREATED)
 
 
-def broadcast_message(channel_id, payload):
+def broadcast_message(channel_id, payload, action='message'):
     try:
         async_to_sync(get_channel_layer().group_send)(f'channel_{channel_id}', {
-            'type': 'chat.message', 'message': payload,
+            'type': 'chat.message', 'message': payload, 'action': action,
         })
     except Exception:
         # Persisted message remains valid; clients can refresh if Redis is unavailable.
@@ -165,7 +165,8 @@ def broadcast_message(channel_id, payload):
 class ChannelMessagesView(APIView):
     def get(self, request, channel_id):
         channel = require_channel_access(request, channel_id)
-        records = Message.objects.filter(channel=channel).select_related('sender')
+        joined = TeamMember.objects.get(team=channel.team, user=request.user).joined_at
+        records = Message.objects.filter(channel=channel, created_at__gte=joined).select_related('sender')
         before = request.query_params.get('before')
         if before:
             timestamp = parse_datetime(before)
@@ -200,3 +201,63 @@ class ChannelMessagesView(APIView):
                 lambda: publish_notification_refresh(channel.team.organization_id, recipients)
             )
         return Response(payload, status=status.HTTP_201_CREATED)
+
+
+class ChannelMessageDetailView(APIView):
+    """Only an authorized message author can edit or soft-delete their channel post."""
+
+    def patch(self, request, channel_id, message_id):
+        channel = require_channel_access(request, channel_id)
+        body = request.data.get('body')
+        if not isinstance(body, str) or not 1 <= len(body.strip()) <= 4000:
+            raise ValidationError({'body': 'Message must contain 1–4000 characters'})
+        with transaction.atomic():
+            message = get_object_or_404(
+                Message.objects.select_for_update().select_related('sender'),
+                pk=message_id, channel=channel,
+            )
+            if message.sender_id != request.user.pk:
+                raise PermissionDenied('Only the author can edit this message')
+            if message.deleted_at:
+                raise ValidationError({'detail': 'Deleted messages cannot be edited'})
+            message.body = body.strip()
+            message.edited_at = timezone.now()
+            message.save(update_fields=['body', 'edited_at'])
+            payload = MessageSerializer(message).data
+            transaction.on_commit(
+                lambda: broadcast_message(channel.pk, payload, action='message.updated')
+            )
+        return Response(payload)
+
+    def delete(self, request, channel_id, message_id):
+        channel = require_channel_access(request, channel_id)
+        with transaction.atomic():
+            message = get_object_or_404(
+                Message.objects.select_for_update().select_related('sender'),
+                pk=message_id, channel=channel,
+            )
+            if message.sender_id != request.user.pk:
+                raise PermissionDenied('Only the author can delete this message')
+            if message.deleted_at is None:
+                recipients = list(MentionNotification.objects.filter(
+                    channel_message=message,
+                ).values_list('recipient_id', flat=True))
+                MentionNotification.objects.filter(channel_message=message).delete()
+                message.body = ''
+                message.deleted_at = timezone.now()
+                message.save(update_fields=['body', 'deleted_at'])
+                payload = MessageSerializer(message).data
+                transaction.on_commit(
+                    lambda: broadcast_message(channel.pk, payload, action='message.deleted')
+                )
+                members = list(TeamMember.objects.filter(
+                    team=channel.team,
+                    user__organization_memberships__organization_id=channel.team.organization_id,
+                    user__is_active=True,
+                ).values_list('user_id', flat=True))
+                transaction.on_commit(
+                    lambda: publish_notification_refresh(
+                        channel.team.organization_id, set(members + recipients)
+                    )
+                )
+        return Response(status=status.HTTP_204_NO_CONTENT)
