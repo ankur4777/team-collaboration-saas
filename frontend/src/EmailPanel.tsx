@@ -41,6 +41,7 @@ export default function EmailPanel({workspaceId,user}:{workspaceId:string|null;u
   const [query,setQuery]=useState('');const [search,setSearch]=useState('');
   const [next,setNext]=useState('');const [page,setPage]=useState('');const [history,setHistory]=useState<string[]>([]);
   const [checked,setChecked]=useState<Set<string>>(new Set());
+  const [unreadOnly,setUnreadOnly]=useState(false);
   const [loading,setLoading]=useState(false);const [reading,setReading]=useState(false);
   const [initializing,setInitializing]=useState(true);const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');const [notice,setNotice]=useState('');
@@ -124,10 +125,10 @@ export default function EmailPanel({workspaceId,user}:{workspaceId:string|null;u
     document.addEventListener('keydown',trap);return()=>document.removeEventListener('keydown',trap);
   },[Boolean(editor),manager]);
 
-  function chooseFolder(value:FolderId){setFolder(value);setPage('');setHistory([]);setFolderMenu(false);}
+  function chooseFolder(value:FolderId){setUnreadOnly(false);setFolder(value);setPage('');setHistory([]);setFolderMenu(false);}
   function chooseAccount(value:string){
     if(editor&&!window.confirm('Close this compose window? Save a draft first to keep your edits.'))return;
-    setEditor(null);setAccountId(value);setFolders([]);setFolder('inbox');setSearch('');setQuery('');setPage('');setHistory([]);
+    setUnreadOnly(false);setEditor(null);setAccountId(value);setFolders([]);setFolder('inbox');setSearch('');setQuery('');setPage('');setHistory([]);
   }
   async function connect(provider:'gmail'|'outlook'){
     setBusy(true);setError('');
@@ -246,13 +247,29 @@ export default function EmailPanel({workspaceId,user}:{workspaceId:string|null;u
     setEditor(null);
   }
   const selected=message;const canAct=Boolean(selected&&!busy&&selected.folder!=='drafts');
+  const visibleRows=unreadOnly?rows.filter(row=>!row.is_read):rows;
+  const actionIds=checked.size?Array.from(checked):selectedId?[selectedId]:[];
+  const canToolbarAct=Boolean(account&&!busy&&!loading&&!reading&&folder!=='drafts'&&actionIds.length);
+  const readAction=checked.size?'read':selected?.is_read?'unread':'read';
+
   return <section className="email-shell">
-    <div className="email-heading"><div><span className="email-eyebrow">YOUR CONNECTED MAILBOXES</span><h1>Mail</h1></div>
+    <div className="email-heading"><div className="email-title"><Mail size={21}/><h1>Mail</h1><span className="email-home-label">Home</span></div>
       <form className="email-search" onSubmit={e=>{e.preventDefault();setSearch(query.trim());setPage('');setHistory([]);}}>
         <Search size={18}/><input aria-label="Search mailbox" placeholder={'Search '+folderLabel.toLowerCase()} maxLength={200} value={query} onChange={e=>setQuery(e.target.value)} disabled={!account}/>
         {query&&<button type="button" aria-label="Clear search" onClick={()=>{setQuery('');setSearch('');setPage('');setHistory([]);}}><X size={16}/></button>}
         <button type="submit" disabled={!account}>Search</button>
       </form><Button label="Manage mailboxes" icon={Settings2} onClick={()=>setManager(true)} disabled={initializing||Boolean(editor)}/></div>
+    <div className="email-command-bar" role="toolbar" aria-label="Mail actions">
+      <button className="mail-primary" onClick={newMessage} disabled={!account||busy||initializing}><Plus size={17}/>New message</button>
+      <span className="email-command-divider"/>
+      <button disabled={!canToolbarAct} onClick={()=>void action(folder==='trash'?'restore':'trash',actionIds)}>{folder==='trash'?<Inbox size={17}/>:<Trash2 size={17}/>}<span>{folder==='trash'?'Restore':'Delete'}</span></button>
+      <button disabled={!canToolbarAct} onClick={()=>void action('archive',actionIds)}><Archive size={17}/><span>Archive</span></button>
+      <button disabled={!canToolbarAct} onClick={()=>void action('junk',actionIds)}><ShieldAlert size={17}/><span>Junk</span></button>
+      <span className="email-command-divider"/>
+      <button disabled={!canAct||checked.size>0} onClick={()=>void startReply('reply_all')} aria-label="Reply all from toolbar"><ReplyAll size={17}/><span>Reply all</span></button>
+      <button disabled={!canToolbarAct} onClick={()=>void action(readAction,actionIds)}><MailOpen size={17}/><span>{readAction==='unread'?'Mark unread':'Mark read'}</span></button>
+      <button className="email-command-refresh" disabled={!account||busy||loading} onClick={refresh} aria-label="Refresh mailbox"><RefreshCw size={17}/></button>
+    </div>
     {error&&<div className="email-alert error" role="alert">{error}<button aria-label="Dismiss error" onClick={()=>setError('')}><X size={16}/></button></div>}
     {notice&&<div className="email-alert" role="status"><Check size={16}/>{notice}<button aria-label="Dismiss notice" onClick={()=>setNotice('')}><X size={16}/></button></div>}
     {initializing?<div className="email-empty"><div className="spin"/><h2>Opening your mailboxes…</h2></div>:!account?
@@ -263,7 +280,9 @@ export default function EmailPanel({workspaceId,user}:{workspaceId:string|null;u
       </div>:
       <div className={'email-layout'+(selectedId?' has-reading':'')}>
         <aside className={'email-folders'+(folderMenu?' is-open':'')}>
-          <button className="mail-primary mail-new" onClick={newMessage} disabled={busy}><Plus size={18}/>New message</button>
+          <div className="email-folder-section-title"><ChevronDown size={13}/>Favourites</div>
+          <nav className="email-favourites" aria-label="Favourite folders">{FOLDERS.filter(f=>['inbox','sent','drafts'].includes(f.id)).map(f=><button key={f.id} aria-label={'Favourite '+f.label} className={folder===f.id?'active':''} onClick={()=>chooseFolder(f.id)}><f.icon size={17}/><span>{f.label}</span></button>)}</nav>
+          <div className="email-folder-section-title email-mailbox-title"><ChevronDown size={13}/>Your mailboxes</div>
           <label className="email-account-label" htmlFor="mailbox-select">MAILBOX</label>
           <select id="mailbox-select" value={accountId} onChange={e=>chooseAccount(e.target.value)} disabled={busy||editingBusy}>
             {accounts.map(a=><option key={a.id} value={a.id}>{a.email+' · '+a.provider}</option>)}
@@ -277,18 +296,22 @@ export default function EmailPanel({workspaceId,user}:{workspaceId:string|null;u
         <section className="email-list" aria-label="Email messages">
           <div className="email-list-heading"><button className="email-mobile-folders" aria-label="Choose mail folder" onClick={()=>setFolderMenu(v=>!v)}><Folder size={18}/><ChevronDown size={14}/></button>
             <div><h2>{folderLabel}</h2><span>{search?'Results for “'+search+'”':account.email}</span></div>
-            <Button label="Refresh mailbox" icon={RefreshCw} onClick={refresh} disabled={busy||loading}/></div>
+          </div>
           <div className="email-list-tools">
-            <label><input type="checkbox" aria-label="Select all messages on this page" checked={rows.length>0&&checked.size===rows.length}
-              onChange={e=>setChecked(e.target.checked?new Set(rows.map(m=>m.id)):new Set())}/><span>{checked.size?checked.size+' selected':'Select'}</span></label>
-            {checked.size>0&&folder!=='drafts'&&<div><Button label="Mark selected as read" icon={MailOpen} onClick={()=>void action('read',Array.from(checked))} disabled={busy}/>
-              <Button label="Move selected to Deleted" icon={Trash2} onClick={()=>void action('trash',Array.from(checked))} disabled={busy}/></div>}
+            <label><input type="checkbox" aria-label="Select all messages on this page" checked={visibleRows.length>0&&visibleRows.every(m=>checked.has(m.id))}
+              onChange={e=>setChecked(e.target.checked?new Set(visibleRows.map(m=>m.id)):new Set())}/></label>
+            <div className="email-list-tabs" aria-label="Message filter">
+              <button aria-pressed={!unreadOnly} onClick={()=>{setUnreadOnly(false);setChecked(new Set());}}>All mail</button>
+              <button aria-pressed={unreadOnly} title="Show unread messages on this page" onClick={()=>{setUnreadOnly(true);setChecked(new Set());}}>Unread</button>
+            </div>
+            {checked.size>0&&<span className="email-selection-count">{checked.size} selected</span>}
           </div>
           <div className="email-message-scroll">
-            {loading?<div className="email-list-empty"><div className="spin"/><p>Loading messages…</p></div>:rows.length===0?
-              <div className="email-list-empty"><Inbox size={32}/><h3>{search?'No matching emails':'You’re all caught up'}</h3><p>{search?'Try another search or folder.':folder==='drafts'?'Saved drafts will appear here.':'Messages in this folder will appear here.'}</p></div>:
-              rows.map(m=><div key={m.id} className={'email-row'+(!m.is_read?' unread':'')+(selectedId===m.id?' selected':'')}>
+            {loading?<div className="email-list-empty"><div className="spin"/><p>Loading messages…</p></div>:visibleRows.length===0?
+              <div className="email-list-empty"><Inbox size={32}/><h3>{search?'No matching emails':unreadOnly?'No unread messages':'You’re all caught up'}</h3><p>{search?'Try another search or folder.':unreadOnly?'There are no unread messages on this page.':folder==='drafts'?'Saved drafts will appear here.':'Messages in this folder will appear here.'}</p></div>:
+              visibleRows.map(m=><div key={m.id} className={'email-row'+(!m.is_read?' unread':'')+(selectedId===m.id?' selected':'')}>
                 <input type="checkbox" aria-label={'Select '+(m.subject||'untitled message')} checked={checked.has(m.id)} onChange={e=>setChecked(old=>{const nextSet=new Set(old);e.target.checked?nextSet.add(m.id):nextSet.delete(m.id);return nextSet;})}/>
+                <span className="email-row-avatar" aria-hidden="true">{avatar(m.sender_name||m.sender)}</span>
                 <button className="email-row-main" onClick={()=>setSelectedId(m.id)}>
                   <span className="email-row-top"><strong>{folder==='sent'||folder==='drafts'?'To: '+(m.to.join(', ')||'(No recipients)'):m.sender_name||m.sender}</strong><time>{date(m.date)}</time></span>
                   <span className="email-row-subject">{m.subject||'(No subject)'}{m.has_attachments&&<Paperclip size={13}/>}</span>
@@ -297,22 +320,19 @@ export default function EmailPanel({workspaceId,user}:{workspaceId:string|null;u
                 {folder!=='drafts'&&<button className={'email-row-star'+(m.is_starred?' starred':'')} aria-label={m.is_starred?'Remove star':'Star message'} disabled={busy} onClick={()=>void action(m.is_starred?'unstar':'star',[m.id])}><Star size={15} fill={m.is_starred?'currentColor':'none'}/></button>}
               </div>)}
           </div>
-          <div className="email-pagination"><span>{rows.length} on this page</span><div>
+          <div className="email-pagination"><span>{visibleRows.length} on this page</span><div>
             <Button label="Previous page" icon={ArrowLeft} disabled={!history.length||loading} onClick={()=>{setPage(history[history.length-1]);setHistory(h=>h.slice(0,-1));}}/>
             <Button label="Next page" icon={ArrowRight} disabled={!next||loading} onClick={()=>{setHistory(h=>[...h,page]);setPage(next);}}/></div></div>
         </section>
         <section className="email-reading" aria-label="Reading pane">
-          <div className="email-reading-tools">
+          {selectedId&&<div className="email-reading-tools">
             <button className="email-mobile-back" onClick={()=>setSelectedId('')}><ArrowLeft size={18}/>Back</button>
+            <span className="email-reading-label">{selected?.folder==='drafts'?'DRAFT':'MESSAGE'}</span>
             {selected?.folder==='drafts'?<button className="mail-secondary" disabled={busy} onClick={()=>void startReply('new')}><FileText size={16}/>Edit draft</button>:
-              <><Button label="Archive" icon={Archive} disabled={!canAct} onClick={()=>void action('archive')}/>
-                <Button label={folder==='trash'?'Restore to inbox':'Move to Deleted'} icon={folder==='trash'?Inbox:Trash2} disabled={!canAct} onClick={()=>void action(folder==='trash'?'restore':'trash')}/>
-                <Button label={selected?.is_read?'Mark unread':'Mark read'} icon={selected?.is_read?Mail:MailOpen} disabled={!canAct} onClick={()=>void action(selected?.is_read?'unread':'read')}/>
-                <Button label="Move to junk" icon={ShieldAlert} disabled={!canAct} onClick={()=>void action('junk')}/>
-                <Button label={selected?.is_starred?'Remove star':'Star'} icon={Star} disabled={!canAct} onClick={()=>void action(selected?.is_starred?'unstar':'star')}/></>}
-          </div>
+              <Button label={selected?.is_starred?'Remove star':'Star'} icon={Star} disabled={!canAct} onClick={()=>void action(selected?.is_starred?'unstar':'star')}/>}
+          </div>}
           {reading?<div className="email-empty"><div className="spin"/><p>Opening message…</p></div>:!selected?
-            <div className="email-empty email-reading-empty"><MailOpen size={45}/><h2>Select a message to read</h2><p>Your next conversation starts here.</p></div>:
+            <div className="email-empty email-reading-empty"><span className="email-reading-illustration"><MailOpen size={44}/></span><h2>Select a message to read</h2><p>Your next conversation starts here.</p></div>:
             <div className="email-reading-content"><h2>{selected.subject||'(No subject)'}</h2>
               <div className="email-sender"><span className="email-avatar">{avatar(selected.sender_name||selected.sender)}</span><div><strong>{selected.sender_name||selected.sender}</strong><small>{selected.sender}</small></div><time>{date(selected.date,true)}</time></div>
               <div className="email-recipient-line"><b>To:</b> {selected.to.join(', ')||'Undisclosed recipients'}</div>
@@ -365,3 +385,4 @@ export default function EmailPanel({workspaceId,user}:{workspaceId:string|null;u
 function historyReplace(params:URLSearchParams){
   const query=params.toString();window.history.replaceState({},'',location.pathname+(query?'?'+query:'')+location.hash);
 }
+
