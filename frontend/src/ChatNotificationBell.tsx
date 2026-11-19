@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AtSign, Bell, Hash, MessageCircle, X } from 'lucide-react';
+import { AtSign, Bell, Hash, Mail, MessageCircle, X } from 'lucide-react';
 import { api, type ChannelNotice, type ChatThread, type MentionNotification, type NotificationPreferences } from './api';
 
 interface Props {
   workspaceId: string|null;
   userId: string;
+  emailVerified: boolean;
   onOpenChat: (chatId:string)=>void;
   onOpenChannel: (teamId:string, channelId:string)=>void;
   refreshVersion?: number;
@@ -16,12 +17,27 @@ function chatTitle(thread:ChatThread,userId:string) {
   return thread.participants.find(p=>p.user.id!==userId)?.user.full_name || 'Direct chat';
 }
 
-export default function ChatNotificationBell({workspaceId,userId,onOpenChat,onOpenChannel,onRealtimeNotification,refreshVersion=0}:Props) {
+export default function ChatNotificationBell({workspaceId,userId,emailVerified,onOpenChat,onOpenChannel,onRealtimeNotification,refreshVersion=0}:Props) {
   const [threads,setThreads] = useState<ChatThread[]>([]);
   const [channels,setChannels] = useState<ChannelNotice[]>([]);
   const [mentions,setMentions] = useState<MentionNotification[]>([]);
   const [preferences,setPreferences] = useState<NotificationPreferences>({direct_chats:true,group_chats:true,team_channels:true});
   const [open,setOpen] = useState(false);
+  const [sendingVerification,setSendingVerification] = useState(false);
+  const [verificationNotice,setVerificationNotice] = useState('');
+  const [verificationError,setVerificationError] = useState('');
+
+  async function resendVerification() {
+    setSendingVerification(true);
+    setVerificationNotice('');
+    setVerificationError('');
+    try {
+      const result=await api.resendVerification();
+      setVerificationNotice(result.detail);
+    } catch(e) {
+      setVerificationError(e instanceof Error?e.message:'Could not resend verification. Please try again.');
+    } finally { setSendingVerification(false); }
+  }
   const [live,setLive] = useState(false);
   const onRealtimeRef = useRef(onRealtimeNotification);
   onRealtimeRef.current=onRealtimeNotification;
@@ -108,7 +124,7 @@ export default function ChatNotificationBell({workspaceId,userId,onOpenChat,onOp
     m.chat_kind==='group'?preferences.group_chats:preferences.direct_chats
   ));
   const unreadCount=unreadChats.reduce((sum,t)=>sum+t.unread_count,0)
-    +unreadChannels.reduce((sum,c)=>sum+c.unread_count,0) + unreadMentions.length;
+    +unreadChannels.reduce((sum,c)=>sum+c.unread_count,0) + unreadMentions.length + (emailVerified?0:1);
   async function openMention(mention:MentionNotification) {
     setOpen(false);
     if(mention.kind==='channel' && mention.team_id)onOpenChannel(mention.team_id,mention.source_id);
@@ -121,14 +137,23 @@ export default function ChatNotificationBell({workspaceId,userId,onOpenChat,onOp
 
   return <div className="notification-bell">
     <button type="button" className="icon-button bell-trigger" title="Workspace notifications"
-      aria-label={`Notifications, ${unreadCount} unread messages`} aria-expanded={open}
+      aria-label={`Notifications, ${unreadCount} unread notifications`} aria-expanded={open}
       onClick={()=>{setOpen(value=>!value);void refresh();}}>
       <Bell size={19}/>{unreadCount>0&&<span className="bell-badge">{unreadCount>99?'99+':unreadCount}</span>}
     </button>
     {open&&<div className="notification-popover" role="dialog" aria-label="Workspace notifications">
-      <div className="notification-head"><div><strong>Notifications</strong><small>Mentions, unread chats and team channels</small></div><button className="icon-button" type="button" aria-label="Close notifications" onClick={()=>setOpen(false)}><X size={17}/></button></div>
+      <div className="notification-head"><div><strong>Notifications</strong><small>Account reminders, mentions and conversations</small></div><button className="icon-button" type="button" aria-label="Close notifications" onClick={()=>setOpen(false)}><X size={17}/></button></div>
       {error&&<div className="notification-error">{error}</div>}
-      {(unreadMentions.length>0||unreadChats.length>0||unreadChannels.length>0) ? <div className="notification-items">
+      {(!emailVerified||unreadMentions.length>0||unreadChats.length>0||unreadChannels.length>0) ? <div className="notification-items">
+        {!emailVerified&&<section className="verification-notification" aria-label="Email verification reminder">
+          <Mail size={18} aria-hidden="true"/>
+          <div><strong>Please verify your email address</strong>
+            <p>Open the confirmation link sent to your inbox to verify your account.</p>
+            <button type="button" className="outline-button" disabled={sendingVerification} onClick={()=>void resendVerification()}>{sendingVerification?'Sending…':'Resend verification'}</button>
+            {verificationNotice&&<p role="status">{verificationNotice}</p>}
+            {verificationError&&<p className="verification-error" role="alert">{verificationError}</p>}
+          </div>
+        </section>}
         {unreadMentions.map(m=><button key={m.id} type="button" className="notification-item mention-item" onClick={()=>void openMention(m)}>
           <AtSign size={18}/><span><strong>{m.sender_name} mentioned you</strong><small>{m.kind==='channel'?`#${m.source_name}`:m.source_name||'Direct chat'} · Mention</small></span><b>New</b>
         </button>)}
@@ -143,3 +168,4 @@ export default function ChatNotificationBell({workspaceId,userId,onOpenChat,onOp
     </div>}
   </div>;
 }
+
