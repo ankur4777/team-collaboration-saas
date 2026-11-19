@@ -13,6 +13,7 @@ async function eventually(fn, message, timeout = 30000) {
 }
 const browser = await chromium.launch({
   headless: true,
+  executablePath: process.env.CALL_TEST_CHROMIUM || undefined,
   args: [
     '--use-fake-ui-for-media-stream',
     '--use-fake-device-for-media-stream',

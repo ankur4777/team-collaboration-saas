@@ -105,8 +105,15 @@ jobs:
       - run: pip install -r backend/requirements.txt
       - run: npm ci --no-audit --no-fund
         working-directory: frontend
-      - run: npx playwright install --with-deps chromium
+      - name: Prepare Chromium
         working-directory: frontend
+        run: |
+          browser=$(command -v google-chrome || command -v chromium || true)
+          if [ -n "$browser" ]; then
+            echo "CALL_TEST_CHROMIUM=$browser" >> "$GITHUB_ENV"
+          else
+            npx playwright install --with-deps chromium
+          fi
       - run: python manage.py migrate --noinput
         working-directory: backend
       - run: python tools/seed_native_call_test.py
