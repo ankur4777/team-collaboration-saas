@@ -260,7 +260,7 @@ export default function EmailPanel({workspaceId,user}:{workspaceId:string|null;u
         <button type="submit" disabled={!account}>Search</button>
       </form><Button label="Manage mailboxes" icon={Settings2} onClick={()=>setManager(true)} disabled={initializing||Boolean(editor)}/></div>
     <div className="email-command-bar" role="toolbar" aria-label="Mail actions">
-      <button className="mail-primary" onClick={newMessage} disabled={!account||busy||initializing}><Plus size={17}/>New message</button>
+      <button className="mail-primary" onClick={newMessage} disabled={!account||busy||initializing}><Plus size={17}/>New Email</button>
       <span className="email-command-divider"/>
       <button disabled={!canToolbarAct} onClick={()=>void action(folder==='trash'?'restore':'trash',actionIds)}>{folder==='trash'?<Inbox size={17}/>:<Trash2 size={17}/>}<span>{folder==='trash'?'Restore':'Delete'}</span></button>
       <button disabled={!canToolbarAct} onClick={()=>void action('archive',actionIds)}><Archive size={17}/><span>Archive</span></button>
@@ -359,7 +359,7 @@ export default function EmailPanel({workspaceId,user}:{workspaceId:string|null;u
       </div><p className="email-account-footnote">Your administrator can enable Gmail and Outlook connections. Disconnecting here removes this app’s stored credentials; you can also revoke access in your Google or Microsoft account.</p>
     </div></div>}
     {editor&&<div className="email-dialog-shade"><div className="email-compose" role="dialog" aria-modal="true" aria-labelledby="mail-compose-title" ref={dialog}>
-      <header><div><h2 id="mail-compose-title">{editor.mode==='new'?'New message':editor.mode==='forward'?'Forward message':'Reply'}</h2><small>From {account?.email}</small></div><Button label="Close compose" icon={X} disabled={editingBusy} onClick={closeEditor}/></header>
+      <header><div><h2 id="mail-compose-title">{editor.mode==='new'?'New Email':editor.mode==='forward'?'Forward message':'Reply'}</h2><small>From {account?.email}</small></div><Button label="Close compose" icon={X} disabled={editingBusy} onClick={closeEditor}/></header>
       <form onSubmit={e=>void send(e)} onKeyDown={e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();if(!editingBusy&&!editor.uncertain)e.currentTarget.requestSubmit();}}}>
         <fieldset disabled={editingBusy||editor.uncertain}>
           {(['to','cc','bcc'] as const).map(field=><label className="email-compose-field" key={field}><span>{field==='to'?'To':field==='cc'?'Cc':'Bcc'}</span>

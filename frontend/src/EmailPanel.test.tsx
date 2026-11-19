@@ -39,8 +39,8 @@ describe('Email inbox interactions',()=>{
   });
   it('composes, saves a draft and sends with one idempotency key',async()=>{
     const user=userEvent.setup();mount();
-    await user.click(await screen.findByRole('button',{name:'New message'}));
-    const compose=screen.getByRole('dialog',{name:'New message'});
+    await user.click(await screen.findByRole('button',{name:'New Email'}));
+    const compose=screen.getByRole('dialog',{name:'New Email'});
     await user.type(within(compose).getByRole('textbox',{name:'To recipients'}),'bob@example.test');
     await user.type(within(compose).getByRole('textbox',{name:'Subject'}),'Hello Bob');
     await user.type(within(compose).getByRole('textbox',{name:'Email message body'}),'Hello from the composer.');
@@ -65,7 +65,7 @@ describe('Email inbox interactions',()=>{
   it('freezes an uncertain send instead of allowing a duplicate',async()=>{
     vi.mocked(mailApi.send).mockResolvedValue({status:'uncertain',detail:'Check Sent before sending again.'});
     const user=userEvent.setup();mount();
-    await user.click(await screen.findByRole('button',{name:'New message'}));
+    await user.click(await screen.findByRole('button',{name:'New Email'}));
     await user.type(screen.getByRole('textbox',{name:'To recipients'}),'bob@example.test');
     await user.click(screen.getByRole('button',{name:'Send'}));
     expect(await screen.findByText('Check Sent before sending again.')).toBeTruthy();
