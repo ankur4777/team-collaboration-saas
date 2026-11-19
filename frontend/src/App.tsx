@@ -15,7 +15,6 @@ import AccountRecoveryScreen from './AccountRecoveryScreen';
 
 function initials(name: string) { return name.split(' ').filter(Boolean).slice(0, 2).map(t => t[0].toUpperCase()).join('') || 'TW'; }
 function errorText(error: unknown) { return error instanceof Error ? error.message : 'Something went wrong'; }
-function relativeTime(iso: string) { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
 function Brand({ compact = false }: { compact?: boolean }) {
   return <div className="brand"><span className="brand-mark"><LayoutGrid size={19} strokeWidth={2.6}/></span>{!compact && <span>team<span className="brand-accent">workspace</span></span>}</div>;
 }
