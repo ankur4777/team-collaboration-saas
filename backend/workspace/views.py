@@ -208,12 +208,13 @@ class ChannelMessageDetailView(APIView):
 
     def patch(self, request, channel_id, message_id):
         channel = require_channel_access(request, channel_id)
+        joined = TeamMember.objects.get(team=channel.team, user=request.user).joined_at
         body = request.data.get('body')
         if not isinstance(body, str) or not 1 <= len(body.strip()) <= 4000:
             raise ValidationError({'body': 'Message must contain 1–4000 characters'})
         with transaction.atomic():
             message = get_object_or_404(
-                Message.objects.select_for_update().select_related('sender'),
+                Message.objects.select_for_update().select_related('sender').filter(created_at__gte=joined),
                 pk=message_id, channel=channel,
             )
             if message.sender_id != request.user.pk:
@@ -231,9 +232,10 @@ class ChannelMessageDetailView(APIView):
 
     def delete(self, request, channel_id, message_id):
         channel = require_channel_access(request, channel_id)
+        joined = TeamMember.objects.get(team=channel.team, user=request.user).joined_at
         with transaction.atomic():
             message = get_object_or_404(
-                Message.objects.select_for_update().select_related('sender'),
+                Message.objects.select_for_update().select_related('sender').filter(created_at__gte=joined),
                 pk=message_id, channel=channel,
             )
             if message.sender_id != request.user.pk:
