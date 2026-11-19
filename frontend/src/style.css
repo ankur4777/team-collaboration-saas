@@ -138,13 +138,13 @@
 .recovery-done small{font-size:11px;color:#7c9587;line-height:1.6}
 .recovery-done a{display:inline-flex;justify-content:center;margin-top:8px}
 .recovery-back{display:inline-flex;align-items:center;gap:6px;font-size:12px;margin-top:20px;color:#527869}
-.verify-banner{margin:15px 24px;padding:13px 15px;border:1px solid #e1e9b7;border-radius:12px;background:#fcfdef;display:flex;align-items:center;gap:12px;color:#4e6944}
-.verify-banner>div{flex:1;min-width:0}
-.verify-banner strong{font-size:12px}
-.verify-banner p{font-size:11px;line-height:1.6;margin-top:4px}
-.verify-banner small{display:block;font-size:11px;margin-top:4px;color:#3c7e54}
-.verify-banner button{flex-shrink:0;font-size:11px}
-@media(max-width:600px){.recovery-card{padding:24px}.recovery-card h1{font-size:23px}.verify-banner{margin:9px 12px;align-items:flex-start;flex-wrap:wrap}.verify-banner button{margin-left:25px}}
+
+
+
+
+
+
+@media(max-width:600px){.recovery-card{padding:24px}.recovery-card h1{font-size:23px}}
 
 
 /* Employee account security and notification settings */
@@ -302,3 +302,14 @@
 }
 .channel-load-older:focus-visible{outline:2px solid #238b6d;outline-offset:2px}
 .channel-load-older:disabled{opacity:.62;cursor:wait}
+
+
+/* Account verification stays inside the notification center. */
+.verification-notification{display:flex;align-items:flex-start;gap:11px;padding:15px 16px;background:#f3f8f6;border-bottom:1px solid #dde7e4;color:#208d74}
+.verification-notification>svg{flex-shrink:0;margin-top:2px}
+.verification-notification>div{min-width:0;flex:1}
+.verification-notification strong{display:block;font-size:12px;color:#214740;line-height:1.6}
+.verification-notification p{font-size:11px;color:#637a75;line-height:1.6;margin-top:5px;overflow-wrap:anywhere}
+.verification-notification button{font-size:11px;padding:8px 10px;margin-top:10px;white-space:normal;text-align:left}
+.verification-notification p[role=status]{color:#176f5b}
+.verification-notification .verification-error{color:#a34131}

@@ -81,22 +81,6 @@ function InviteScreen({ session, onDone, onBack }: {session:Session|null;onDone:
   </div></div>;
 }
 
-function EmailVerificationBanner() {
-  const [sending,setSending] = useState(false);
-  const [notice,setNotice] = useState('');
-  async function resend() {
-    setSending(true);
-    try { const result=await api.resendVerification();setNotice(result.detail); }
-    catch(e) { setNotice(errorText(e)); }
-    finally { setSending(false); }
-  }
-  return <div className="verify-banner">
-    <Mail size={18}/>
-    <div><strong>Please verify your email address</strong><p>We sent a confirmation link to your inbox. In development, check API container logs.</p>{notice&&<small role="status">{notice}</small>}</div>
-    <button type="button" className="outline-button" disabled={sending} onClick={()=>void resend()}>{sending?'Sending…':'Resend verification'}</button>
-  </div>;
-}
-
 const navItems = [
   {id:'teams', label:'Teams & Channels', icon:Users, ready:true},
   {id:'chats', label:'Chats & Groups', icon:MessageCircle, ready:true},
@@ -308,11 +292,10 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
     <div className="sidebar-bottom"><button className="nav-item" onClick={()=>setModal('members')}><Users size={18}/>Members <span className="count-chip">{members.length}</span></button><button className={`nav-item ${view==='settings'?'active':''}`} onClick={()=>{setView('settings');setSidebarOpen(false);}}><Settings2 size={18}/>Settings</button><div className="profile"><div className="avatar">{initials(session.user.full_name)}</div><div className="profile-name"><strong>{session.user.full_name}</strong><small>{session.user.email}</small></div><button className="icon-button" aria-label="Log out" title="Log out" onClick={signOut}><LogOut size={18}/></button></div></div>
   </aside>
   {sidebarOpen&&<div className="mobile-shade" onClick={()=>setSidebarOpen(false)}/>}
-  <main className="main-panel"><header className="top-bar"><div className="top-bar-left"><button className="mobile-menu icon-button" onClick={()=>setSidebarOpen(true)}><Menu/></button><span className="crumb">Workspace</span><span className="crumb-divider">/</span><strong>{view==='teams'?(activeTeam?.name||'Teams'):navItems.find(n=>n.id===view)?.label||'Settings'}</strong></div><div className="top-bar-right"><span className="preview-pill"><span/> PHASE 2 PREVIEW</span><ChatNotificationBell workspaceId={session.active_organization_id} userId={session.user.id} refreshVersion={notificationRefresh} onRealtimeNotification={()=>{void loadChannelNotices();}}
+  <main className="main-panel"><header className="top-bar"><div className="top-bar-left"><button className="mobile-menu icon-button" onClick={()=>setSidebarOpen(true)}><Menu/></button><span className="crumb">Workspace</span><span className="crumb-divider">/</span><strong>{view==='teams'?(activeTeam?.name||'Teams'):navItems.find(n=>n.id===view)?.label||'Settings'}</strong></div><div className="top-bar-right"><span className="preview-pill"><span/> PHASE 2 PREVIEW</span><ChatNotificationBell workspaceId={session.active_organization_id} userId={session.user.id} emailVerified={session.user.email_verified} refreshVersion={notificationRefresh} onRealtimeNotification={()=>{void loadChannelNotices();}}
           onOpenChat={id=>{setOpenChatRequest({id,nonce:Date.now()});setView('chats');setSidebarOpen(false);}}
           onOpenChannel={(teamId,channelId)=>{setSelectedTeam(teamId);setSelectedChannel(channelId);setView('teams');setSidebarOpen(false);}}/><div className="top-avatar">{initials(session.user.full_name)}</div></div></header>
   {error&&<div className="floating-error"><ErrorBanner message={error} onClose={()=>setError('')}/></div>}
-  {!session.user.email_verified&&<EmailVerificationBanner/>}
   {view==='teams' ? <>{!activeTeam?<div className="hero-empty"><Empty icon={<Users size={32}/>} title="Bring your team together" description="Create your first team to begin organizing conversations and projects." action={<button className="primary-button" onClick={()=>setModal('team')}><Plus size={17}/>Create your first team</button>}/></div>:
     <><div className="workspace-heading"><div><div className="eyebrow">YOUR WORKSPACE / TEAMS</div><h1>{activeTeam.name}</h1><p className="muted">Collaborate, share updates, and keep your team in sync.</p></div><div className="heading-actions"><button className="outline-button" onClick={()=>setModal('members')}><Users size={16}/> Manage members</button><button className="primary-button" onClick={()=>setModal('channel')}><Plus size={17}/> New channel</button></div></div>
       <div className="chat-workspace"><section className="channels-panel"><div className="panel-title">CHANNELS <button className="icon-button" title="New channel" onClick={()=>setModal('channel')}><Plus size={17}/></button></div>{channels.map(ch=><button className={`channel-card ${selectedChannel===ch.id?'active':''}`} key={ch.id} onClick={()=>setSelectedChannel(ch.id)}><span className="channel-symbol"><Hash size={17}/></span><span>{ch.name}</span>{channelUnread(ch.id)>0&&<span className="channel-unread-count" aria-label={`${channelUnread(ch.id)} unread messages`}>{channelUnread(ch.id)>99?'99+':channelUnread(ch.id)}</span>}{selectedChannel===ch.id&&<span className="selected-indicator"/>}</button>)}<div className="channel-help"><Sparkles size={18}/><strong>A place for every topic</strong><p>Create channels to keep discussions organized.</p></div></section>
@@ -366,4 +349,5 @@ export default function App() {
   if(!session)return <>{bootError&&<div className="boot-error"><ErrorBanner message={bootError}/></div>}<AuthScreen onAuth={setSession}/></>;
   return <Workspace session={session} onSession={setSession} onLogout={()=>setSession(null)}/>;
 }
+
 

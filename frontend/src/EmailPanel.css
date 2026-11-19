@@ -1,11 +1,11 @@
 /* Match TeamWorkspace DM Sans body type, Manrope headings and green/mint palette.
    Provider logos retain their recognizable brand colors. */
-/* Mail fills the space left by the workspace header and verification banner. */
+/* Mail fills the space left by the workspace header. */
 .app-layout.mail-view{height:100vh;height:100dvh;min-height:0}
 .mail-view .main-panel{min-height:0;overflow:hidden}
 .mail-view .sidebar{min-height:0;overflow-y:auto}
 .mail-view .sidebar-header,.mail-view .org-picker,.mail-view .sidebar-title,.mail-view .nav-list,.mail-view .sidebar-bottom{flex-shrink:0}
-.mail-view .top-bar,.mail-view .verify-banner{flex-shrink:0}
+.mail-view .top-bar{flex-shrink:0}
 .email-shell{--mail-accent:#208d74;--mail-ink:#192c30;--mail-muted:#637a75;--mail-border:#dde7e4;display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;overflow:hidden;color:var(--mail-ink);background:#fff;font-size:13px;line-height:1.6;position:relative}
 .email-shell :where(button,input,select,textarea){font:inherit}
 .email-shell button{cursor:pointer}.email-shell button:disabled{cursor:not-allowed;opacity:.48}
@@ -58,4 +58,5 @@
 
 /* Compact empty state keeps Add mailbox visible on short laptop screens. */
 @media(max-height:800px){.email-heading{padding-block:14px}.email-empty{padding:18px 22px;gap:10px}.email-empty-symbol{width:64px;height:64px;border-radius:18px;margin-bottom:0}.email-empty h2{font-size:20px}.email-connect-buttons{margin:4px 0}.email-folders{padding-block:12px}.mail-new{margin-bottom:14px}.email-folders nav button{padding-block:8px}.email-mailbox-footer{padding-top:16px}}
+
 
