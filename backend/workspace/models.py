@@ -346,3 +346,59 @@ class AccountSession(models.Model):
 
     class Meta:
         ordering = ['-last_seen_at', '-created_at']
+
+
+
+class Meeting(models.Model):
+    id = models.UUIDField(primary_key=True, default=make_id, editable=False)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='meetings')
+    organizer = models.ForeignKey(User, on_delete=models.PROTECT, related_name='organized_meetings')
+    channel = models.ForeignKey(Channel, null=True, blank=True, on_delete=models.SET_NULL, related_name='meetings')
+    title = models.CharField(max_length=180)
+    agenda = models.TextField(max_length=10000, blank=True)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    time_zone = models.CharField(max_length=64, default='UTC')
+    meeting_url = models.URLField(max_length=1000)
+    notes = models.TextField(max_length=20000, blank=True)
+    cancelled = models.BooleanField(default=False)
+    revision = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['starts_at', 'id']
+        indexes = [models.Index(fields=['organization', 'starts_at'], name='meeting_org_start')]
+        constraints = [models.CheckConstraint(condition=models.Q(ends_at__gt=models.F('starts_at')), name='meeting_end_after_start')]
+
+
+class MeetingAttendee(models.Model):
+    class Response(models.TextChoices):
+        PENDING = 'pending', 'Invited'
+        ACCEPTED = 'accepted', 'Accepted'
+        TENTATIVE = 'tentative', 'Tentative'
+        DECLINED = 'declined', 'Declined'
+
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name='attendees')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='meeting_invitations')
+    response = models.CharField(max_length=12, choices=Response.choices, default=Response.PENDING)
+    notice_kind = models.CharField(max_length=12, default='invited')
+    notice_read = models.BooleanField(default=False)
+    invited_at = models.DateTimeField(default=timezone.now)
+    reminder_read_start = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['meeting', 'user'], name='uq_meeting_attendee')]
+
+
+class MeetingActionItem(models.Model):
+    id = models.UUIDField(primary_key=True, default=make_id, editable=False)
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name='action_items')
+    title = models.CharField(max_length=300)
+    assignee = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='meeting_actions')
+    due_date = models.DateField(null=True, blank=True)
+    done = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'id']

@@ -34,7 +34,7 @@ This is a runnable **React + TypeScript frontend** and **Python Django + Django 
 - Responsive React screens for registration, login, workspace, team navigation, channels, messages, member management, and invitations.
 - First automated Django API tests for registration/CSRF/logout, invitations, and cross-company isolation.
 
-**Still planned:** Background Gmail/Outlook synchronization and push webhooks, rich HTML email editing, chat attachments, calendar, meetings, files, tasks, MFA, payments, audit trails, distributed login throttling and advanced admin workflows. See the email setup guide for the implemented mail features.
+**Still planned:** Background Gmail/Outlook synchronization and push webhooks, rich HTML email editing, chat attachment enhancements, native video meetings, recurring calendar events, files, standalone tasks, MFA, payments, audit trails, distributed login throttling and advanced admin workflows. See the email setup guide for the implemented mail features.
 
 ## Requirements
 
@@ -294,3 +294,12 @@ Do not push the `.env` file or reuse the unrelated LMS repository.
 
 To configure Gmail or Outlook locally after creating your OAuth application, run `./tools/setup-mail.ps1 -Provider gmail` or `-Provider outlook` in VS Code PowerShell. The helper preserves existing settings, generates the mail encryption key when needed, securely prompts for provider credentials and checks the restarted API configuration. See [Real mail quickstart](docs/REAL_MAIL_QUICKSTART.md). Provider registration and user consent are required before live delivery can be tested.
 
+
+
+
+## Meetings and Calendar
+
+Meetings now supports workspace-private scheduling, channel/team invitations, RSVP,
+rescheduling/cancellation, in-app reminders, notes and assigned action items.
+Calendar uses the same meeting records with day, week and month views.
+See [Meetings quickstart](docs/MEETINGS_QUICKSTART.md) for local setup and testing.

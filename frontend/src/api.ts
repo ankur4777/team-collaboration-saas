@@ -190,3 +190,31 @@ export const api = {
   editChannelMessage: (channelId:string,messageId:string,body:string) => request<Message>(`channels/${channelId}/messages/${messageId}/`, 'PATCH', {body}),
   deleteChannelMessage: (channelId:string,messageId:string) => request<void>(`channels/${channelId}/messages/${messageId}/`, 'DELETE'),
 };
+
+
+export interface MeetingActionItem {id:string;title:string;assignee_id:string|null;due_date:string|null;done:boolean}
+export interface MeetingRecord {
+  id:string;title:string;agenda:string;starts_at:string;ends_at:string;time_zone:string;meeting_url:string;
+  notes:string;cancelled:boolean;revision:number;organizer:Pick<Person,'id'|'full_name'|'email'>;
+  channel:{id:string;name:string;team_id:string;team_name:string}|null;
+  my_response:'pending'|'accepted'|'tentative'|'declined';
+  attendees:Array<{user:Pick<Person,'id'|'full_name'|'email'>;response:MeetingRecord['my_response']}>;
+  action_items:MeetingActionItem[];
+}
+export interface MeetingPayload {
+  title:string;agenda:string;starts_at:string;ends_at:string;time_zone:string;meeting_url:string;
+  attendee_ids:string[];channel_id:string|null;invite_channel:boolean;notes?:string;revision?:number;
+}
+export interface MeetingNotice {id:string;title:string;starts_at:string;kind:string}
+export const meetingsApi = {
+  list:(from:string,to:string,channelId?:string)=>request<{results:MeetingRecord[];limit:number}>(`meetings/?${new URLSearchParams({from,to,...(channelId?{channel_id:channelId}:{})})}`),
+  detail:(id:string)=>request<MeetingRecord>(`meetings/${id}/`),
+  create:(data:MeetingPayload)=>post<MeetingRecord>('meetings/',data),
+  update:(id:string,data:MeetingPayload)=>request<MeetingRecord>(`meetings/${id}/`,'PATCH',data),
+  cancel:(id:string,revision:number)=>post<MeetingRecord>(`meetings/${id}/cancel/`,{revision}),
+  rsvp:(id:string,response:string)=>post<MeetingRecord>(`meetings/${id}/rsvp/`,{response}),
+  notifications:()=>request<{results:MeetingNotice[]}>('meetings/notifications/'),
+  read:(id:string)=>post<{status:string}>(`meetings/${id}/read/`,{}),
+  addAction:(id:string,data:{title:string;assignee_id:string|null;due_date:string|null})=>post<MeetingRecord>(`meetings/${id}/actions/`,data),
+  completeAction:(id:string,item:string,done:boolean)=>request<MeetingRecord>(`meetings/${id}/actions/${item}/`,'PATCH',{done}),
+};
