@@ -268,3 +268,16 @@
 .attachment-file-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;max-width:180px}
 .attachment-file small{font-size:10px;color:#83998a;white-space:nowrap}
 .attachment-error{font-size:11px;color:#a24035;padding:5px 7px}
+
+
+/* Phase 2 — author-only team channel message editing and deletion */
+.channel-message-actions{display:flex;gap:10px;margin-top:3px}
+.channel-message-actions button,.channel-message-edit button{border:0;background:transparent;color:#438b70;font-size:11px;padding:4px 3px;cursor:pointer}
+.channel-message-actions button:last-child{color:#b05c51}
+.channel-message-actions button:disabled,.channel-message-edit button:disabled{opacity:.5;cursor:not-allowed}
+.channel-message-edit{max-width:min(450px,75vw);display:flex;flex-direction:column;gap:6px}
+.channel-message-edit textarea{font:inherit;line-height:1.5;color:#335546;background:#fff;border:1px solid #b5dfc5;border-radius:7px;padding:9px;resize:vertical;min-height:55px}
+.channel-message-edit>div{display:flex;justify-content:flex-end;gap:12px}
+.channel-message-error{color:#b34141;font-size:11px;margin-top:4px}
+.msg-body.deleted{color:#89988e;font-style:italic}
+.channel-edited-note{font-size:10px;color:#8a9c92}
