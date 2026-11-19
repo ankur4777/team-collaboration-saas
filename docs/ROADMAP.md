@@ -43,6 +43,7 @@
 - Implemented: @Full Name suggestions in team channels and direct/group chats, recipient-scoped durable mention alerts, mark-as-read, membership/privacy checks and notification-bell integration.
 - Implemented: private file attachments for direct/group chats and team channels (5 MiB allowlisted uploads, authorized downloads, persistent Docker storage). Production malware scanning, previews, retention and storage quotas remain planned.
 - Implemented: author-only team channel message editing and soft deletion, WebSocket update events, deleted-content cleanup in search/unread/mentions, and current-join-time history filtering.
+- Implemented: secure 50-message channel history pagination with stable timestamp/message-ID cursor, Load older messages controls, scroll restoration and legacy API compatibility.
 - Still planned: group creator transfer, group exit flow, desktop/mobile push and email notifications, persistent notification history, advanced preferences, attachments, indexed/full-text search, historical result navigation, retention and file previews.
 
 ## Phase 2 — Real-time communication
