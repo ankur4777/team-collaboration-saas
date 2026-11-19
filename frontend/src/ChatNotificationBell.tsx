@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AtSign, Bell, Hash, Mail, MessageCircle, X } from 'lucide-react';
-import { api, type ChannelNotice, type ChatThread, type MentionNotification, type NotificationPreferences } from './api';
+import { AtSign, Bell, Hash, Mail, MessageCircle, Video, X } from 'lucide-react';
+import { api, meetingsApi, type MeetingNotice, type ChannelNotice, type ChatThread, type MentionNotification, type NotificationPreferences } from './api';
 
 interface Props {
   workspaceId: string|null;
   userId: string;
   emailVerified: boolean;
+  onOpenMeeting?: (meetingId:string)=>void;
   onOpenChat: (chatId:string)=>void;
   onOpenChannel: (teamId:string, channelId:string)=>void;
   refreshVersion?: number;
@@ -17,7 +18,8 @@ function chatTitle(thread:ChatThread,userId:string) {
   return thread.participants.find(p=>p.user.id!==userId)?.user.full_name || 'Direct chat';
 }
 
-export default function ChatNotificationBell({workspaceId,userId,emailVerified,onOpenChat,onOpenChannel,onRealtimeNotification,refreshVersion=0}:Props) {
+export default function ChatNotificationBell({workspaceId,userId,emailVerified,onOpenMeeting,onOpenChat,onOpenChannel,onRealtimeNotification,refreshVersion=0}:Props) {
+  const [meetings,setMeetings] = useState<MeetingNotice[]>([]);
   const [threads,setThreads] = useState<ChatThread[]>([]);
   const [channels,setChannels] = useState<ChannelNotice[]>([]);
   const [mentions,setMentions] = useState<MentionNotification[]>([]);
@@ -46,13 +48,14 @@ export default function ChatNotificationBell({workspaceId,userId,emailVerified,o
   latestId.current = workspaceId;
 
   const refresh = useCallback(async()=>{
-    if(!workspaceId){setThreads([]);setChannels([]);setMentions([]);return;}
+    if(!workspaceId){setThreads([]);setChannels([]);setMentions([]);setMeetings([]);return;}
     try{
-      const [chatRows,channelRows,settings,mentionRows] = await Promise.all([api.chats(),api.channelNotifications(),api.notificationPreferences(),api.mentionNotifications()]);
+      const [chatRows,channelRows,settings,mentionRows,meetingRows] = await Promise.all([api.chats(),api.channelNotifications(),api.notificationPreferences(),api.mentionNotifications(),meetingsApi.notifications()]);
       if(latestId.current!==workspaceId)return;
       setThreads(chatRows);
       setChannels(channelRows);
       setMentions(mentionRows.results);
+      setMeetings(meetingRows.results);
       setPreferences(settings);
       setError('');
     }catch(e){
@@ -61,6 +64,7 @@ export default function ChatNotificationBell({workspaceId,userId,emailVerified,o
   },[workspaceId]);
 
   useEffect(()=>{
+    setMeetings([]);
     setThreads([]);
     setChannels([]);
     setMentions([]);
@@ -124,7 +128,7 @@ export default function ChatNotificationBell({workspaceId,userId,emailVerified,o
     m.chat_kind==='group'?preferences.group_chats:preferences.direct_chats
   ));
   const unreadCount=unreadChats.reduce((sum,t)=>sum+t.unread_count,0)
-    +unreadChannels.reduce((sum,c)=>sum+c.unread_count,0) + unreadMentions.length + (emailVerified?0:1);
+    +unreadChannels.reduce((sum,c)=>sum+c.unread_count,0) + unreadMentions.length + meetings.length + (emailVerified?0:1);
   async function openMention(mention:MentionNotification) {
     setOpen(false);
     if(mention.kind==='channel' && mention.team_id)onOpenChannel(mention.team_id,mention.source_id);
@@ -142,9 +146,9 @@ export default function ChatNotificationBell({workspaceId,userId,emailVerified,o
       <Bell size={19}/>{unreadCount>0&&<span className="bell-badge">{unreadCount>99?'99+':unreadCount}</span>}
     </button>
     {open&&<div className="notification-popover" role="dialog" aria-label="Workspace notifications">
-      <div className="notification-head"><div><strong>Notifications</strong><small>Account reminders, mentions and conversations</small></div><button className="icon-button" type="button" aria-label="Close notifications" onClick={()=>setOpen(false)}><X size={17}/></button></div>
+      <div className="notification-head"><div><strong>Notifications</strong><small>Meetings, account reminders and conversations</small></div><button className="icon-button" type="button" aria-label="Close notifications" onClick={()=>setOpen(false)}><X size={17}/></button></div>
       {error&&<div className="notification-error">{error}</div>}
-      {(!emailVerified||unreadMentions.length>0||unreadChats.length>0||unreadChannels.length>0) ? <div className="notification-items">
+      {(!emailVerified||meetings.length>0||unreadMentions.length>0||unreadChats.length>0||unreadChannels.length>0) ? <div className="notification-items">
         {!emailVerified&&<section className="verification-notification" aria-label="Email verification reminder">
           <Mail size={18} aria-hidden="true"/>
           <div><strong>Please verify your email address</strong>
@@ -154,6 +158,7 @@ export default function ChatNotificationBell({workspaceId,userId,emailVerified,o
             {verificationError&&<p className="verification-error" role="alert">{verificationError}</p>}
           </div>
         </section>}
+        {meetings.map(m=><button key={'meeting-'+m.id} type="button" className="notification-item" onClick={()=>{setOpen(false);onOpenMeeting?.(m.id);void meetingsApi.read(m.id).then(()=>void refresh()).catch(()=>{});}}><Video size={18}/><span><strong>{m.title}</strong><small>{m.kind==='reminder'?'Starts within 15 minutes':m.kind==='cancelled'?'Meeting cancelled':m.kind==='response'?'Participant response':m.kind==='updated'?'Meeting updated':'Meeting invitation'} · {new Date(m.starts_at).toLocaleString()}</small></span></button>)}
         {unreadMentions.map(m=><button key={m.id} type="button" className="notification-item mention-item" onClick={()=>void openMention(m)}>
           <AtSign size={18}/><span><strong>{m.sender_name} mentioned you</strong><small>{m.kind==='channel'?`#${m.source_name}`:m.source_name||'Direct chat'} · Mention</small></span><b>New</b>
         </button>)}
@@ -168,4 +173,5 @@ export default function ChatNotificationBell({workspaceId,userId,emailVerified,o
     </div>}
   </div>;
 }
+
 

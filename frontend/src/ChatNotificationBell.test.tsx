@@ -2,10 +2,12 @@ import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {cleanup,render,screen,waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ChatNotificationBell from './ChatNotificationBell';
-import {api} from './api';
+import {api,meetingsApi} from './api';
 
-vi.mock('./api',()=>({api:{chats:vi.fn(),channelNotifications:vi.fn(),notificationPreferences:vi.fn(),mentionNotifications:vi.fn(),resendVerification:vi.fn()}}));
+vi.mock('./api',()=>({api:{chats:vi.fn(),channelNotifications:vi.fn(),notificationPreferences:vi.fn(),mentionNotifications:vi.fn(),resendVerification:vi.fn()},meetingsApi:{notifications:vi.fn(),read:vi.fn()}}));
 beforeEach(()=>{
+  vi.mocked(meetingsApi.notifications).mockResolvedValue({results:[]});
+  vi.mocked(meetingsApi.read).mockResolvedValue({status:'read'});
   vi.stubGlobal('WebSocket',class {close(){}});
   vi.mocked(api.chats).mockResolvedValue([]);
   vi.mocked(api.channelNotifications).mockResolvedValue([]);
@@ -56,4 +58,15 @@ describe('Email verification in notifications',()=>{
     expect(screen.queryByRole('button',{name:'Resend verification'})).toBeNull();
     expect(screen.getByText('No unread mentions or conversations in this workspace.')).toBeTruthy();
   });
+  it('shows meeting invitations and opens the meeting from the notification center',async()=>{
+    vi.mocked(meetingsApi.notifications).mockResolvedValue({results:[{id:'meeting-1',title:'Project review',starts_at:new Date().toISOString(),kind:'invited'}]});
+    const onOpenMeeting=vi.fn();const user=userEvent.setup();
+    render(<ChatNotificationBell workspaceId="org-1" userId="user-1" emailVerified onOpenMeeting={onOpenMeeting} onOpenChat={()=>{}} onOpenChannel={()=>{}}/>);
+    await user.click(await screen.findByRole('button',{name:'Notifications, 1 unread notifications'}));
+    await user.click(screen.getByRole('button',{name:/Project review/}));
+    expect(onOpenMeeting).toHaveBeenCalledWith('meeting-1');
+    expect(meetingsApi.read).toHaveBeenCalledWith('meeting-1');
+  });
+
 });
+

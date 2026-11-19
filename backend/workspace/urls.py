@@ -1,8 +1,18 @@
 from django.urls import path
+from . import meetings
 from . import private_attachments
 from . import auth_views, views, member_views, chat_views, channel_notifications, account_recovery, settings_views, session_views, message_search, mentions
 
 urlpatterns = [
+    path('meetings/', meetings.MeetingsView.as_view()),
+    path('meetings/notifications/', meetings.MeetingNotificationsView.as_view()),
+    path('meetings/<uuid:meeting_id>/', meetings.MeetingDetailView.as_view()),
+    path('meetings/<uuid:meeting_id>/cancel/', meetings.MeetingCancelView.as_view()),
+    path('meetings/<uuid:meeting_id>/rsvp/', meetings.MeetingRSVPView.as_view()),
+    path('meetings/<uuid:meeting_id>/read/', meetings.MeetingReadView.as_view()),
+    path('meetings/<uuid:meeting_id>/calendar.ics', meetings.MeetingCalendarFileView.as_view()),
+    path('meetings/<uuid:meeting_id>/actions/', meetings.MeetingActionItemsView.as_view()),
+    path('meetings/<uuid:meeting_id>/actions/<uuid:item_id>/', meetings.MeetingActionItemView.as_view()),
     path('auth/csrf/', auth_views.csrf),
     path('auth/register/', auth_views.register),
     path('auth/login/', auth_views.sign_in),
@@ -45,3 +55,4 @@ urlpatterns = [
     path('channels/<uuid:channel_id>/attachments/', private_attachments.ChannelAttachmentsView.as_view()),
     path('attachments/<uuid:attachment_id>/download/', private_attachments.AttachmentDownloadView.as_view()),
 ]
+
