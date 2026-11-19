@@ -130,3 +130,10 @@ MAIL_MICROSOFT_CLIENT_SECRET = mail_client_secret('MAIL_MICROSOFT_CLIENT_SECRET'
 MAIL_MICROSOFT_TENANT = os.getenv('MAIL_MICROSOFT_TENANT', 'common')
 MAIL_CALLBACK_ORIGIN = os.getenv('MAIL_CALLBACK_ORIGIN', FRONTEND_ORIGIN)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 16 * 1024 * 1024
+
+
+# Native WebRTC calls. Configure your own authorized STUN/TURN services for WAN connectivity.
+CALL_STUN_URLS = [v.strip() for v in os.getenv('CALL_STUN_URLS','').split(',') if v.strip()]
+CALL_TURN_URLS = [v.strip() for v in os.getenv('CALL_TURN_URLS','').split(',') if v.strip()]
+CALL_TURN_SHARED_SECRET = os.getenv('CALL_TURN_SHARED_SECRET','')
+CALL_ICE_TRANSPORT_POLICY = os.getenv('CALL_ICE_TRANSPORT_POLICY','all')

@@ -20,7 +20,7 @@ class MeetingTests(TestCase):
         self.client=APIClient();self.login(self.owner)
         self.payload={'title':'Review','agenda':'Discuss work','starts_at':(timezone.now()+timedelta(hours=2)).isoformat(),
           'ends_at':(timezone.now()+timedelta(hours=3)).isoformat(),'time_zone':'Asia/Kolkata',
-          'meeting_url':'https://meet.example.test/room','attendee_ids':[str(self.member.pk)]}
+          'attendee_ids':[str(self.member.pk)]}
     def login(self,user,org=None):
         self.client=APIClient()
         self.client.force_authenticate(user)

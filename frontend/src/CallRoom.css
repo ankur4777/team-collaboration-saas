@@ -1,0 +1,255 @@
+.call-room {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  background: #112922;
+  color: #edf8f3;
+  font-family: inherit;
+  overflow: hidden;
+}
+.call-room > header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #ffffff16;
+  flex-shrink: 0;
+}
+.call-room > header > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.call-room h2 {
+  font-size: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 4px;
+}
+.call-room > header span {
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  color: #8fc2aa;
+}
+.call-count {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: #a8cabc;
+}
+.call-room button {
+  font: inherit;
+  border: 1px solid #ffffff20;
+  border-radius: 9px;
+  background: #23473a;
+  color: #edf8f3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 13px;
+  cursor: pointer;
+}
+.call-room button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.call-room button:hover:not(:disabled) {
+  background: #305b49;
+}
+.call-room button:focus-visible {
+  outline: 3px solid #9adfce;
+  outline-offset: 2px;
+}
+.call-error {
+  padding: 12px 24px;
+  background: #6e322a;
+  color: #ffe6df;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.call-prejoin {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;
+  gap: 16px;
+  padding: 30px;
+  text-align: center;
+}
+.call-prejoin > svg {
+  color: #8bd8b2;
+}
+.call-prejoin h3 {
+  font-size: 24px;
+}
+.call-prejoin p {
+  font-size: 14px;
+  color: #acccbc;
+}
+.call-prejoin small {
+  font-size: 12px;
+  color: #8fb19f;
+  max-width: 430px;
+  line-height: 1.7;
+}
+.call-prejoin-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.call-prejoin button {
+  font-size: 13px;
+}
+.call-room .call-join {
+  background: #278b65;
+  border-color: #278b65;
+  padding: 12px 35px;
+}
+.call-grid {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  align-content: center;
+  gap: 14px;
+  padding: 20px;
+}
+.call-tile {
+  position: relative;
+  aspect-ratio: 16/10;
+  min-height: 190px;
+  max-height: 65vh;
+  border-radius: 13px;
+  overflow: hidden;
+  background: #203e32;
+  isolation: isolate;
+}
+.call-tile video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #203e32;
+}
+.call-tile.local video {
+  transform: scaleX(-1);
+}
+.call-tile video.camera-hidden {
+  opacity: 0;
+}
+.call-initials {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 45px;
+  color: #aad8c1;
+  pointer-events: none;
+}
+.call-person {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 20px 13px 11px;
+  background: linear-gradient(transparent, #071912dd);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  z-index: 1;
+}
+.call-person small {
+  margin-left: auto;
+  color: #b3d0bf;
+  font-size: 10px;
+}
+.call-waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 30px;
+  color: #89b49e;
+  min-height: 220px;
+}
+.call-waiting h3 {
+  font-size: 19px;
+}
+.call-waiting p {
+  font-size: 12px;
+  text-align: center;
+}
+.call-room > footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  padding: 15px;
+  border-top: 1px solid #ffffff16;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.call-room > footer button {
+  font-size: 12px;
+}
+.call-room .call-leave {
+  background: #b4483e;
+  border-color: #b4483e;
+}
+.call-room .call-end {
+  background: transparent;
+  color: #ffb3a8;
+  border-color: #8c5148;
+}
+.call-room .call-enable-audio {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  font-size: 12px;
+  background: #27795a;
+}
+@media (max-width: 680px) {
+  .call-room > header {
+    padding: 12px 15px;
+    gap: 10px;
+  }
+  .call-room h2 {
+    font-size: 15px;
+  }
+  .call-grid {
+    padding: 10px;
+    gap: 10px;
+    grid-template-columns: 1fr;
+    align-content: start;
+  }
+  .call-tile {
+    min-height: 180px;
+    max-height: none;
+  }
+  .call-room > footer {
+    padding: 10px;
+    gap: 7px;
+  }
+  .call-room > footer button {
+    padding: 9px;
+    font-size: 11px;
+  }
+  .call-room > footer button span {
+    display: none;
+  }
+  .call-prejoin {
+    padding: 22px;
+  }
+  .call-prejoin h3 {
+    font-size: 22px;
+  }
+}

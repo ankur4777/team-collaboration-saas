@@ -303,3 +303,7 @@ Meetings now supports workspace-private scheduling, channel/team invitations, RS
 rescheduling/cancellation, in-app reminders, notes and assigned action items.
 Calendar uses the same meeting records with day, week and month views.
 See [Meetings quickstart](docs/MEETINGS_QUICKSTART.md) for local setup and testing.
+
+Meetings includes native in-app voice/video calls for up to six invited participants,
+with microphone/camera controls and organizer end-for-everyone. Production calling
+requires HTTPS and a configured TURN relay; see the Meetings quickstart.

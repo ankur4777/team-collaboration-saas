@@ -44,7 +44,7 @@ jobs:
           MYSQL_USER: root
           MYSQL_PASSWORD: test-root-password
           REDIS_URL: redis://127.0.0.1:6379/0
-      - run: 'python -c "from config.asgi import application; from workspace.routing import websocket_urlpatterns; assert len(websocket_urlpatterns) == 3"'
+      - run: 'python -c "from config.asgi import application; from workspace.routing import websocket_urlpatterns; assert len(websocket_urlpatterns) == 4"'
         env: *env
       - run: python manage.py test workspace mailbox_app --verbosity 2
         env: *env
@@ -87,3 +87,48 @@ jobs:
         shell: pwsh
         run: ./tools/tests/check_setup_wrapper.ps1
 
+
+
+  native-call-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      DJANGO_SETTINGS_MODULE: config.test_settings
+      API_PROXY_TARGET: http://127.0.0.1:8000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: sudo apt-get update && sudo apt-get install -y pkg-config default-libmysqlclient-dev
+      - run: pip install -r backend/requirements.txt
+      - run: npm ci --no-audit --no-fund
+        working-directory: frontend
+      - name: Prepare Chromium
+        working-directory: frontend
+        run: |
+          browser=$(command -v google-chrome || command -v chromium || true)
+          if [ -n "$browser" ]; then
+            echo "CALL_TEST_CHROMIUM=$browser" >> "$GITHUB_ENV"
+          else
+            npx playwright install --with-deps chromium
+          fi
+      - run: python manage.py migrate --noinput
+        working-directory: backend
+      - run: python tools/seed_native_call_test.py
+      - name: Run API and frontend
+        run: |
+          (cd backend && daphne -b 127.0.0.1 -p 8000 config.asgi:application > /tmp/native-api.log 2>&1) &
+          (cd frontend && npx vite --host 127.0.0.1 --port 5173 > /tmp/native-web.log 2>&1) &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5173/api/health/; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/native-api.log /tmp/native-web.log
+          exit 1
+      - run: node e2e/native-call.mjs
+        working-directory: frontend
+      - name: Print server logs on failure
+        if: failure()
+        run: cat /tmp/native-api.log /tmp/native-web.log || true

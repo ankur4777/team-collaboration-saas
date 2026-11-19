@@ -1,6 +1,6 @@
 """Workspace-private meeting scheduling; external call links are never fetched."""
 from datetime import timedelta
-from urllib.parse import urlsplit
+from django.conf import settings
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.db import transaction
@@ -59,7 +59,7 @@ def serialize(row, user):
     return {
         'id': str(row.pk), 'title': row.title, 'agenda': row.agenda,
         'starts_at': row.starts_at.isoformat(), 'ends_at': row.ends_at.isoformat(),
-        'time_zone': row.time_zone, 'meeting_url': row.meeting_url, 'notes': row.notes,
+        'time_zone': row.time_zone, 'meeting_url': settings.FRONTEND_ORIGIN+'/?meeting='+str(row.pk), 'notes': row.notes, 'call_ended': bool(row.call_ended_at),
         'cancelled': row.cancelled, 'revision': row.revision, 'organizer': person(row.organizer),
         'channel': {'id': str(row.channel_id), 'name': row.channel.name, 'team_id': str(row.channel.team_id), 'team_name': row.channel.team.name} if row.channel_id else None,
         'my_response': next((a.response for a in attendees if a.user_id == user.pk), 'pending'),
@@ -91,18 +91,11 @@ class MeetingInput(serializers.Serializer):
     starts_at = AwareDateTime()
     ends_at = AwareDateTime()
     time_zone = serializers.CharField(max_length=64, default='UTC')
-    meeting_url = serializers.URLField(max_length=1000)
     attendee_ids = serializers.ListField(child=serializers.UUIDField(), max_length=200, default=list)
     channel_id = serializers.UUIDField(allow_null=True, default=None)
     invite_channel = serializers.BooleanField(default=False)
     notes = serializers.CharField(max_length=20000, allow_blank=True, required=False)
     revision = serializers.IntegerField(min_value=1, required=False)
-
-    def validate_meeting_url(self, value):
-        parsed = urlsplit(value)
-        if parsed.scheme != 'https' or parsed.username or parsed.password:
-            raise serializers.ValidationError('Use an HTTPS meeting link without embedded credentials.')
-        return value
 
     def validate_time_zone(self, value):
         try:
@@ -112,6 +105,8 @@ class MeetingInput(serializers.Serializer):
         return value
 
     def validate(self, data):
+        if self.initial_data.get('meeting_url'):
+            raise serializers.ValidationError({'meeting_url': 'Meetings now use internal TeamWorkspace call rooms. Leave this field empty.'})
         if data['ends_at'] <= data['starts_at']:
             raise serializers.ValidationError({'ends_at': 'End time must be after start time.'})
         if data['ends_at'] - data['starts_at'] > timedelta(days=1):
@@ -145,11 +140,13 @@ def save_input(request, data, row=None):
     ids, channel = data.pop('_ids'), data.pop('_channel')
     for key in ('attendee_ids', 'channel_id', 'invite_channel', 'revision'):
         data.pop(key, None)
-    changed_schedule = row and (row.starts_at != data['starts_at'] or row.ends_at != data['ends_at'] or row.meeting_url != data['meeting_url'])
+    changed_schedule = row and (row.starts_at != data['starts_at'] or row.ends_at != data['ends_at'])
     if row:
         for name, value in data.items():
             setattr(row, name, value)
         row.channel = channel
+        if changed_schedule:
+            row.call_ended_at = None
         row.revision += 1
         row.save()
     else:
@@ -340,7 +337,7 @@ class MeetingCalendarFileView(APIView):
         lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//TeamWorkspace//Meetings//EN', 'BEGIN:VEVENT',
                  f'UID:{row.pk}@teamworkspace', f'DTSTAMP:{stamp(timezone.now())}', f'DTSTART:{stamp(row.starts_at)}',
                  f'DTEND:{stamp(row.ends_at)}', f'SUMMARY:{escape(row.title)}', f'DESCRIPTION:{escape(row.agenda)}',
-                 f'URL:{row.meeting_url}', f'SEQUENCE:{row.revision}', f'STATUS:{"CANCELLED" if row.cancelled else "CONFIRMED"}',
+                 f'URL:{settings.FRONTEND_ORIGIN}/?meeting={row.pk}', f'SEQUENCE:{row.revision}', f'STATUS:{"CANCELLED" if row.cancelled else "CONFIRMED"}',
                  'END:VEVENT', 'END:VCALENDAR']
         # Fold UTF-8 lines at <=75 octets, including continuation whitespace.
         folded = []

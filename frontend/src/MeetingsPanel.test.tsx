@@ -11,6 +11,7 @@ import MeetingsPanel from './MeetingsPanel';
 import { meetingsApi, type MeetingRecord } from './api';
 vi.mock('./api', () => ({
   api: { channels: vi.fn(), teamMembers: vi.fn() },
+  callsApi: { config: vi.fn(), end: vi.fn() },
   meetingsApi: {
     list: vi.fn(),
     detail: vi.fn(),
@@ -34,6 +35,7 @@ const meeting: MeetingRecord = {
   time_zone: 'UTC',
   meeting_url: 'https://meet.example.test/review',
   notes: '',
+  call_ended: false,
   cancelled: false,
   revision: 1,
   organizer: { id: 'owner', full_name: 'Owner', email: 'owner@example.test' },
@@ -90,7 +92,7 @@ const mount = (userId = 'member', calendar = false) =>
     />,
   );
 describe('Meetings dashboard', () => {
-  it('schedules a meeting with workspace attendees and an external link', async () => {
+  it('schedules an internal meeting without an external link', async () => {
     const user = userEvent.setup();
     mount('owner');
     await user.click(screen.getByRole('button', { name: 'Schedule meeting' }));
@@ -99,10 +101,7 @@ describe('Meetings dashboard', () => {
       within(form).getByLabelText('Meeting title'),
       'Release planning',
     );
-    await user.type(
-      within(form).getByLabelText('Meeting link'),
-      'https://meet.example.test/new',
-    );
+    expect(within(form).queryByLabelText('Meeting link')).toBeNull();
     await user.click(within(form).getByRole('checkbox', { name: /Member/ }));
     await user.click(
       within(form).getByRole('button', { name: 'Create meeting' }),
@@ -112,25 +111,28 @@ describe('Meetings dashboard', () => {
         expect.objectContaining({
           title: 'Release planning',
           attendee_ids: ['member'],
-          meeting_url: 'https://meet.example.test/new',
         }),
       ),
     );
   });
-  it('lets an invited member accept and open the provider link', async () => {
+  it('lets an invited member accept and open the internal call screen', async () => {
     const user = userEvent.setup();
     mount();
     await user.click(
       await screen.findByRole('button', { name: /Project review/ }),
     );
-    expect(
-      await screen.findByRole('link', { name: 'Join meeting' }),
-    ).toHaveProperty('href', meeting.meeting_url);
+
     await user.click(screen.getByRole('button', { name: 'Accept' }));
     await waitFor(() =>
       expect(meetingsApi.rsvp).toHaveBeenCalledWith('meeting-1', 'accepted'),
     );
     expect(screen.queryByRole('button', { name: 'Cancel meeting' })).toBeNull();
+    await user.click(
+      await screen.findByRole('button', { name: 'Join meeting' }),
+    );
+    expect(
+      screen.getByRole('dialog', { name: 'Call: Project review' }),
+    ).toBeTruthy();
   });
   it('uses the same record in Calendar and opens its details', async () => {
     const user = userEvent.setup();
@@ -145,17 +147,17 @@ describe('Meetings dashboard', () => {
         .getAttribute('href'),
     ).toBe('/api/meetings/meeting-1/calendar.ics');
   });
-  it('does not expose a join link for unsafe input', async () => {
+  it('does not offer to join a call ended by the organizer', async () => {
+    vi.mocked(meetingsApi.detail).mockResolvedValue({
+      ...meeting,
+      call_ended: true,
+    });
     const user = userEvent.setup();
     mount();
-    await user.click(screen.getByRole('button', { name: 'Join with link' }));
-    const form = screen.getByRole('dialog', { name: 'Join with link' });
-    await user.type(
-      within(form).getByLabelText('Meeting link'),
-      'javascript:alert(1)',
+    await user.click(
+      await screen.findByRole('button', { name: /Project review/ }),
     );
-    expect(
-      within(form).queryByRole('link', { name: 'Join meeting' }),
-    ).toBeNull();
+    expect(await screen.findByText('This call has ended.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Join meeting' })).toBeNull();
   });
 });
