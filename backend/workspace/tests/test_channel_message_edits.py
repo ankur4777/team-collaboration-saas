@@ -158,6 +158,19 @@ class ChannelMessageEditDeleteTests(TestCase):
         self.assertNotIn(old['id'], [item['id'] for item in rows])
         self.assertNotIn(last['id'], [item['id'] for item in rows])
 
+    def test_rejoined_message_author_cannot_mutate_old_history(self):
+        old = self.send_message('Written before removal')
+        TeamMember.objects.filter(team=self.team, user=self.owner).delete()
+        TeamMember.objects.create(team=self.team, user=self.owner, role=TeamMember.Role.OWNER)
+        self.assertEqual(self.client.get(
+            f'/api/channels/{self.channel.pk}/messages/',
+        ).json(), [])
+        self.assertEqual(
+            self.patch(self.detail_url(old['id']), {'body':'Old content changed'}).status_code, 404,
+        )
+        self.assertEqual(self.delete(self.detail_url(old['id'])).status_code, 404)
+        self.assertEqual(Message.objects.get(pk=old['id']).body, 'Written before removal')
+
     def test_wrong_message_and_other_company_cannot_mutate(self):
         import uuid
         sent = self.send_message()
