@@ -42,7 +42,7 @@ class ChannelNotificationsView(APIView):
             baseline = joined_teams[channel.team_id]
             if last_read and last_read > baseline:
                 baseline = last_read
-            count = (Message.objects.filter(channel=channel, created_at__gt=baseline)
+            count = (Message.objects.filter(channel=channel, created_at__gt=baseline, deleted_at__isnull=True)
                      .exclude(sender_id=request.user.pk).count())
             result.append({
                 'channel_id': str(channel.id),

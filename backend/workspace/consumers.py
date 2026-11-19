@@ -36,10 +36,30 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         channel_id = self.scope['url_route']['kwargs']['channel_id']
         user = self.scope.get('user')
         active_org = self.scope['session'].get('active_organization_id')
-        if not await self.allowed(user.pk, channel_id, active_org):
+        if not user or not await self.allowed(user.pk, channel_id, active_org):
             await self.close(code=4403)
             return
-        await self.send_json({'type': 'message', 'message': event['message']})
+        # Rejoined team members must never receive edits/deletions or message
+        # contents that predate their latest team admission.
+        created_at = event.get('message', {}).get('created_at')
+        if not await self.can_see_message(user.pk, channel_id, created_at):
+            return
+        await self.send_json({
+            'type': event.get('action', 'message'),
+            'message': event['message'],
+        })
+
+    @database_sync_to_async
+    def can_see_message(self, user_id, channel_id, created_at):
+        if not isinstance(created_at, str):
+            return False
+        timestamp = parse_datetime(created_at)
+        if timestamp is None:
+            return False
+        return TeamMember.objects.filter(
+            team__channels__id=channel_id, user_id=user_id,
+            joined_at__lte=timestamp,
+        ).exists()
 
     @database_sync_to_async
     def allowed(self, user_id, channel_id, organization_id):

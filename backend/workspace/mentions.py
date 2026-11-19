@@ -83,7 +83,7 @@ def visible(notification, membership, chat_joins, team_joins):
         return joined is not None and message.created_at >= joined
     if notification.channel_message_id:
         message = notification.channel_message
-        if message.channel.team.organization_id != membership.organization_id:
+        if message.deleted_at or message.channel.team.organization_id != membership.organization_id:
             return False
         joined = team_joins.get(message.channel.team_id)
         return joined is not None and message.created_at >= joined
