@@ -66,6 +66,7 @@ class MessageSearchView(APIView):
                     channel__team__members__user=request.user,
                     created_at__gte=F('channel__team__members__joined_at'),
                     body__icontains=query,
+                    deleted_at__isnull=True,
                 )
                 .select_related('sender', 'channel__team')
                 .order_by('-created_at', '-id')[:MAX_RESULTS]
