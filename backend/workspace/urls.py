@@ -41,6 +41,7 @@ urlpatterns = [
     path('teams/<uuid:team_id>/channels/', views.TeamChannelsView.as_view()),
     path('teams/<uuid:team_id>/members/', views.TeamMembersView.as_view()),
     path('channels/<uuid:channel_id>/messages/', views.ChannelMessagesView.as_view()),
+    path('channels/<uuid:channel_id>/messages/<uuid:message_id>/', views.ChannelMessageDetailView.as_view()),
     path('channels/<uuid:channel_id>/attachments/', private_attachments.ChannelAttachmentsView.as_view()),
     path('attachments/<uuid:attachment_id>/download/', private_attachments.AttachmentDownloadView.as_view()),
 ]
