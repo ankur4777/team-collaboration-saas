@@ -359,7 +359,8 @@ class Meeting(models.Model):
     starts_at = models.DateTimeField()
     ends_at = models.DateTimeField()
     time_zone = models.CharField(max_length=64, default='UTC')
-    meeting_url = models.URLField(max_length=1000)
+    meeting_url = models.URLField(max_length=1000, blank=True, default='')
+    call_ended_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(max_length=20000, blank=True)
     cancelled = models.BooleanField(default=False)
     revision = models.PositiveIntegerField(default=1)
@@ -402,3 +403,18 @@ class MeetingActionItem(models.Model):
 
     class Meta:
         ordering = ['created_at', 'id']
+
+
+class MeetingCallPeer(models.Model):
+    """Short-lived signaling presence; no audio, video, SDP or ICE is stored."""
+    id = models.UUIDField(primary_key=True, default=make_id, editable=False)
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name='call_peers')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    channel_name = models.CharField(max_length=255, unique=True)
+    session_key = models.CharField(max_length=40)
+    updated_at = models.DateTimeField(default=timezone.now)
+    audio = models.BooleanField(default=True)
+    video = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['meeting', 'user'], name='uq_meeting_call_user')]

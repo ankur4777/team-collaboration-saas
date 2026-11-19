@@ -5,8 +5,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  ExternalLink,
-  Link,
   Plus,
   RefreshCw,
   Users,
@@ -23,6 +21,7 @@ import {
   type Channel,
 } from './api';
 import './MeetingsPanel.css';
+import CallRoom from './CallRoom';
 
 type Props = {
   workspaceId: string | null;
@@ -60,14 +59,6 @@ function when(value: string) {
     minute: '2-digit',
   });
 }
-function safeLink(value: string) {
-  try {
-    const u = new URL(value);
-    return u.protocol === 'https:' && !u.username && !u.password ? u.href : '';
-  } catch {
-    return '';
-  }
-}
 
 function MeetingEditor({
   meeting,
@@ -101,7 +92,6 @@ function MeetingEditor({
         : new Date(start.getTime() + 30 * 60000),
     ),
   );
-  const [url, setUrl] = useState(meeting?.meeting_url || '');
   const [notes, setNotes] = useState(meeting?.notes || '');
   const [teamId, setTeamId] = useState(meeting?.channel?.team_id || '');
   const [channelId, setChannelId] = useState(meeting?.channel?.id || '');
@@ -149,11 +139,6 @@ function MeetingEditor({
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError('');
-    const link = safeLink(url.trim());
-    if (!link) {
-      setError('Paste a valid HTTPS meeting link.');
-      return;
-    }
     const a = new Date(starts),
       b = new Date(ends);
     if (
@@ -174,7 +159,6 @@ function MeetingEditor({
         starts_at: a.toISOString(),
         ends_at: b.toISOString(),
         time_zone: zone(),
-        meeting_url: link,
         attendee_ids: attendees.filter(
           (id) => !channelId || teamUsers?.includes(id),
         ),
@@ -280,20 +264,10 @@ function MeetingEditor({
               <Clock size={14} />
               Times use your browser time zone: {zone()}.
             </p>
-            <label>
-              Meeting link
-              <input
-                type="url"
-                required
-                maxLength={1000}
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://…"
-              />
-            </label>
             <p className="meeting-hint">
-              Paste an existing Teams, Google Meet, Zoom or other HTTPS call
-              link. Joining opens that service.
+              <Video size={14} />
+              Voice and video happen directly inside TeamWorkspace. A call room
+              is created automatically.
             </p>
             <label>
               Agenda
@@ -452,8 +426,7 @@ export default function MeetingsPanel({
     meeting: MeetingRecord | null;
     now: boolean;
   } | null>(null);
-  const [joinOpen, setJoinOpen] = useState(false);
-  const [joinLink, setJoinLink] = useState('');
+  const [callMeeting, setCallMeeting] = useState<MeetingRecord | null>(null);
   const [query, setQuery] = useState('');
   const [date, setDate] = useState(dayStart(new Date()));
   const [calendarMode, setCalendarMode] = useState<'Month' | 'Week' | 'Day'>(
@@ -633,10 +606,6 @@ export default function MeetingsPanel({
           <p>Plan together. Meet with purpose.</p>
         </div>
         <div className="meeting-heading-actions">
-          <button className="outline-button" onClick={() => setJoinOpen(true)}>
-            <Link size={16} />
-            Join with link
-          </button>
           <button
             className="outline-button"
             onClick={() => setEditor({ meeting: null, now: true })}
@@ -906,15 +875,17 @@ export default function MeetingsPanel({
                 Organized by {selected.organizer.full_name}
               </p>
               <div className="meeting-detail-actions">
-                {active && safeLink(selected.meeting_url) && (
-                  <a
+                {active && !selected.call_ended && (
+                  <button
                     className="primary-button"
-                    href={safeLink(selected.meeting_url)}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    onClick={() => setCallMeeting(selected)}
                   >
-                    Join meeting <ExternalLink size={15} />
-                  </a>
+                    <Video size={15} />
+                    Join meeting
+                  </button>
+                )}
+                {selected.call_ended && (
+                  <span className="meeting-hint">This call has ended.</span>
                 )}
                 <a
                   className="outline-button"
@@ -1142,69 +1113,15 @@ export default function MeetingsPanel({
           }}
         />
       )}
-      {joinOpen && (
-        <div className="meeting-shade">
-          <div
-            className="meeting-modal meeting-join"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="join-meeting-title"
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setJoinOpen(false);
-              if (e.key === 'Tab') {
-                const nodes = Array.from(
-                  e.currentTarget.querySelectorAll<HTMLElement>(
-                    'button,input,a',
-                  ),
-                );
-                const first = nodes[0],
-                  last = nodes[nodes.length - 1];
-                if (e.shiftKey && document.activeElement === first) {
-                  e.preventDefault();
-                  last?.focus();
-                } else if (!e.shiftKey && document.activeElement === last) {
-                  e.preventDefault();
-                  first?.focus();
-                }
-              }
-            }}
-          >
-            <header>
-              <h2 id="join-meeting-title">Join with link</h2>
-              <button
-                autoFocus
-                className="icon-button"
-                aria-label="Close join meeting"
-                onClick={() => setJoinOpen(false)}
-              >
-                <X size={19} />
-              </button>
-            </header>
-            <label>
-              Meeting link
-              <input
-                type="url"
-                value={joinLink}
-                placeholder="https://…"
-                onChange={(e) => setJoinLink(e.target.value)}
-              />
-            </label>
-            <p className="meeting-hint">
-              Your call opens in a new tab on the meeting provider’s website.
-            </p>
-            {safeLink(joinLink) && (
-              <a
-                className="primary-button"
-                href={safeLink(joinLink)}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setJoinOpen(false)}
-              >
-                Join meeting <ExternalLink size={15} />
-              </a>
-            )}
-          </div>
-        </div>
+      {callMeeting && (
+        <CallRoom
+          meeting={callMeeting}
+          userId={userId}
+          onLeave={() => {
+            setCallMeeting(null);
+            setVersion((v) => v + 1);
+          }}
+        />
       )}
     </section>
   );

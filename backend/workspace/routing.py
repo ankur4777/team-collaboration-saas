@@ -3,9 +3,12 @@ from django.urls import re_path
 
 from .consumers import ChannelConsumer, PrivateChatConsumer
 from .notification_consumers import NotificationConsumer
+from .call_consumer import MeetingCallConsumer
 
 websocket_urlpatterns = [
+    re_path(r'^ws/meetings/(?P<meeting_id>[0-9a-f-]{36})/call/$', MeetingCallConsumer.as_asgi()),
     re_path(r'^ws/notifications/$', NotificationConsumer.as_asgi()),
     re_path(r'^ws/channels/(?P<channel_id>[0-9a-f-]{36})/$', ChannelConsumer.as_asgi()),
     re_path(r'^ws/chats/(?P<chat_id>[0-9a-f-]{36})/$', PrivateChatConsumer.as_asgi()),
 ]
+

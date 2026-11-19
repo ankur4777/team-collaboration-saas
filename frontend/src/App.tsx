@@ -92,10 +92,10 @@ const navItems = [
   {id:'files', label:'Shared files', icon:FolderOpen, ready:false},
 ];
 function Workspace({ session, onSession, onLogout }: {session:Session;onSession:(value:Session)=>void;onLogout:()=>void}) {
-  const [view,setView] = useState(new URLSearchParams(location.search).has('mail')?'inbox':'teams'); const [teams,setTeams] = useState<Team[]>([]);
+  const [view,setView] = useState(new URLSearchParams(location.search).has('meeting')?'meetings':new URLSearchParams(location.search).has('mail')?'inbox':'teams'); const [teams,setTeams] = useState<Team[]>([]);
   const [openChatRequest,setOpenChatRequest] = useState<{id:string;nonce:number}|null>(null);
   const [notificationRefresh,setNotificationRefresh] = useState(0);
-  const [openMeetingRequest,setOpenMeetingRequest] = useState<{id:string;nonce:number}|null>(null);
+  const [openMeetingRequest,setOpenMeetingRequest] = useState<{id:string;nonce:number}|null>(()=>{const id=new URLSearchParams(location.search).get('meeting');return id?{id,nonce:Date.now()}:null;});
   const [channelNotices,setChannelNotices] = useState<ChannelNotice[]>([]);
   const currentOrgRef = useRef(session.active_organization_id);
   currentOrgRef.current = session.active_organization_id;
@@ -147,7 +147,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   },[loadChannelNotices]);
 
   const loadTeams = useCallback(async()=>{ try {const rows=await api.teams();setTeams(rows);setSelectedTeam(current=>current && rows.some(t=>t.id===current)?current:(rows[0]?.id||null));}catch(e){setError(errorText(e));}},[]);
-  useEffect(()=>{setTeams([]);setChannels([]);setMembers([]);setOpenMeetingRequest(null);setSelectedTeam(null);setSelectedChannel(null);setMessages([]);loadTeams();if(session.active_organization_id)api.members(session.active_organization_id).then(setMembers).catch(()=>{});},[session.active_organization_id,loadTeams]);
+  useEffect(()=>{setTeams([]);setChannels([]);setMembers([]);setSelectedTeam(null);setSelectedChannel(null);setMessages([]);loadTeams();if(session.active_organization_id)api.members(session.active_organization_id).then(setMembers).catch(()=>{});},[session.active_organization_id,loadTeams]);
   useEffect(()=>{
     setTeamMentionPeople([]);
     if(!selectedTeam)return;
