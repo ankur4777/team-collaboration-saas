@@ -98,4 +98,24 @@ describe('Email inbox interactions',()=>{
     await waitFor(()=>expect(screen.queryByRole('heading',{name:'Project review'})).toBeNull());
     expect(await screen.findByText('Select a message to read')).toBeTruthy();
   });
+  it('filters unread messages on the current page without fetching a different mailbox',async()=>{
+    vi.mocked(mailApi.messages).mockResolvedValue({results:[message,{...message,id:'message-2',subject:'Already read',is_read:true}],next_cursor:''});
+    const user=userEvent.setup();mount();
+    await screen.findByRole('button',{name:/Bob.*Already read/});
+    await user.click(screen.getByRole('button',{name:'Unread'}));
+    expect(screen.queryByRole('button',{name:/Bob.*Already read/})).toBeNull();
+    expect(screen.getByRole('button',{name:/Bob.*Project review/})).toBeTruthy();
+    await user.click(screen.getByRole('button',{name:'All mail'}));
+    expect(screen.getByRole('button',{name:/Bob.*Already read/})).toBeTruthy();
+  });
+  it('uses the command toolbar to archive checked messages only',async()=>{
+    vi.mocked(mailApi.messages).mockResolvedValue({results:[message,{...message,id:'message-2',subject:'Keep this email'}],next_cursor:''});
+    const user=userEvent.setup();mount();
+    await user.click(await screen.findByRole('checkbox',{name:'Select Project review'}));
+    await user.click(within(screen.getByRole('toolbar',{name:'Mail actions'})).getByRole('button',{name:'Archive'}));
+    await waitFor(()=>expect(mailApi.action).toHaveBeenCalledWith('account-1','message-1','archive'));
+    expect(mailApi.action).not.toHaveBeenCalledWith('account-1','message-2','archive');
+  });
+
 });
+
