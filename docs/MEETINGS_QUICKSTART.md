@@ -193,3 +193,14 @@ suppression, the translation adapter and original/translated display. It does no
 claim to validate a live vendor speech engine, microphone transcription accuracy,
 real translation quality or production credentials. Test those on your deployed
 HTTPS site with supported browsers and your configured translation service.
+
+## Immersive meeting room layout
+
+After joining, the room uses a large centered participant tile, a circular initials
+avatar when the camera is off, participant name labels and a floating rounded
+control dock. TeamWorkspace's fonts and green palette are retained. The old
+second-column waiting placeholder is removed; a solo participant uses the main
+stage. Existing call, sharing, chat, captions and reaction controls remain. The
+avatar uses the participant's initials because profile photos are not currently
+part of the account data. Desktop and mobile solo layouts are covered by browser
+checks and screenshots.

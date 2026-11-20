@@ -337,6 +337,7 @@ export default function CallAccessibility({
     <div className="call-access-controls">
       <button
         aria-label="Emoji reactions"
+        title="Emoji reactions"
         aria-expanded={popover === 'emoji'}
         onClick={() => setPopover(popover === 'emoji' ? null : 'emoji')}
       >
@@ -344,6 +345,7 @@ export default function CallAccessibility({
       </button>
       <button
         aria-label={enabled ? 'Turn off captions' : 'Turn on captions'}
+        title={enabled ? 'Turn off captions' : 'Turn on captions'}
         aria-pressed={enabled}
         onClick={captionsToggle}
       >
@@ -351,6 +353,7 @@ export default function CallAccessibility({
       </button>
       <button
         aria-label="Translate speech"
+        title="Translate speech"
         aria-expanded={popover === 'translate'}
         onClick={() => {
           setEnabled(true);
