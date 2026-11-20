@@ -211,6 +211,19 @@ class MeetingDetailView(APIView):
     def get(self, request, meeting_id):
         return Response(serialize(get_meeting(request, meeting_id), request.user))
 
+    def delete(self, request, meeting_id):
+        with transaction.atomic():
+            row = get_meeting(request, meeting_id, lock=True, organizer=True)
+            conflict = revision_error(row, request.data)
+            if conflict is not None:
+                return conflict
+            if not (row.cancelled or row.call_ended_at or row.ends_at <= timezone.now()):
+                raise ValidationError('Only ended or cancelled meetings can be deleted. Cancel an upcoming meeting first.')
+            # Capture notification recipients before deleting related invitation rows.
+            broadcast(row)
+            row.delete()
+        return Response({'status': 'deleted'})
+
     def patch(self, request, meeting_id):
         with transaction.atomic():
             row = get_meeting(request, meeting_id, lock=True, organizer=True)
@@ -232,6 +245,8 @@ class MeetingCancelView(APIView):
             conflict = revision_error(row, request.data)
             if conflict is not None:
                 return conflict
+            if not row.cancelled and (row.call_ended_at or row.ends_at <= timezone.now()):
+                raise ValidationError('This meeting has ended. Delete it instead of cancelling it.')
             if not row.cancelled:
                 row.cancelled = True
                 row.revision += 1

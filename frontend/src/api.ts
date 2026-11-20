@@ -211,6 +211,7 @@ export const meetingsApi = {
   detail:(id:string)=>request<MeetingRecord>(`meetings/${id}/`),
   create:(data:MeetingPayload)=>post<MeetingRecord>('meetings/',data),
   update:(id:string,data:MeetingPayload)=>request<MeetingRecord>(`meetings/${id}/`,'PATCH',data),
+  remove:(id:string,revision:number)=>request<{status:string}>(`meetings/${id}/`,'DELETE',{revision}),
   cancel:(id:string,revision:number)=>post<MeetingRecord>(`meetings/${id}/cancel/`,{revision}),
   rsvp:(id:string,response:string)=>post<MeetingRecord>(`meetings/${id}/rsvp/`,{response}),
   notifications:()=>request<{results:MeetingNotice[]}>('meetings/notifications/'),

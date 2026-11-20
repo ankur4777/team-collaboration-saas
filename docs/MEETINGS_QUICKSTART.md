@@ -221,3 +221,12 @@ and load testing; simply removing the admission check does not supply that.
 Backend tests cover 202 invitees, twelve admissions and eight simultaneous authenticated
 signaling sockets. The browser media test covers two clients, not a large-group
 performance benchmark.
+
+## Delete an ended meeting
+
+Once the scheduled end time passes, the organizer ends the call, or a meeting is
+cancelled, the organizer sees **Delete meeting** instead of **Cancel meeting**.
+Upcoming/running meetings retain Cancel meeting. Deleting asks for confirmation
+and permanently removes the meeting, invitations, notes, action items and call
+presence for all attendees. Other workspace content is unaffected. Only the
+organizer can delete; active meetings and stale revisions are rejected by the API.

@@ -391,8 +391,16 @@ try {
     'Organizer end did not stop the other client',
     20000,
   );
+  const deleteButton=owner.getByRole('button',{name:'Delete meeting',exact:true});
+  await deleteButton.waitFor();
+  assert.equal(await owner.getByRole('button',{name:'Cancel meeting',exact:true}).count(),0,'Ended meeting still offers Cancel');
+  await owner.screenshot({path:'call-test-results/ended-meeting-delete.png'});
+  owner.once('dialog',dialog=>dialog.accept());
+  await deleteButton.click();
+  await owner.getByText('Meeting deleted.',{exact:true}).waitFor();
+  assert.equal((await contexts[1].request.get(base+'/api/meetings/11111111-1111-4111-8111-111111111111/')).status(),404,'Deleted meeting remains visible to an attendee');
   console.log(
-    'PASS: native audio/video, reactions, deterministic speech/caption transport and translation adapter, hand raising, participant list, plain-text live chat, layouts, screen sharing/restoration, mute, camera, leave/rejoin, cleanup and organizer end.',
+    'PASS: native audio/video, reactions, deterministic speech/caption transport and translation adapter, hand raising, participant list, plain-text live chat, layouts, screen sharing/restoration, mute, camera, leave/rejoin, cleanup, organizer end and confirmed meeting deletion.',
   );
   await Promise.all(contexts.map((c) => c.close()));
 } finally {
