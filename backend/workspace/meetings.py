@@ -91,7 +91,7 @@ class MeetingInput(serializers.Serializer):
     starts_at = AwareDateTime()
     ends_at = AwareDateTime()
     time_zone = serializers.CharField(max_length=64, default='UTC')
-    attendee_ids = serializers.ListField(child=serializers.UUIDField(), max_length=200, default=list)
+    attendee_ids = serializers.ListField(child=serializers.UUIDField(), default=list)
     channel_id = serializers.UUIDField(allow_null=True, default=None)
     invite_channel = serializers.BooleanField(default=False)
     notes = serializers.CharField(max_length=20000, allow_blank=True, required=False)
@@ -129,8 +129,6 @@ class MeetingInput(serializers.Serializer):
                 ids |= team_ids
         elif data['invite_channel']:
             raise serializers.ValidationError({'channel_id': 'Choose a channel to invite its team.'})
-        if len(ids) > 200:
-            raise serializers.ValidationError({'attendee_ids': 'Maximum 200 attendees including the organizer.'})
         data['_ids'] = ids
         data['_channel'] = channel
         return data

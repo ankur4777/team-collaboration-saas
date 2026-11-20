@@ -43,7 +43,7 @@ Daphne. Do not delete existing Docker volumes to apply this update.
 ## Current behavior and scope
 
 - Meet now opens a scheduling form defaulted to now and a 30-minute duration.
-  Its room supports up to six invited participants using native WebRTC.
+  Its room supports invited participants using native WebRTC with no fixed application participant cap.
 - Invitations/reminders are in-app, not outgoing email. Live refresh signals
   use the existing notification WebSocket with polling fallback every 20 seconds.
   Due reminders are computed when the notification API is read, not by a worker;
@@ -130,7 +130,7 @@ The room uses TeamWorkspace's inherited DM Sans / Manrope typography, compact
 12–13px controls, 18px title, white surfaces and mint/green accents. Video tiles
 retain a dark green background for legible participant labels.
 
-Calls still support six people. Recording, breakout rooms,
+Calls have no fixed application participant cap. Recording, breakout rooms,
 background effects and large-group SFU hosting are not included in this update.
 
 ## Emoji, live captions and speech translation
@@ -204,3 +204,20 @@ stage. Existing call, sharing, chat, captions and reaction controls remain. The
 avatar uses the participant's initials because profile photos are not currently
 part of the account data. Desktop and mobile solo layouts are covered by browser
 checks and screenshots.
+
+## Participant capacity
+
+The fixed six-person admission check and separate 200-attendee invitation cap are removed. The header and participant panel
+show the actual connected count, without a maximum denominator. Invitations,
+workspace/channel checks, one-tab-per-user checks, stale presence cleanup and
+message-size/rate limits still apply. The call configuration returns
+`max_peers: null` to mean no fixed application admission cap.
+
+This is not unlimited media capacity. The current implementation creates a mesh
+of direct peer connections: each browser sends media to every other participant.
+CPU, upload bandwidth, browser limits and TURN capacity therefore constrain the
+usable room size. Large production meetings need an SFU/media-server architecture
+and load testing; simply removing the admission check does not supply that.
+Backend tests cover 202 invitees, twelve admissions and eight simultaneous authenticated
+signaling sockets. The browser media test covers two clients, not a large-group
+performance benchmark.

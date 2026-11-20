@@ -19,7 +19,6 @@ from .device_sessions import GENERATION_KEY, live_websocket_session
 from .meetings import get_meeting
 
 PEER_TTL = 90
-MAX_PEERS = 6
 
 
 def socket_allowed(scope, meeting_id):
@@ -55,8 +54,6 @@ def register_peer(scope, meeting_id, channel_name):
         MeetingCallPeer.objects.filter(meeting_id=meeting_id, updated_at__lt=cutoff).delete()
         if MeetingCallPeer.objects.filter(meeting_id=meeting_id, user=scope['user']).exists():
             return {'error':4409}
-        if MeetingCallPeer.objects.filter(meeting_id=meeting_id).count() >= MAX_PEERS:
-            return {'error':4429}
         peer = MeetingCallPeer.objects.create(meeting_id=meeting_id, user=scope['user'], channel_name=channel_name, session_key=scope['session'].session_key)
         peers = MeetingCallPeer.objects.filter(meeting_id=meeting_id).exclude(pk=peer.pk).select_related('user')
         return {'self':peer_data(peer), 'peers':[peer_data(p) for p in peers], 'stale':[str(v) for v in stale]}
@@ -89,7 +86,7 @@ class MeetingCallConfigView(APIView):
         if row.cancelled or row.call_ended_at or row.ends_at <= timezone.now():
             raise ValidationError('This meeting is cancelled, ended or expired.')
         response = Response({'rtc':ice_configuration(request.user.pk),'websocket_path':f'/ws/meetings/{row.pk}/call/',
-                             'max_peers':MAX_PEERS,'relay_configured':bool(getattr(settings,'CALL_TURN_URLS',[])), 'translation_enabled':bool(getattr(settings,'CALL_TRANSLATE_URL',''))})
+                             'max_peers':None,'relay_configured':bool(getattr(settings,'CALL_TURN_URLS',[])), 'translation_enabled':bool(getattr(settings,'CALL_TRANSLATE_URL',''))})
         response['Cache-Control']='no-store'
         return response
 
