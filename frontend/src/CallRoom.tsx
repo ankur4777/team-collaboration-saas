@@ -111,12 +111,19 @@ function MediaTile({
       />
       {!person.video && !person.screen_sharing && (
         <span className="call-initials">
-          {person.name
-            .split(' ')
-            .map((w) => w[0])
-            .slice(0, 2)
-            .join('')
-            .toUpperCase()}
+          <span className="call-avatar-disc">
+            {person.name
+              .split(' ')
+              .map((w) => w[0])
+              .slice(0, 2)
+              .join('')
+              .toUpperCase()}
+          </span>
+          <VideoOff
+            size={18}
+            className="call-avatar-camera"
+            aria-label="Camera off"
+          />
         </span>
       )}
       <div className="call-person">
@@ -755,7 +762,9 @@ export default function CallRoom({
   const owner = meeting.organizer.id === userId;
   const people = Object.values(remotes);
   const localPerson = {
-    name: 'You',
+    name:
+      meeting.attendees.find((a) => a.user.id === userId)?.user.full_name ||
+      'You',
     audio,
     video,
     hand_raised: hand,
@@ -806,7 +815,7 @@ export default function CallRoom({
   }
   return (
     <div
-      className="call-room"
+      className={'call-room' + (joined ? ' in-call' : '')}
       ref={room}
       tabIndex={-1}
       onKeyDown={trapFocus}
@@ -905,7 +914,9 @@ export default function CallRoom({
                 <span>
                   {sharing || people.some((p) => p.person.screen_sharing)
                     ? 'Presentation in progress'
-                    : 'Meeting room'}
+                    : !people.length
+                      ? 'Waiting for teammates'
+                      : 'Meeting room'}
                 </span>
                 <label>
                   <LayoutGrid size={15} />
@@ -924,7 +935,11 @@ export default function CallRoom({
                 </label>
               </div>
               <div
-                className={'call-grid' + (spotlightLayout ? ' spotlight' : '')}
+                className={
+                  'call-grid' +
+                  (spotlightLayout ? ' spotlight' : '') +
+                  (!people.length ? ' solo' : '')
+                }
               >
                 <MediaTile
                   stream={sharing ? display.current : local}
@@ -944,23 +959,6 @@ export default function CallRoom({
                     onPin={() => spotlight(p.person.id)}
                   />
                 ))}
-                {!people.length && (
-                  <div className="call-waiting">
-                    <Users size={30} />
-                    <h3>Waiting for your teammates</h3>
-                    <p>
-                      Invited teammates can join this meeting from
-                      TeamWorkspace.
-                    </p>
-                    <button
-                      onClick={() => {
-                        setPanel('info');
-                      }}
-                    >
-                      Meeting details
-                    </button>
-                  </div>
-                )}
               </div>
             </main>
             {panel && (
@@ -1156,41 +1154,66 @@ export default function CallRoom({
             )}
           </div>
           <footer>
-            <div className="call-device-controls">
+            <div className="call-control-dock" aria-label="Call controls">
+              <div className="call-device-controls">
+                <button
+                  aria-label={audio ? 'Mute microphone' : 'Unmute microphone'}
+                  title={audio ? 'Mute microphone' : 'Unmute microphone'}
+                  aria-pressed={audio}
+                  onClick={() => void toggle('audio')}
+                >
+                  {audio ? <Mic /> : <MicOff />}
+                  <span>Microphone</span>
+                </button>
+                <button
+                  aria-label={video ? 'Turn camera off' : 'Turn camera on'}
+                  title={video ? 'Turn camera off' : 'Turn camera on'}
+                  aria-pressed={video}
+                  onClick={() => void toggle('video')}
+                >
+                  {video ? <Video /> : <VideoOff />}
+                  <span>Camera</span>
+                </button>
+                <button
+                  aria-label={sharing ? 'Stop presenting' : 'Present screen'}
+                  title={sharing ? 'Stop presenting' : 'Present screen'}
+                  aria-pressed={sharing}
+                  disabled={shareBusy}
+                  onClick={() => void shareScreen()}
+                >
+                  <MonitorUp />
+                  <span>{sharing ? 'Stop presenting' : 'Present screen'}</span>
+                </button>
+                <button
+                  aria-label={hand ? 'Lower hand' : 'Raise hand'}
+                  title={hand ? 'Lower hand' : 'Raise hand'}
+                  aria-pressed={hand}
+                  onClick={raiseHand}
+                >
+                  <Hand />
+                  <span>{hand ? 'Lower hand' : 'Raise hand'}</span>
+                </button>
+              </div>
+              <CallAccessibility
+                meetingId={meeting.id}
+                userId={userId}
+                event={accessEvent}
+                send={send}
+                audio={audio}
+                isMicActive={() =>
+                  !!stream.current
+                    ?.getAudioTracks()
+                    .some((t) => t.enabled && t.readyState === 'live')
+                }
+                stage={stageElement}
+                translationReady={translationReady}
+              />
               <button
-                aria-label={audio ? 'Mute microphone' : 'Unmute microphone'}
-                aria-pressed={audio}
-                onClick={() => void toggle('audio')}
+                className="call-leave"
+                aria-label="Leave call"
+                title="Leave call"
+                onClick={leave}
               >
-                {audio ? <Mic /> : <MicOff />}
-                <span>Microphone</span>
-              </button>
-              <button
-                aria-label={video ? 'Turn camera off' : 'Turn camera on'}
-                aria-pressed={video}
-                onClick={() => void toggle('video')}
-              >
-                {video ? <Video /> : <VideoOff />}
-                <span>Camera</span>
-              </button>
-              <button
-                aria-label={sharing ? 'Stop presenting' : 'Present screen'}
-                aria-pressed={sharing}
-                disabled={shareBusy}
-                onClick={() => void shareScreen()}
-              >
-                <MonitorUp />
-                <span>{sharing ? 'Stop presenting' : 'Present screen'}</span>
-              </button>
-              <button
-                aria-label={hand ? 'Lower hand' : 'Raise hand'}
-                aria-pressed={hand}
-                onClick={raiseHand}
-              >
-                <Hand />
-                <span>{hand ? 'Lower hand' : 'Raise hand'}</span>
-              </button>
-              <button className="call-leave" onClick={leave}>
                 <PhoneOff />
                 <span>Leave call</span>
               </button>
@@ -1204,20 +1227,6 @@ export default function CallRoom({
                 </button>
               )}
             </div>
-            <CallAccessibility
-              meetingId={meeting.id}
-              userId={userId}
-              event={accessEvent}
-              send={send}
-              audio={audio}
-              isMicActive={() =>
-                !!stream.current
-                  ?.getAudioTracks()
-                  .some((t) => t.enabled && t.readyState === 'live')
-              }
-              stage={stageElement}
-              translationReady={translationReady}
-            />
             <div className="call-panel-controls">
               <button
                 aria-label="Participants"

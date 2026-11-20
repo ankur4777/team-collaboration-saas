@@ -80,6 +80,44 @@ try {
     await page
       .getByRole('button', { name: 'Leave call', exact: true })
       .waitFor();
+    if (i === 0) {
+      await page
+        .getByRole('button', { name: 'Turn camera off', exact: true })
+        .click();
+      await page.locator('.call-grid.solo .call-avatar-disc').waitFor();
+      assert.equal(
+        await page.locator('.call-grid .call-tile').count(),
+        1,
+        'A solo room must have one centered tile',
+      );
+      assert.equal(
+        await page.locator('.call-waiting').count(),
+        0,
+        'Waiting placeholder still occupies half the room',
+      );
+      assert.equal(
+        await page.locator('.call-control-dock').evaluate((el) => {
+          const b = el.getBoundingClientRect();
+          return Math.abs((b.left + b.right) / 2 - innerWidth / 2) < 16;
+        }),
+        true,
+        'The floating dock is not centered',
+      );
+      await page.screenshot({ path: 'call-test-results/solo-room.png' });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.screenshot({ path: 'call-test-results/solo-room-mobile.png' });
+      assert.equal(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+        true,
+        'Solo room overflows mobile viewport',
+      );
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page
+        .getByRole('button', { name: 'Turn camera on', exact: true })
+        .click();
+    }
   }
   const [owner, member] = pages;
   for (const page of pages) {
