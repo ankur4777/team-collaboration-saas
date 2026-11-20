@@ -305,9 +305,11 @@
 .call-grid.spotlight .call-tile.focused {
   grid-column: 1/-1;
   grid-row: 1;
-  max-height: 55vh;
+  width: 100%;
+  height: clamp(230px, 55vh, 560px);
+  max-height: none;
   min-height: 230px;
-  aspect-ratio: 16/9;
+  aspect-ratio: auto;
 }
 .call-waiting {
   display: flex;
@@ -693,7 +695,8 @@
   }
   .call-grid.spotlight .call-tile.focused {
     min-height: 180px;
-    max-height: 40vh;
+    height: clamp(180px, 40vh, 340px);
+    max-height: none;
   }
   .call-prejoin {
     padding: 22px;

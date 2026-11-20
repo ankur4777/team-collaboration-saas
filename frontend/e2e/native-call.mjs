@@ -137,6 +137,11 @@ try {
     'Screen video did not reach other client',
   );
   assert.ok(await owner.locator('[data-call-peer="local"] video').evaluate(el=>el.srcObject.getVideoTracks()[0].getSettings().displaySurface),'Presentation is not a native display capture');
+  assert.equal(await member.locator('.call-grid.spotlight').evaluate(grid=>{
+    const focus=grid.querySelector('.focused').getBoundingClientRect();
+    const others=[...grid.querySelectorAll('.call-tile:not(.focused)')];
+    return focus.width>=grid.clientWidth-42 && others.every(tile=>tile.getBoundingClientRect().top>=focus.bottom);
+  }),true,'Presentation did not fill the stage or overlapped another tile');
   await member.screenshot({path:'call-test-results/remote-presentation.png'});
   const display = await owner
     .locator('[data-call-peer="local"] video')
