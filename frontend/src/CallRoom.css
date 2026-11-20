@@ -1010,7 +1010,7 @@
   min-height: 0;
 }
 .in-call .call-grid.solo .call-tile {
-  width: min(100%, 920px);
+  width: min(100%, 840px);
   aspect-ratio: auto;
   min-height: 0;
   max-height: none;
@@ -1253,3 +1253,9 @@
 .in-call .call-grid.solo{padding-top:4px;padding-bottom:4px}
 .in-call>footer{padding-top:6px;padding-bottom:8px}
 @media(max-width:680px){.in-call>header{padding-top:8px;padding-bottom:8px}.in-call .call-grid.solo{padding-top:4px;padding-bottom:4px}}
+
+/* Slightly narrower tile with more vertical space for the participant. */
+.in-call>header{padding-top:6px;padding-bottom:6px}
+.in-call .call-stage-tools select{padding-top:4px;padding-bottom:4px}
+.in-call .call-grid.solo{padding:0 24px}
+.in-call>footer{padding-top:4px;padding-bottom:4px}
