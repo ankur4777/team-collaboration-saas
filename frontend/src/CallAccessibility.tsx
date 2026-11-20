@@ -318,8 +318,8 @@ export default function CallAccessibility({
                     <strong>
                       {c.sender.user_id === userId ? 'You' : c.sender.name}
                     </strong>
-                    <p>{c.translated || c.text}</p>
-                    {c.translated && <small>{c.text}</small>}
+                    <p dir="auto">{c.translated || c.text}</p>
+                    {c.translated && <small dir="auto">{c.text}</small>}
                   </div>
                 ))
               ) : (

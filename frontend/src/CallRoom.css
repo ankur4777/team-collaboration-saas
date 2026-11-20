@@ -817,7 +817,7 @@
   position: absolute;
   right: 18px;
   top: 65px;
-  z-index: 10;
+  z-index: 3;
   pointer-events: none;
   display: flex;
   align-items: flex-end;
@@ -851,7 +851,7 @@
   left: 16px;
   right: 16px;
   bottom: 12px;
-  z-index: 12;
+  z-index: 4;
   pointer-events: none;
   display: flex;
   flex-direction: column;
@@ -950,3 +950,6 @@
     animation: none;
   }
 }
+
+/* Keep TeamWorkspace Latin typography, with readable Indic caption fallbacks. */
+.call-captions-overlay p,.call-captions-overlay small{font-family:"DM Sans","Nirmala UI","Noto Sans Devanagari","Noto Sans Gurmukhi",Mangal,system-ui,sans-serif;}
