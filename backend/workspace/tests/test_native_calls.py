@@ -113,3 +113,38 @@ class CallSocketTests(CallFixture,TransactionTestCase):
             self.assertTrue((await a.connect())[0]);await a.receive_json_from();await a.send_to(text_data='x'*65537)
             self.assertEqual((await a.receive_output())['code'],1009);await a.disconnect()
         async_to_sync(scenario)()
+
+    def test_hand_and_presentation_state_reach_peers_and_late_joiners(self):
+        MeetingAttendee.objects.create(meeting=self.meeting,user=self.outsider)
+        a,b,c=self.socket(self.owner),self.socket(self.member),self.socket(self.outsider)
+        async def scenario():
+            await a.connect();ready=await a.receive_json_from()
+            await b.connect();await b.receive_json_from();await a.receive_json_from()
+            await a.send_json_to({'type':'media','peer_id':'forged','audio':True,'video':False,'hand_raised':True,'screen_sharing':True})
+            event=await b.receive_json_from()
+            self.assertEqual(event['peer_id'],ready['self']['id']);self.assertTrue(event['hand_raised']);self.assertTrue(event['screen_sharing'])
+            await a.send_json_to({'type':'media','audio':True,'video':False,'hand_raised':'yes','screen_sharing':True})
+            self.assertTrue(await b.receive_nothing(timeout=.1))
+            await c.connect();late=await c.receive_json_from()
+            owner=next(p for p in late['peers'] if p['id']==ready['self']['id'])
+            self.assertTrue(owner['hand_raised']);self.assertTrue(owner['screen_sharing'])
+            await c.disconnect();await b.disconnect();await a.disconnect()
+        async_to_sync(scenario)()
+
+    def test_live_chat_authentic_sender_validation_and_throttle(self):
+        a,b=self.socket(self.owner),self.socket(self.member)
+        async def scenario():
+            await a.connect();ready=await a.receive_json_from()
+            await b.connect();await b.receive_json_from();await a.receive_json_from()
+            await a.send_json_to({'type':'chat','text':'<script>plain text</script>','sender':{'name':'Forged'}})
+            own,remote=await a.receive_json_from(),await b.receive_json_from()
+            self.assertEqual(own,remote);message=remote['message']
+            self.assertEqual(message['sender']['id'],ready['self']['id']);self.assertEqual(message['sender']['name'],self.owner.full_name)
+            self.assertEqual(message['text'],'<script>plain text</script>');self.assertTrue(message['id']);self.assertTrue(message['sent_at'])
+            await a.send_json_to({'type':'chat','text':'x'*2001});self.assertEqual((await a.receive_json_from())['type'],'notice')
+            self.assertTrue(await b.receive_nothing(timeout=.1))
+            for i in range(4):
+                await a.send_json_to({'type':'chat','text':str(i)});await a.receive_json_from();await b.receive_json_from()
+            await a.send_json_to({'type':'chat','text':'too fast'});self.assertEqual((await a.receive_json_from())['type'],'notice')
+            self.assertTrue(await b.receive_nothing(timeout=.1));await b.disconnect();await a.disconnect()
+        async_to_sync(scenario)()

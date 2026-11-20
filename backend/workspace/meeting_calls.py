@@ -42,7 +42,7 @@ def socket_allowed(scope, meeting_id):
 
 
 def peer_data(peer):
-    return {'id':str(peer.pk), 'user_id':str(peer.user_id), 'name':peer.user.full_name, 'audio':peer.audio, 'video':peer.video}
+    return {'id':str(peer.pk), 'user_id':str(peer.user_id), 'name':peer.user.full_name, 'audio':peer.audio, 'video':peer.video, 'hand_raised':peer.hand_raised, 'screen_sharing':peer.screen_sharing}
 
 
 def register_peer(scope, meeting_id, channel_name):

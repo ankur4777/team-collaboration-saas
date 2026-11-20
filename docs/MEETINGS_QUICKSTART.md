@@ -105,3 +105,30 @@ the room; media travels over WebRTC, not through Django. Calls are not recorded.
 CI includes two Chromium clients with synthetic audio/video devices, checking
 actual remote media tracks, mute, camera-off, leave/rejoin and organizer end.
 This does not replace testing your production HTTPS/TURN/firewall configuration.
+
+## Collaboration controls inside a call
+
+- **Present screen:** choose a screen, window or browser tab in the browser picker.
+  Presentation replaces your camera video for other participants; the microphone
+  continues normally. Stop presenting or use the browser's stop-sharing control to
+  restore the camera. Screen audio is not shared. Screen capture requires a
+  supported desktop browser and explicit permission each time.
+- **Participants:** view everyone currently connected, with microphone/camera,
+  raised-hand and presentation indicators. Click a pin to spotlight a person.
+- **Raise hand / Lower hand:** updates the other participants and new arrivals.
+- **In-call chat:** plain-text messages to everyone connected, including unread
+  badges. Messages are not stored, are capped to 200 visible messages per client,
+  and are unavailable to new arrivals or after leaving. Limit: 2,000 characters
+  per message, five messages per ten seconds. Persistent meeting notes remain in
+  the meeting details.
+- **Auto / Tiled / Spotlight:** choose your own layout. Auto focuses a presenter;
+  pinning affects only your view. Full screen uses the browser's full-screen mode.
+- **Meeting details:** copy the internal link. Only invited members can use it;
+  copying the link does not grant access.
+
+The room uses TeamWorkspace's inherited DM Sans / Manrope typography, compact
+12–13px controls, 18px title, white surfaces and mint/green accents. Video tiles
+retain a dark green background for legible participant labels.
+
+Calls still support six people. Recording, automatic captions, breakout rooms,
+background effects and large-group SFU hosting are not included in this update.

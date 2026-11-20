@@ -132,3 +132,11 @@ jobs:
       - name: Print server logs on failure
         if: failure()
         run: cat /tmp/native-api.log /tmp/native-web.log || true
+
+      - name: Upload call UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-call-ui
+          path: frontend/call-test-results/
+          if-no-files-found: ignore

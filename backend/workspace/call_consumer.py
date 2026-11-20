@@ -2,6 +2,7 @@
 import asyncio
 import json
 import time
+import uuid
 from datetime import timedelta
 
 from channels.db import database_sync_to_async
@@ -20,6 +21,7 @@ class MeetingCallConsumer(AsyncJsonWebsocketConsumer):
         self.meeting_id = self.scope['url_route']['kwargs']['meeting_id']
         self.group = 'call_'+self.meeting_id
         self.window_start, self.message_count = time.monotonic(), 0
+        self.chat_start, self.chat_count = time.monotonic(), 0
         if not await database_sync_to_async(socket_allowed)(self.scope,self.meeting_id):
             await self.close(code=4403)
             return
@@ -77,9 +79,30 @@ class MeetingCallConsumer(AsyncJsonWebsocketConsumer):
         if kind=='ping':
             await database_sync_to_async(MeetingCallPeer.objects.filter(pk=self.peer_id).update)(updated_at=timezone.now())
             await self.send_json({'type':'pong'})
-        elif kind=='media' and type(content.get('audio')) is bool and type(content.get('video')) is bool:
-            await database_sync_to_async(MeetingCallPeer.objects.filter(pk=self.peer_id).update)(audio=content['audio'],video=content['video'])
-            await self.channel_layer.group_send(self.group,{'type':'call.event','action':'media','peer_id':self.peer_id,'audio':content['audio'],'video':content['video']})
+        elif kind=='media':
+            fields = ('audio', 'video', 'hand_raised', 'screen_sharing')
+            if any(type(content.get(key)) is not bool for key in ('audio','video')):
+                return
+            if any(key in content and type(content[key]) is not bool for key in fields):
+                return
+            state = {key: content.get(key, False) for key in fields}
+            await database_sync_to_async(MeetingCallPeer.objects.filter(pk=self.peer_id).update)(**state)
+            await self.channel_layer.group_send(self.group,{'type':'call.event','action':'media','peer_id':self.peer_id,**state})
+        elif kind=='chat':
+            text = content.get('text')
+            if not isinstance(text,str) or not text.strip() or len(text)>2000:
+                await self.send_json({'type':'notice','text':'Messages must contain 1–2000 characters.'})
+                return
+            if time.monotonic()-self.chat_start > 10:
+                self.chat_start,self.chat_count=time.monotonic(),0
+            self.chat_count += 1
+            if self.chat_count > 5:
+                await self.send_json({'type':'notice','text':'Please wait a few seconds before sending another message.'})
+                return
+            sender = await self.sender_data(self.peer_id)
+            if sender:
+                await self.channel_layer.group_send(self.group,{'type':'call.event','action':'chat','message':{
+                    'id':str(uuid.uuid4()),'sender':sender,'text':text.strip(),'sent_at':timezone.now().isoformat()}})
         elif kind=='signal':
             target = content.get('target')
             if not isinstance(target,str) or len(target)!=36 or target==self.peer_id:
