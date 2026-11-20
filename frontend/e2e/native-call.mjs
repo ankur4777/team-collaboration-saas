@@ -73,6 +73,98 @@ try {
     const page = await context.newPage();
     pages.push(page);
     await page.goto(base + '/?meeting=11111111-1111-4111-8111-111111111111');
+    if (i === 0) {
+      await page.goto(base + '/');
+      await page.getByRole('button', { name: 'Calendar', exact: true }).click();
+      await page
+        .getByRole('button', { name: 'New event', exact: true })
+        .waitFor();
+      await page.locator('.wc-event').first().waitFor();
+      await page.screenshot({ path: 'call-test-results/calendar-month.png' });
+      await page
+        .getByRole('navigation', { name: 'Calendar views' })
+        .getByRole('button', { name: 'Work week', exact: true })
+        .click();
+      await eventually(
+        () =>
+          page
+            .locator('.wc-time-column')
+            .count()
+            .then((n) => n === 5),
+        'Work week did not show five days',
+      );
+      await page.screenshot({
+        path: 'call-test-results/calendar-work-week.png',
+      });
+      await page
+        .getByRole('navigation', { name: 'Calendar views' })
+        .getByRole('button', { name: 'Week', exact: true })
+        .click();
+      assert.equal(await page.locator('.wc-time-column').count(), 7);
+      await page
+        .getByRole('navigation', { name: 'Calendar views' })
+        .getByRole('button', { name: 'Day', exact: true })
+        .click();
+      await page.screenshot({ path: 'call-test-results/calendar-day.png' });
+      await page.locator('.wc-time-slot').nth(14).click();
+      const form = page.getByRole('dialog', {
+        name: 'Schedule meeting',
+        exact: true,
+      });
+      await form.waitFor();
+      assert.ok(
+        (
+          await form
+            .locator('input[type="datetime-local"]')
+            .first()
+            .inputValue()
+        ).endsWith('T14:00'),
+        'Calendar time slot was not prefilled',
+      );
+      await form.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await page
+        .getByRole('button', { name: 'Filter calendar', exact: true })
+        .click();
+      await page
+        .getByRole('checkbox', { name: 'Organized by me', exact: true })
+        .uncheck();
+      assert.equal(await page.locator('.wc-timed-event.owned').count(), 0);
+      await page
+        .getByRole('checkbox', { name: 'Organized by me', exact: true })
+        .check();
+      await page.getByRole('button', { name: 'Done', exact: true }).click();
+      await page
+        .getByRole('textbox', { name: 'Search calendar', exact: true })
+        .fill('Product planning');
+      await page.locator('.wc-timed-event').first().waitFor();
+      assert.equal(await page.locator('.wc-timed-event').count(), 1);
+      await page
+        .getByRole('button', { name: 'Clear calendar search', exact: true })
+        .click();
+      await page.setViewportSize({ width: 390, height: 844 });
+      await eventually(
+        () =>
+          page
+            .locator('.wc-sidebar')
+            .count()
+            .then((n) => n === 0),
+        'Mini calendar did not adapt to mobile',
+      );
+      await eventually(
+        () => page.locator('.sidebar').evaluate((el) => el.getBoundingClientRect().right <= 0),
+        'Workspace menu did not finish closing on mobile',
+      );
+      await page.screenshot({ path: 'call-test-results/calendar-mobile.png' });
+      assert.equal(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+        true,
+        'Calendar overflowed the mobile viewport',
+      );
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.goto(base + '/?meeting=11111111-1111-4111-8111-111111111111');
+    }
     await page
       .getByRole('button', { name: 'Join meeting', exact: true })
       .click();
@@ -391,14 +483,33 @@ try {
     'Organizer end did not stop the other client',
     20000,
   );
-  const deleteButton=owner.getByRole('button',{name:'Delete meeting',exact:true});
+  const deleteButton = owner.getByRole('button', {
+    name: 'Delete meeting',
+    exact: true,
+  });
   await deleteButton.waitFor();
-  assert.equal(await owner.getByRole('button',{name:'Cancel meeting',exact:true}).count(),0,'Ended meeting still offers Cancel');
-  await owner.screenshot({path:'call-test-results/ended-meeting-delete.png'});
-  owner.once('dialog',dialog=>dialog.accept());
+  assert.equal(
+    await owner
+      .getByRole('button', { name: 'Cancel meeting', exact: true })
+      .count(),
+    0,
+    'Ended meeting still offers Cancel',
+  );
+  await owner.screenshot({
+    path: 'call-test-results/ended-meeting-delete.png',
+  });
+  owner.once('dialog', (dialog) => dialog.accept());
   await deleteButton.click();
-  await owner.getByText('Meeting deleted.',{exact:true}).waitFor();
-  assert.equal((await contexts[1].request.get(base+'/api/meetings/11111111-1111-4111-8111-111111111111/')).status(),404,'Deleted meeting remains visible to an attendee');
+  await owner.getByText('Meeting deleted.', { exact: true }).waitFor();
+  assert.equal(
+    (
+      await contexts[1].request.get(
+        base + '/api/meetings/11111111-1111-4111-8111-111111111111/',
+      )
+    ).status(),
+    404,
+    'Deleted meeting remains visible to an attendee',
+  );
   console.log(
     'PASS: native audio/video, reactions, deterministic speech/caption transport and translation adapter, hand raising, participant list, plain-text live chat, layouts, screen sharing/restoration, mute, camera, leave/rejoin, cleanup, organizer end and confirmed meeting deletion.',
   );
