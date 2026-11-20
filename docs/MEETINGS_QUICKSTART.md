@@ -130,5 +130,66 @@ The room uses TeamWorkspace's inherited DM Sans / Manrope typography, compact
 12–13px controls, 18px title, white surfaces and mint/green accents. Video tiles
 retain a dark green background for legible participant labels.
 
-Calls still support six people. Recording, automatic captions, breakout rooms,
+Calls still support six people. Recording, breakout rooms,
 background effects and large-group SFU hosting are not included in this update.
+
+## Emoji, live captions and speech translation
+
+- **Emoji reactions:** open the smile button and select a reaction. Everyone
+  currently connected sees your name and emoji for four seconds. Reactions are
+  not stored; the server limits bursts to three reactions per five seconds.
+- **Turn on captions:** enables your caption display and opens speech settings.
+  It does not automatically activate speech recognition. To share your own words,
+  choose **My speaking language → Start my speech captions**. Each speaker must
+  opt in separately. Unsupported browsers can still display shared captions.
+- Browser speech recognition availability depends on browser, language and its
+  recognition service. It may transmit microphone audio to the browser vendor's
+  speech service. The disclosure appears before starting. No speech recognition
+  service is silently started for teammates. Muting pauses recognition; leaving,
+  stopping speech captions or turning captions off aborts it. Unmuting resumes
+  only if you previously opted in. Microphone permission and HTTPS/localhost are
+  required. Browser speech accuracy and availability are not guaranteed.
+- **Translate speech:** translates new, shared caption text into your chosen
+  language. It is translated captions, not real-time voice cloning/dubbing.
+  **Read translations aloud** optionally reads other speakers' translations using
+  your browser's speech synthesis; available voices depend on your device.
+  Original text remains visible. Use headphones to avoid feedback.
+- Caption text and translation results are not saved by TeamWorkspace. Captions
+  expire from the display after 18 seconds, with at most three visible segments.
+  Recognition/translation services have their own data handling policies.
+  Captions are capped to 500 characters per final segment, 30 segments per minute
+  per speaker. Captions cannot be published while the sender is marked muted.
+
+### Configure translation
+
+An administrator must provide a LibreTranslate-compatible service URL in `.env`:
+
+```dotenv
+CALL_TRANSLATE_URL=https://your-authorized-service.example/translate
+CALL_TRANSLATE_API_KEY=your-server-side-key-if-required
+```
+
+You can use an authorized hosted instance or your own self-hosted LibreTranslate
+service. No public/free instance is used automatically. The endpoint must include
+`/translate`; install/enable the desired language models on that service. The
+service may not support every speaking/target language in the selectors. Keys
+stay on the API server. Recreate the API after changing these values:
+
+```powershell
+docker compose up -d --force-recreate api
+```
+
+Translation is available only to currently connected, invited call participants,
+with a 60-request/minute per-user limit, bounded text, a four-second timeout and
+no redirect following. Only caption text is sent to the configured translation
+service, not call audio. If unavailable, original captions remain and the UI
+shows an error. An unconfigured translation service is shown as unavailable.
+
+### Validation limits
+
+CI uses deterministic browser recognition results and a test-only translation
+HTTP fixture to check real WebSocket caption/reaction transport, muted-word
+suppression, the translation adapter and original/translated display. It does not
+claim to validate a live vendor speech engine, microphone transcription accuracy,
+real translation quality or production credentials. Test those on your deployed
+HTTPS site with supported browsers and your configured translation service.

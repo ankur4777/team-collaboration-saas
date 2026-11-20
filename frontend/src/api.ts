@@ -219,8 +219,9 @@ export const meetingsApi = {
   completeAction:(id:string,item:string,done:boolean)=>request<MeetingRecord>(`meetings/${id}/actions/${item}/`,'PATCH',{done}),
 };
 
-export interface CallConfig {rtc:RTCConfiguration;websocket_path:string;max_peers:number;relay_configured:boolean}
+export interface CallConfig {rtc:RTCConfiguration;websocket_path:string;max_peers:number;relay_configured:boolean;translation_enabled:boolean}
 export const callsApi = {
+  translate:(id:string,data:{text:string;source:string;target:string})=>post<{text:string}>(`meetings/${id}/call/translate/`,data),
   config:(id:string)=>request<CallConfig>(`meetings/${id}/call/`),
   end:(id:string)=>post<{status:string}>(`meetings/${id}/call/end/`,{}),
 };

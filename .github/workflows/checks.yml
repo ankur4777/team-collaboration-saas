@@ -95,6 +95,7 @@ jobs:
     env:
       DJANGO_SETTINGS_MODULE: config.test_settings
       API_PROXY_TARGET: http://127.0.0.1:8000
+      CALL_TRANSLATE_URL: http://127.0.0.1:8899/translate
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -119,6 +120,7 @@ jobs:
       - run: python tools/seed_native_call_test.py
       - name: Run API and frontend
         run: |
+          (python tools/call_translation_test_server.py > /tmp/call-translation.log 2>&1) &
           (cd backend && daphne -b 127.0.0.1 -p 8000 config.asgi:application > /tmp/native-api.log 2>&1) &
           (cd frontend && npx vite --host 127.0.0.1 --port 5173 > /tmp/native-web.log 2>&1) &
           for i in $(seq 1 30); do

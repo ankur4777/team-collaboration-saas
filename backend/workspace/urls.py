@@ -1,10 +1,12 @@
 from django.urls import path
+from .call_access import CallTranslateView
 from . import meeting_calls
 from . import meetings
 from . import private_attachments
 from . import auth_views, views, member_views, chat_views, channel_notifications, account_recovery, settings_views, session_views, message_search, mentions
 
 urlpatterns = [
+    path('meetings/<uuid:meeting_id>/call/translate/', CallTranslateView.as_view()),
     path('meetings/<uuid:meeting_id>/call/', meeting_calls.MeetingCallConfigView.as_view()),
     path('meetings/<uuid:meeting_id>/call/end/', meeting_calls.MeetingCallEndView.as_view()),
     path('meetings/', meetings.MeetingsView.as_view()),
