@@ -26,6 +26,7 @@ import {
   Check,
 } from 'lucide-react';
 import { callsApi, type MeetingRecord } from './api';
+import CallAccessibility, { type AccessEvent } from './CallAccessibility';
 import './CallRoom.css';
 
 type Person = {
@@ -175,6 +176,9 @@ export default function CallRoom({
   const [remotes, setRemotes] = useState<Record<string, Remote>>({});
   const [error, setError] = useState('');
   const [ending, setEnding] = useState(false);
+  const [accessEvent, setAccessEvent] = useState<AccessEvent | null>(null);
+  const [translationReady, setTranslationReady] = useState(false);
+  const [stageElement, setStageElement] = useState<HTMLElement | null>(null);
   const [hand, setHand] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
@@ -289,6 +293,7 @@ export default function CallRoom({
     stream.current = null;
     if (alive.current) {
       setLocal(null);
+      setAccessEvent(null);
       setJoined(false);
       setJoining(false);
     }
@@ -420,6 +425,7 @@ export default function CallRoom({
       const config = await callsApi.config(meeting.id);
       if (!alive.current) return;
       ice.current = config.rtc;
+      setTranslationReady(!!config.translation_enabled);
       let acquired: MediaStream;
       if (media.current.audio || media.current.video)
         acquired = await navigator.mediaDevices.getUserMedia({
@@ -468,7 +474,9 @@ export default function CallRoom({
                   })
                   .catch(() => {});
               }, 20 * 60000);
-            } else if (data.type === 'chat') {
+            } else if (data.type === 'reaction' || data.type === 'caption')
+              setAccessEvent(data as AccessEvent);
+            else if (data.type === 'chat') {
               setChat((old) => [...old, data.message].slice(-200));
               if (
                 panelRef.current !== 'chat' &&
@@ -892,7 +900,7 @@ export default function CallRoom({
             </div>
           )}
           <div className="call-workspace">
-            <main className="call-stage">
+            <main className="call-stage" ref={setStageElement}>
               <div className="call-stage-tools">
                 <span>
                   {sharing || people.some((p) => p.person.screen_sharing)
@@ -1196,6 +1204,20 @@ export default function CallRoom({
                 </button>
               )}
             </div>
+            <CallAccessibility
+              meetingId={meeting.id}
+              userId={userId}
+              event={accessEvent}
+              send={send}
+              audio={audio}
+              isMicActive={() =>
+                !!stream.current
+                  ?.getAudioTracks()
+                  .some((t) => t.enabled && t.readyState === 'live')
+              }
+              stage={stageElement}
+              translationReady={translationReady}
+            />
             <div className="call-panel-controls">
               <button
                 aria-label="Participants"

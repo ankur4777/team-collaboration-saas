@@ -709,3 +709,247 @@
     font-size: 11px;
   }
 }
+
+.call-stage {
+  position: relative;
+}
+.call-access-controls {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  position: relative;
+}
+.call-access-popover {
+  position: absolute;
+  bottom: calc(100% + 14px);
+  right: 0;
+  width: 330px;
+  max-height: 65vh;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #d7e5df;
+  box-shadow: 0 10px 35px #183c3725;
+  border-radius: 13px;
+  padding: 16px;
+  z-index: 30;
+  color: #42635d;
+  text-align: left;
+}
+.call-access-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.call-access-heading h3 {
+  font-size: 16px;
+  color: #214740;
+}
+.call-access-heading button {
+  padding: 4px;
+  border: 0;
+}
+.call-emoji-picker {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 9px;
+}
+.call-room .call-emoji-picker button {
+  font-size: 25px;
+  padding: 9px;
+  background: #f3f8f5;
+}
+.call-access-note {
+  font-size: 11px;
+  line-height: 1.65;
+  color: #6d8780;
+  margin: 10px 0;
+}
+.call-access-field {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin: 12px 0;
+}
+.call-access-field select {
+  display: block;
+  width: 100%;
+  background: #f7faf8;
+  color: #42635d;
+  border: 1px solid #d7e5df;
+  border-radius: 7px;
+  padding: 8px;
+  font: inherit;
+  font-size: 12px;
+  margin-top: 6px;
+}
+.call-access-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin: 12px 0;
+  line-height: 1.5;
+}
+.call-access-check input {
+  accent-color: #208d74;
+}
+.call-access-warning {
+  background: #fff8e7;
+  color: #84622c;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 10px 0;
+}
+.call-translation-options {
+  border-top: 1px solid #e5eeea;
+  margin-top: 15px;
+  padding-top: 10px;
+}
+.call-translation-options h4 {
+  font-size: 12px;
+  margin: 0;
+}
+.call-reactions {
+  position: absolute;
+  right: 18px;
+  top: 65px;
+  z-index: 3;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.call-reactions > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: #ffffffeb;
+  border: 1px solid #d7e5df;
+  border-radius: 13px;
+  padding: 8px 12px;
+  animation: call-reaction-in 0.25s ease-out;
+}
+.call-reactions span {
+  font-size: 30px;
+  line-height: 1.3;
+}
+.call-reactions small {
+  font-size: 10px;
+  color: #42635d;
+  max-width: 85px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.call-captions-overlay {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 12px;
+  z-index: 4;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+}
+.call-captions-overlay > div {
+  max-width: 760px;
+  width: max-content;
+  max-inline-size: 100%;
+  border-radius: 9px;
+  background: #103c34f5;
+  color: #f2faf6;
+  padding: 9px 15px;
+  box-shadow: 0 2px 8px #123f3525;
+  overflow-wrap: anywhere;
+}
+.call-captions-overlay strong {
+  font-size: 11px;
+  color: #a1e5cd;
+}
+.call-captions-overlay p {
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.call-captions-overlay small {
+  display: block;
+  font-size: 11px;
+  color: #b9d7cc;
+  margin-top: 4px;
+}
+.call-captions-overlay .call-caption-waiting {
+  font-size: 11px;
+  background: #ffffffed;
+  color: #42635d;
+  border: 1px solid #d7e5df;
+}
+.call-room .call-caption-error {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 12px);
+  width: 240px;
+  font-size: 11px;
+  background: #fff8e7;
+  color: #84622c;
+  z-index: 15;
+}
+@keyframes call-reaction-in {
+  from {
+    opacity: 0;
+    transform: translateY(15px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 680px) {
+  .call-access-popover {
+    position: fixed;
+    bottom: 155px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: calc(100dvh - 230px);
+  }
+  .call-access-controls {
+    gap: 6px;
+  }
+  .call-captions-overlay {
+    left: 8px;
+    right: 8px;
+  }
+  .call-captions-overlay p {
+    font-size: 13px;
+  }
+  .call-reactions {
+    top: 60px;
+    right: 10px;
+    gap: 5px;
+  }
+  .call-reactions span {
+    font-size: 25px;
+  }
+  .call-reactions > div {
+    padding: 6px 8px;
+  }
+  .call-room .call-caption-error {
+    right: 0;
+    width: 230px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .call-reactions > div {
+    animation: none;
+  }
+}
+
+/* Keep TeamWorkspace Latin typography, with readable Indic caption fallbacks. */
+.call-captions-overlay p,.call-captions-overlay small{font-family:"DM Sans","Nirmala UI","Noto Sans Devanagari","Noto Sans Gurmukhi",Mangal,system-ui,sans-serif;}

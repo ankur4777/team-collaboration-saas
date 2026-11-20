@@ -33,6 +33,33 @@ try {
   const pages = [];
   for (let i = 0; i < 2; i++) {
     const context = contexts[i];
+    // Deterministic speech results: Chrome's remote recognition service is not used in CI.
+    await context.addInitScript(() => {
+      class SpeechFixture {
+        start() {
+          this.running = true;
+          window.__callSpeech = this;
+        }
+        abort() {
+          this.running = false;
+        }
+      }
+      Object.defineProperty(window, 'SpeechRecognition', {
+        value: SpeechFixture,
+        configurable: true,
+      });
+      window.__emitCallSpeech = (text) => {
+        const engine = window.__callSpeech;
+        if (engine?.running)
+          engine.onresult?.({
+            resultIndex: 0,
+            results: {
+              length: 1,
+              0: { isFinal: true, 0: { transcript: text } },
+            },
+          });
+      };
+    });
     const csrf = await context.request.get(base + '/api/auth/csrf/');
     const token = (await csrf.json()).csrf_token;
     const login = await context.request.post(base + '/api/auth/login/', {
@@ -71,6 +98,70 @@ try {
       'Real audio/video tracks did not connect',
     );
   }
+  await owner
+    .getByRole('button', { name: 'Emoji reactions', exact: true })
+    .click();
+  await owner
+    .getByRole('button', { name: 'React with Thumbs up', exact: true })
+    .click();
+  await member
+    .getByRole('status', { name: 'Live reactions', exact: true })
+    .getByText('👍', { exact: true })
+    .waitFor();
+  await owner
+    .getByRole('button', { name: 'Turn on captions', exact: true })
+    .click();
+  await owner
+    .getByRole('button', { name: 'Start my speech captions', exact: true })
+    .click();
+  await owner
+    .getByRole('button', { name: 'Close accessibility settings', exact: true })
+    .click();
+  await member
+    .getByRole('button', { name: 'Translate speech', exact: true })
+    .click();
+  await member
+    .getByRole('checkbox', { name: 'Translate new captions', exact: true })
+    .check();
+  await member
+    .getByRole('button', { name: 'Close accessibility settings', exact: true })
+    .click();
+  await owner.evaluate(() =>
+    window.__emitCallSpeech('Caption test from owner'),
+  );
+  await member
+    .getByRole('log', { name: 'Live captions', exact: true })
+    .getByText('मालिक की ओर से कैप्शन परीक्षण', { exact: true })
+    .waitFor();
+  await member
+    .getByRole('log', { name: 'Live captions', exact: true })
+    .getByText('Caption test from owner', { exact: true })
+    .waitFor();
+  await member.screenshot({
+    path: 'call-test-results/translated-captions.png',
+  });
+  await owner
+    .getByRole('button', { name: 'Mute microphone', exact: true })
+    .click();
+  await owner.evaluate(() =>
+    window.__emitCallSpeech('Muted caption should not be sent'),
+  );
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(
+    await member
+      .getByText('Muted caption should not be sent', { exact: true })
+      .count(),
+    0,
+  );
+  await owner
+    .getByRole('button', { name: 'Unmute microphone', exact: true })
+    .click();
+  await owner
+    .getByRole('button', { name: 'Turn off captions', exact: true })
+    .click();
+  await member
+    .getByRole('button', { name: 'Turn off captions', exact: true })
+    .click();
   await owner.getByRole('button', { name: 'Raise hand', exact: true }).click();
   await member
     .getByRole('button', { name: 'Participants', exact: true })
@@ -110,13 +201,25 @@ try {
   await member
     .getByRole('button', { name: 'Close side panel', exact: true })
     .click();
-  await owner.getByRole('button', {name:'Participants',exact:true}).click();
-  await owner.screenshot({path:'call-test-results/desktop-participants.png'});
-  await owner.setViewportSize({width:390,height:844});
-  await owner.screenshot({path:'call-test-results/mobile-participants.png'});
-  assert.equal(await owner.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Call overflows mobile viewport');
-  await owner.getByRole('button',{name:'Close side panel',exact:true}).click();
-  await owner.setViewportSize({width:1280,height:720});
+  await owner
+    .getByRole('button', { name: 'Participants', exact: true })
+    .click();
+  await owner.screenshot({
+    path: 'call-test-results/desktop-participants.png',
+  });
+  await owner.setViewportSize({ width: 390, height: 844 });
+  await owner.screenshot({ path: 'call-test-results/mobile-participants.png' });
+  assert.equal(
+    await owner.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+    true,
+    'Call overflows mobile viewport',
+  );
+  await owner
+    .getByRole('button', { name: 'Close side panel', exact: true })
+    .click();
+  await owner.setViewportSize({ width: 1280, height: 720 });
   await owner
     .getByLabel('Call layout', { exact: true })
     .selectOption('spotlight');
@@ -136,13 +239,29 @@ try {
         .evaluate((el) => el.videoWidth > 0 && el.readyState >= 2),
     'Screen video did not reach other client',
   );
-  assert.ok(await owner.locator('[data-call-peer="local"] video').evaluate(el=>el.srcObject.getVideoTracks()[0].getSettings().displaySurface),'Presentation is not a native display capture');
-  assert.equal(await member.locator('.call-grid.spotlight').evaluate(grid=>{
-    const focus=grid.querySelector('.focused').getBoundingClientRect();
-    const others=[...grid.querySelectorAll('.call-tile:not(.focused)')];
-    return focus.width>=grid.clientWidth-42 && others.every(tile=>tile.getBoundingClientRect().top>=focus.bottom);
-  }),true,'Presentation did not fill the stage or overlapped another tile');
-  await member.screenshot({path:'call-test-results/remote-presentation.png'});
+  assert.ok(
+    await owner
+      .locator('[data-call-peer="local"] video')
+      .evaluate(
+        (el) => el.srcObject.getVideoTracks()[0].getSettings().displaySurface,
+      ),
+    'Presentation is not a native display capture',
+  );
+  assert.equal(
+    await member.locator('.call-grid.spotlight').evaluate((grid) => {
+      const focus = grid.querySelector('.focused').getBoundingClientRect();
+      const others = [...grid.querySelectorAll('.call-tile:not(.focused)')];
+      return (
+        focus.width >= grid.clientWidth - 42 &&
+        others.every((tile) => tile.getBoundingClientRect().top >= focus.bottom)
+      );
+    }),
+    true,
+    'Presentation did not fill the stage or overlapped another tile',
+  );
+  await member.screenshot({
+    path: 'call-test-results/remote-presentation.png',
+  });
   const display = await owner
     .locator('[data-call-peer="local"] video')
     .evaluateHandle((el) => el.srcObject);
@@ -235,7 +354,7 @@ try {
     20000,
   );
   console.log(
-    'PASS: native audio/video, hand raising, participant list, plain-text live chat, layouts, screen sharing/restoration, mute, camera, leave/rejoin, cleanup and organizer end.',
+    'PASS: native audio/video, reactions, deterministic speech/caption transport and translation adapter, hand raising, participant list, plain-text live chat, layouts, screen sharing/restoration, mute, camera, leave/rejoin, cleanup and organizer end.',
   );
   await Promise.all(contexts.map((c) => c.close()));
 } finally {

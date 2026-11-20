@@ -10,6 +10,7 @@ from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 
+from .call_access import CAPTION_LANGUAGES, REACTIONS
 from .models import MeetingCallPeer
 from .meeting_calls import socket_allowed, register_peer, peer_data, PEER_TTL
 
@@ -22,6 +23,7 @@ class MeetingCallConsumer(AsyncJsonWebsocketConsumer):
         self.group = 'call_'+self.meeting_id
         self.window_start, self.message_count = time.monotonic(), 0
         self.chat_start, self.chat_count = time.monotonic(), 0
+        self.access_windows = {}
         if not await database_sync_to_async(socket_allowed)(self.scope,self.meeting_id):
             await self.close(code=4403)
             return
@@ -88,6 +90,31 @@ class MeetingCallConsumer(AsyncJsonWebsocketConsumer):
             state = {key: content.get(key, False) for key in fields}
             await database_sync_to_async(MeetingCallPeer.objects.filter(pk=self.peer_id).update)(**state)
             await self.channel_layer.group_send(self.group,{'type':'call.event','action':'media','peer_id':self.peer_id,**state})
+        elif kind in ('reaction','caption'):
+            now=time.monotonic()
+            start,count=self.access_windows.get(kind,(now,0))
+            period,limit=(5,3) if kind=='reaction' else (60,30)
+            if now-start>=period:
+                start,count=now,0
+            if count>=limit:
+                await self.send_json({'type':'notice','text':'Please slow down before sending another '+kind+'.'})
+                return
+            sender=await self.sender_data(self.peer_id)
+            if not sender:
+                return
+            if kind=='reaction':
+                emoji=content.get('emoji')
+                if emoji not in REACTIONS:
+                    return
+                payload={'emoji':emoji}
+            else:
+                text,language=content.get('text'),content.get('language')
+                if not isinstance(text,str) or not text.strip() or len(text)>500 or language not in CAPTION_LANGUAGES or not sender['audio']:
+                    return
+                payload={'text':text.strip(),'language':language}
+            self.access_windows[kind]=(start,count+1)
+            await self.channel_layer.group_send(self.group,{'type':'call.event','action':kind,kind:{
+                'id':str(uuid.uuid4()),'sender':sender,'sent_at':timezone.now().isoformat(),**payload}})
         elif kind=='chat':
             text = content.get('text')
             if not isinstance(text,str) or not text.strip() or len(text)>2000:

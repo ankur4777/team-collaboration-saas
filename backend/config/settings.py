@@ -137,3 +137,7 @@ CALL_STUN_URLS = [v.strip() for v in os.getenv('CALL_STUN_URLS','').split(',') i
 CALL_TURN_URLS = [v.strip() for v in os.getenv('CALL_TURN_URLS','').split(',') if v.strip()]
 CALL_TURN_SHARED_SECRET = os.getenv('CALL_TURN_SHARED_SECRET','')
 CALL_ICE_TRANSPORT_POLICY = os.getenv('CALL_ICE_TRANSPORT_POLICY','all')
+
+# Optional LibreTranslate-compatible service. Set an administrator-owned endpoint.
+CALL_TRANSLATE_URL = os.getenv('CALL_TRANSLATE_URL', '')
+CALL_TRANSLATE_API_KEY = os.getenv('CALL_TRANSLATE_API_KEY', '')

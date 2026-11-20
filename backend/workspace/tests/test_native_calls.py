@@ -148,3 +148,57 @@ class CallSocketTests(CallFixture,TransactionTestCase):
             await a.send_json_to({'type':'chat','text':'too fast'});self.assertEqual((await a.receive_json_from())['type'],'notice')
             self.assertTrue(await b.receive_nothing(timeout=.1));await b.disconnect();await a.disconnect()
         async_to_sync(scenario)()
+
+    def test_reactions_and_captions_have_authenticated_identity_and_bounds(self):
+        a,b=self.socket(self.owner),self.socket(self.member)
+        async def scenario():
+            await a.connect();ready=await a.receive_json_from()
+            await b.connect();await b.receive_json_from();await a.receive_json_from()
+            for kind,payload in [('reaction',{'emoji':'👍'}),('caption',{'text':'Hello team','language':'en-US'})]:
+                await a.send_json_to({'type':kind,'sender':{'name':'Forged'},**payload})
+                own,remote=await a.receive_json_from(),await b.receive_json_from()
+                self.assertEqual(own,remote);self.assertEqual(remote[kind]['sender']['id'],ready['self']['id']);self.assertEqual(remote[kind]['sender']['name'],self.owner.full_name)
+            await a.send_json_to({'type':'reaction','emoji':'<script>'})
+            await a.send_json_to({'type':'caption','text':'x'*501,'language':'en-US'})
+            await a.send_json_to({'type':'caption','text':'hello','language':'invalid'})
+            self.assertTrue(await b.receive_nothing(timeout=.1))
+            for _ in range(2):
+                await a.send_json_to({'type':'reaction','emoji':'👏'});await a.receive_json_from();await b.receive_json_from()
+            await a.send_json_to({'type':'reaction','emoji':'👍'});self.assertEqual((await a.receive_json_from())['type'],'notice')
+            await a.send_json_to({'type':'media','audio':False,'video':True});await b.receive_json_from()
+            await a.send_json_to({'type':'caption','text':'Muted words','language':'en-US'})
+            self.assertTrue(await b.receive_nothing(timeout=.1));await b.disconnect();await a.disconnect()
+        async_to_sync(scenario)()
+
+
+class CallTranslationTests(CallFixture,TestCase):
+    def setUp(self):
+        self.setup_call()
+        register_peer(self.scope(self.owner),self.meeting.pk,'translation-test')
+        self.path=f'/api/meetings/{self.meeting.pk}/call/translate/'
+        self.payload={'text':'Hello team','source':'en','target':'hi'}
+    @override_settings(CALL_TRANSLATE_URL='')
+    def test_service_unconfigured_and_nonparticipant_denied(self):
+        self.assertEqual(self.clients[self.owner.pk].post(self.path,self.payload,content_type='application/json').status_code,503)
+        self.assertEqual(self.clients[self.member.pk].post(self.path,self.payload,content_type='application/json').status_code,403)
+        self.assertEqual(self.clients[self.outsider.pk].post(self.path,self.payload,content_type='application/json').status_code,404)
+    @override_settings(CALL_TRANSLATE_URL='https://translate.example.test/translate',CALL_TRANSLATE_API_KEY='server-only-test-secret')
+    def test_translation_uses_configured_service_and_secret_stays_on_server(self):
+        with patch('workspace.call_access.httpx.Client') as factory:
+            client=factory.return_value.__enter__.return_value
+            client.post.return_value.content=b'{}';client.post.return_value.json.return_value={'translatedText':'नमस्ते टीम'}
+            response=self.clients[self.owner.pk].post(self.path,self.payload,content_type='application/json')
+            self.assertEqual(response.status_code,200,response.content);self.assertEqual(response.json()['text'],'नमस्ते टीम');self.assertEqual(response['Cache-Control'],'no-store')
+            self.assertNotIn('server-only-test-secret',response.content.decode())
+            self.assertEqual(client.post.call_args.kwargs['json']['api_key'],'server-only-test-secret')
+            self.assertEqual(factory.call_args.kwargs['follow_redirects'],False)
+    @override_settings(CALL_TRANSLATE_URL='https://translate.example.test/translate')
+    def test_translation_validation_timeout_and_revoked_call(self):
+        import httpx
+        with patch('workspace.call_access.httpx.Client') as factory:
+            client=factory.return_value.__enter__.return_value;client.post.side_effect=httpx.TimeoutException('test-only failure')
+            self.assertEqual(self.clients[self.owner.pk].post(self.path,self.payload,content_type='application/json').status_code,502)
+            self.assertEqual(self.clients[self.owner.pk].post(self.path,{**self.payload,'target':'invalid'},content_type='application/json').status_code,400)
+            self.assertEqual(self.clients[self.owner.pk].post(self.path,[],content_type='application/json').status_code,400)
+            Meeting.objects.filter(pk=self.meeting.pk).update(call_ended_at=timezone.now())
+            self.assertEqual(self.clients[self.owner.pk].post(self.path,self.payload,content_type='application/json').status_code,403)

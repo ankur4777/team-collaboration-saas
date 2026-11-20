@@ -89,7 +89,7 @@ class MeetingCallConfigView(APIView):
         if row.cancelled or row.call_ended_at or row.ends_at <= timezone.now():
             raise ValidationError('This meeting is cancelled, ended or expired.')
         response = Response({'rtc':ice_configuration(request.user.pk),'websocket_path':f'/ws/meetings/{row.pk}/call/',
-                             'max_peers':MAX_PEERS,'relay_configured':bool(getattr(settings,'CALL_TURN_URLS',[]))})
+                             'max_peers':MAX_PEERS,'relay_configured':bool(getattr(settings,'CALL_TURN_URLS',[])), 'translation_enabled':bool(getattr(settings,'CALL_TRANSLATE_URL',''))})
         response['Cache-Control']='no-store'
         return response
 
