@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   ArrowLeft,
   CalendarDays,
-  ChevronLeft,
   ChevronRight,
   Clock,
   Plus,
@@ -22,6 +21,10 @@ import {
 } from './api';
 import './MeetingsPanel.css';
 import CallRoom from './CallRoom';
+import WorkspaceCalendar, {
+  calendarRange,
+  type CalendarMode,
+} from './WorkspaceCalendar';
 
 type Props = {
   workspaceId: string | null;
@@ -63,6 +66,7 @@ function when(value: string) {
 function MeetingEditor({
   meeting,
   now,
+  initialStart,
   teams,
   members,
   userId,
@@ -71,15 +75,16 @@ function MeetingEditor({
 }: {
   meeting: MeetingRecord | null;
   now: boolean;
+  initialStart?: Date;
   teams: Team[];
   members: Member[];
   userId: string;
   onClose: () => void;
   onSave: (data: MeetingPayload) => Promise<void>;
 }) {
-  const start = new Date();
+  const start = initialStart ? new Date(initialStart) : new Date();
   start.setSeconds(0, 0);
-  if (!now) start.setMinutes(start.getMinutes() + 30);
+  if (!now && !initialStart) start.setMinutes(start.getMinutes() + 30);
   const [title, setTitle] = useState(meeting?.title || '');
   const [agenda, setAgenda] = useState(meeting?.agenda || '');
   const [starts, setStarts] = useState(
@@ -425,13 +430,12 @@ export default function MeetingsPanel({
   const [editor, setEditor] = useState<{
     meeting: MeetingRecord | null;
     now: boolean;
+    startAt?: Date;
   } | null>(null);
   const [callMeeting, setCallMeeting] = useState<MeetingRecord | null>(null);
   const [query, setQuery] = useState('');
   const [date, setDate] = useState(dayStart(new Date()));
-  const [calendarMode, setCalendarMode] = useState<'Month' | 'Week' | 'Day'>(
-    'Month',
-  );
+  const [calendarMode, setCalendarMode] = useState<CalendarMode>('Month');
   const [taskTitle, setTaskTitle] = useState('');
   const [assignee, setAssignee] = useState('');
   const [due, setDue] = useState('');
@@ -439,15 +443,9 @@ export default function MeetingsPanel({
   current.current = selectedId;
   let from: Date, to: Date;
   if (calendar) {
-    if (calendarMode === 'Month') {
-      from = new Date(date.getFullYear(), date.getMonth(), 1);
-      from = plusDays(from, -from.getDay());
-      to = plusDays(from, 42);
-    } else {
-      from = dayStart(date);
-      if (calendarMode === 'Week') from = plusDays(from, -from.getDay());
-      to = plusDays(from, calendarMode === 'Week' ? 7 : 1);
-    }
+    const range = calendarRange(date, calendarMode);
+    from = range.from;
+    to = range.to;
   } else {
     const today = dayStart(new Date());
     if (tab === 'Today') {
@@ -615,42 +613,35 @@ export default function MeetingsPanel({
     !selected.cancelled &&
     !selected.call_ended &&
     new Date(selected.ends_at).getTime() > now;
-  const days = Array.from(
-    { length: calendarMode === 'Month' ? 42 : calendarMode === 'Week' ? 7 : 1 },
-    (_, i) => plusDays(from, i),
-  );
-  function moveCalendar(direction: number) {
-    if (calendarMode === 'Month')
-      setDate(new Date(date.getFullYear(), date.getMonth() + direction, 1));
-    else setDate(plusDays(date, direction * (calendarMode === 'Week' ? 7 : 1)));
-  }
   return (
-    <section className="meetings-shell">
-      <header className="meetings-heading">
-        <div>
-          <span className="eyebrow">
-            YOUR WORKSPACE / {calendar ? 'CALENDAR' : 'MEETINGS'}
-          </span>
-          <h1>{calendar ? 'Calendar' : 'Meetings'}</h1>
-          <p>Plan together. Meet with purpose.</p>
-        </div>
-        <div className="meeting-heading-actions">
-          <button
-            className="outline-button"
-            onClick={() => setEditor({ meeting: null, now: true })}
-          >
-            <Video size={16} />
-            Meet now
-          </button>
-          <button
-            className="primary-button"
-            onClick={() => setEditor({ meeting: null, now: false })}
-          >
-            <Plus size={16} />
-            Schedule meeting
-          </button>
-        </div>
-      </header>
+    <section className={'meetings-shell' + (calendar ? ' calendar-shell' : '')}>
+      {!calendar && (
+        <header className="meetings-heading">
+          <div>
+            <span className="eyebrow">
+              YOUR WORKSPACE / {calendar ? 'CALENDAR' : 'MEETINGS'}
+            </span>
+            <h1>{calendar ? 'Calendar' : 'Meetings'}</h1>
+            <p>Plan together. Meet with purpose.</p>
+          </div>
+          <div className="meeting-heading-actions">
+            <button
+              className="outline-button"
+              onClick={() => setEditor({ meeting: null, now: true })}
+            >
+              <Video size={16} />
+              Meet now
+            </button>
+            <button
+              className="primary-button"
+              onClick={() => setEditor({ meeting: null, now: false })}
+            >
+              <Plus size={16} />
+              Schedule meeting
+            </button>
+          </div>
+        </header>
+      )}
       {error && (
         <div className="meeting-feedback error-banner" role="alert">
           {error}
@@ -675,49 +666,8 @@ export default function MeetingsPanel({
           </button>
         </div>
       )}
-      <div className="meetings-controls">
-        {calendar ? (
-          <>
-            <button
-              className="icon-button"
-              aria-label="Previous calendar period"
-              onClick={() => moveCalendar(-1)}
-            >
-              <ChevronLeft size={19} />
-            </button>
-            <strong>
-              {date.toLocaleDateString(undefined, {
-                month: 'long',
-                year: 'numeric',
-                ...(calendarMode === 'Month' ? {} : { day: 'numeric' }),
-              })}
-            </strong>
-            <button
-              className="icon-button"
-              aria-label="Next calendar period"
-              onClick={() => moveCalendar(1)}
-            >
-              <ChevronRight size={19} />
-            </button>
-            <button
-              className="text-link"
-              onClick={() => setDate(dayStart(new Date()))}
-            >
-              Today
-            </button>
-            <select
-              aria-label="Calendar view"
-              value={calendarMode}
-              onChange={(e) =>
-                setCalendarMode(e.target.value as typeof calendarMode)
-              }
-            >
-              {['Month', 'Week', 'Day'].map((v) => (
-                <option key={v}>{v}</option>
-              ))}
-            </select>
-          </>
-        ) : (
+      {!calendar && (
+        <div className="meetings-controls">
           <nav aria-label="Meeting filters">
             {(['Today', 'Upcoming', 'Past', 'Cancelled'] as Tab[]).map((t) => (
               <button
@@ -732,22 +682,22 @@ export default function MeetingsPanel({
               </button>
             ))}
           </nav>
-        )}
-        <input
-          aria-label="Search meetings"
-          placeholder="Search meetings"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <button
-          className="icon-button"
-          aria-label="Refresh meetings"
-          disabled={loading || busy}
-          onClick={() => setVersion((v) => v + 1)}
-        >
-          <RefreshCw size={17} />
-        </button>
-      </div>
+          <input
+            aria-label="Search meetings"
+            placeholder="Search meetings"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <button
+            className="icon-button"
+            aria-label="Refresh meetings"
+            disabled={loading || busy}
+            onClick={() => setVersion((v) => v + 1)}
+          >
+            <RefreshCw size={17} />
+          </button>
+        </div>
+      )}
       <div
         className={
           'meetings-layout' +
@@ -759,48 +709,27 @@ export default function MeetingsPanel({
           className="meetings-list"
           aria-label={calendar ? 'Meeting calendar' : 'Meeting list'}
         >
-          {loading && rows.length === 0 ? (
+          {loading && rows.length === 0 && !calendar ? (
             <p className="meeting-empty">Loading meetings…</p>
           ) : calendar ? (
-            <div className={'meeting-calendar ' + calendarMode.toLowerCase()}>
-              {days.map((day) => {
-                const items = filtered.filter(
-                  (m) =>
-                    new Date(m.starts_at) < plusDays(day, 1) &&
-                    new Date(m.ends_at) > day,
-                );
-                return (
-                  <div
-                    className={
-                      'meeting-calendar-day' +
-                      (dayKey(day) === dayKey(new Date()) ? ' today' : '')
-                    }
-                    key={dayKey(day)}
-                  >
-                    <span>
-                      {day.toLocaleDateString(undefined, {
-                        weekday: 'short',
-                        day: 'numeric',
-                      })}
-                    </span>
-                    {items.map((m) => (
-                      <button
-                        disabled={busy}
-                        className={selectedId === m.id ? 'selected' : ''}
-                        key={m.id}
-                        onClick={() => select(m.id)}
-                      >
-                        {new Date(m.starts_at).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}{' '}
-                        {m.title}
-                      </button>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
+            <WorkspaceCalendar
+              date={date}
+              mode={calendarMode}
+              events={filtered}
+              selectedId={selectedId}
+              userId={userId}
+              query={query}
+              loading={loading}
+              busy={busy}
+              onDate={setDate}
+              onMode={setCalendarMode}
+              onQuery={setQuery}
+              onOpen={select}
+              onCreate={(startAt) =>
+                setEditor({ meeting: null, now: false, startAt })
+              }
+              onRefresh={() => setVersion((v) => v + 1)}
+            />
           ) : filtered.length === 0 ? (
             <div className="meeting-empty">
               <CalendarDays size={34} />
@@ -879,7 +808,7 @@ export default function MeetingsPanel({
                 onClick={() => setSelectedId('')}
               >
                 <ArrowLeft size={16} />
-                Back to meetings
+                {calendar ? 'Back to calendar' : 'Back to meetings'}
               </button>
               <span className="eyebrow">
                 {selected.cancelled
@@ -1129,6 +1058,7 @@ export default function MeetingsPanel({
         <MeetingEditor
           meeting={editor.meeting}
           now={editor.now}
+          initialStart={editor.startAt}
           teams={teams}
           members={members}
           userId={userId}
@@ -1138,6 +1068,7 @@ export default function MeetingsPanel({
               ? await meetingsApi.update(editor.meeting.id, data)
               : await meetingsApi.create(data);
             setEditor(null);
+            if (calendar) setDate(dayStart(new Date(row.starts_at)));
             setSelectedId(row.id);
             setSelected(row);
             setVersion((v) => v + 1);

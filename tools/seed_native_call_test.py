@@ -19,3 +19,15 @@ for i,user in enumerate(users):OrganizationMember.objects.get_or_create(organiza
 meeting,_=Meeting.objects.update_or_create(pk='11111111-1111-4111-8111-111111111111',defaults={'organization':org,'organizer':users[0],'title':'Native browser test','starts_at':timezone.now(),'ends_at':timezone.now()+timedelta(hours=1),'call_ended_at':None,'cancelled':False})
 for user in users:MeetingAttendee.objects.get_or_create(meeting=meeting,user=user)
 print('Native call fixture ready.')
+
+# Additional CI-only calendar fixtures exercise overlap, overnight and invited rows.
+base=timezone.now().replace(hour=10,minute=0,second=0,microsecond=0)
+for number,title,begin,end,host in [
+    (2,'Product planning',base,base+timedelta(hours=1),users[0]),
+    (3,'Design review',base+timedelta(minutes=30),base+timedelta(minutes=90),users[0]),
+    (4,'Project check-in',base+timedelta(days=1,hours=4),base+timedelta(days=1,hours=5),users[1]),
+    (5,'Global handover',base.replace(hour=0)-timedelta(minutes=30),base.replace(hour=0)+timedelta(minutes=30),users[0]),
+]:
+    key=f'{number}'*8+'-'+f'{number}'*4+'-4'+f'{number}'*3+'-8'+f'{number}'*3+'-'+f'{number}'*12
+    item,_=Meeting.objects.update_or_create(pk=key,defaults={'organization':org,'organizer':host,'title':title,'starts_at':begin,'ends_at':end,'cancelled':False,'call_ended_at':None})
+    for user in users:MeetingAttendee.objects.get_or_create(meeting=item,user=user,defaults={'response':'accepted' if user==host else 'pending'})

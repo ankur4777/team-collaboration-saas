@@ -230,3 +230,27 @@ Upcoming/running meetings retain Cancel meeting. Deleting asks for confirmation
 and permanently removes the meeting, invitations, notes, action items and call
 presence for all attendees. Other workspace content is unaffected. Only the
 organizer can delete; active meetings and stale revisions are rejected by the API.
+
+## Calendar workspace
+
+Calendar has an Outlook-inspired toolbar, green TeamWorkspace header, searchable
+meeting grid and a mini month sidebar. Day, Work week (Monday–Friday), Week
+(Monday–Sunday) and Month views all use the same private meeting records. The
+sidebar date picker, Today, period arrows and Go to date control navigate the
+visible range. Search matches titles and organizer names in that range.
+
+Use **New event**, a date-cell plus button or an hourly time slot to open the
+existing meeting editor with the selected date/time. Events open the same meeting
+details, including RSVP, joining calls and organizer edit/cancel/delete actions.
+Overlapping timed events are placed side by side; overnight meetings are clipped
+to each day's displayed segment. Times use your browser's time zone.
+
+Workspace meetings can be shown/hidden using My calendars. Filter controls toggle
+organized, invited and ended meetings. Print opens the browser print dialog for
+the current view. On smaller screens the mini-calendar becomes a toggleable
+sidebar and multi-day grids scroll within the calendar.
+
+This is the workspace calendar interface, not Google/Microsoft calendar account
+sync. Existing private invitation rules, the 500-record visible-range limit and
+meeting scheduling rules remain. Meetings currently support timed events, not
+separate all-day, recurring or imported external-calendar event types.
