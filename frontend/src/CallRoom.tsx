@@ -529,9 +529,7 @@ export default function CallRoom({
           setError(
             e.code === 4409
               ? 'This meeting is already open in another tab. Leave that call first.'
-              : e.code === 4429
-                ? 'This room is full (six people maximum).'
-                : 'The call ended, expired, or your access changed. You can close this window or try again.',
+              : 'The call ended, expired, or your access changed. You can close this window or try again.',
           );
       };
     } catch (e) {
@@ -833,9 +831,13 @@ export default function CallRoom({
             {duration}
           </span>
         )}
-        <div className="call-count">
+        <div
+          className="call-count"
+          title="Participants in call"
+          aria-label="Participants in call"
+        >
           <Users size={16} />
-          {people.length + (joined ? 1 : 0)} / 6
+          {people.length + (joined ? 1 : 0)}
         </div>
         <button
           aria-label={full ? 'Exit full screen' : 'Enter full screen'}
@@ -989,7 +991,7 @@ export default function CallRoom({
                 </div>
                 {panel === 'people' && (
                   <div className="call-people">
-                    <p>{people.length + 1} in this call · 6 maximum</p>
+                    <p>{people.length + 1} in this call</p>
                     {[
                       {
                         person: {

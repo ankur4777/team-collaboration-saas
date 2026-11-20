@@ -304,6 +304,9 @@ rescheduling/cancellation, in-app reminders, notes and assigned action items.
 Calendar uses the same meeting records with day, week and month views.
 See [Meetings quickstart](docs/MEETINGS_QUICKSTART.md) for local setup and testing.
 
-Meetings includes native in-app voice/video calls for up to six invited participants,
+Meetings includes native in-app voice/video calls for invited participants without a fixed application admission cap,
 with microphone/camera controls and organizer end-for-everyone. Production calling
 requires HTTPS and a configured TURN relay; see the Meetings quickstart.
+
+Native calls currently use browser-to-browser mesh media. Actual participant capacity
+depends on devices and network bandwidth; large-group scaling requires an SFU media server.

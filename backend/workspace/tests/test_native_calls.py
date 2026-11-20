@@ -47,19 +47,32 @@ class CallConfigTests(CallFixture,TestCase):
         self.assertEqual(self.clients[self.member.pk].post(path+'end/').status_code,403)
         self.assertEqual(self.clients[self.owner.pk].post(path+'end/').status_code,200)
         self.assertEqual(self.clients[self.member.pk].get(path).status_code,400)
-    def test_capacity_duplicate_and_stale_presence(self):
+    def test_more_than_six_can_join_with_duplicate_and_stale_checks(self):
         own=self.scope(self.owner)
         first=register_peer(own,self.meeting.pk,'test-channel-owner')
         self.assertIn('self',first)
         self.assertEqual(register_peer(own,self.meeting.pk,'duplicate')['error'],4409)
-        for i in range(5):
+        for i in range(10):
             u=User.objects.create_user(f'peer{i}@example.test','TestOnly123!',full_name='Peer')
             OrganizationMember.objects.create(organization=self.org,user=u);MeetingAttendee.objects.create(meeting=self.meeting,user=u)
             c=Client();c.force_login(u);s=c.session;s['active_organization_id']=str(self.org.pk);s.save()
             self.assertIn('self',register_peer({'user':u,'session':s},self.meeting.pk,f'peer-channel-{i}'))
-        self.assertEqual(register_peer(self.scope(self.member),self.meeting.pk,'full')['error'],4429)
+        self.assertIn('self',register_peer(self.scope(self.member),self.meeting.pk,'twelfth-peer'))
+        self.assertEqual(MeetingCallPeer.objects.filter(meeting=self.meeting).count(),12)
+        self.assertIsNone(self.clients[self.owner.pk].get(f'/api/meetings/{self.meeting.pk}/call/').json()['max_peers'])
         MeetingCallPeer.objects.filter(pk=first['self']['id']).update(updated_at=timezone.now()-timedelta(seconds=100))
-        self.assertIn('self',register_peer(self.scope(self.member),self.meeting.pk,'after-expiry'))
+        self.assertIn('self',register_peer(self.scope(self.owner),self.meeting.pk,'after-expiry'))
+    def test_more_than_two_hundred_workspace_members_can_be_invited(self):
+        users=[User(email=f'invite-{i}@example.test',full_name=f'Invite {i}',password='!') for i in range(201)]
+        User.objects.bulk_create(users)
+        OrganizationMember.objects.bulk_create([OrganizationMember(organization=self.org,user=user) for user in users])
+        now=timezone.now()
+        payload={'title':'Larger invitation list','agenda':'','starts_at':now.isoformat(),'ends_at':(now+timedelta(hours=1)).isoformat(),
+                 'time_zone':'UTC','attendee_ids':[str(u.pk) for u in users],'channel_id':None,'invite_channel':False,'notes':''}
+        response=self.clients[self.owner.pk].post('/api/meetings/',payload,content_type='application/json')
+        self.assertEqual(response.status_code,201,response.content)
+        self.assertEqual(len(response.json()['attendees']),202)
+
     @override_settings(CALL_ICE_TRANSPORT_POLICY='relay',CALL_TURN_URLS=[])
     def test_relay_only_requires_a_relay(self):
         from rest_framework.exceptions import ValidationError
@@ -202,3 +215,27 @@ class CallTranslationTests(CallFixture,TestCase):
             self.assertEqual(self.clients[self.owner.pk].post(self.path,[],content_type='application/json').status_code,400)
             Meeting.objects.filter(pk=self.meeting.pk).update(call_ended_at=timezone.now())
             self.assertEqual(self.clients[self.owner.pk].post(self.path,self.payload,content_type='application/json').status_code,403)
+
+class LargerCallSocketTests(CallFixture,TransactionTestCase):
+    def setUp(self):
+        self.setup_call()
+    def test_eight_invited_sockets_join_and_eighth_can_signal_first(self):
+        users=[self.owner,self.member]
+        for i in range(6):
+            user=User.objects.create_user(f'large-peer-{i}@example.test','TestOnly123!',full_name=f'Peer {i}')
+            OrganizationMember.objects.create(organization=self.org,user=user)
+            MeetingAttendee.objects.create(meeting=self.meeting,user=user)
+            client=Client();client.force_login(user);session=client.session
+            session['active_organization_id']=str(self.org.pk);session.save();self.clients[user.pk]=client;users.append(user)
+        sockets=[self.socket(user) for user in users]
+        async def scenario():
+            ids=[]
+            for i,socket in enumerate(sockets):
+                self.assertTrue((await socket.connect())[0]);ready=await socket.receive_json_from()
+                ids.append(ready['self']['id']);self.assertEqual(len(ready['peers']),i)
+                for old in sockets[:i]:self.assertEqual((await old.receive_json_from())['type'],'joined')
+            await sockets[-1].send_json_to({'type':'signal','target':ids[0],'description':{'type':'offer','sdp':'v=0\r\n'}})
+            signal=await sockets[0].receive_json_from();self.assertEqual(signal['from']['id'],ids[-1]);self.assertEqual(signal['description']['type'],'offer')
+            for socket in reversed(sockets):await socket.disconnect()
+        async_to_sync(scenario)()
+        self.assertEqual(MeetingCallPeer.objects.filter(meeting=self.meeting).count(),0)
