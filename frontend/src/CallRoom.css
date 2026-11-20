@@ -1011,10 +1011,10 @@
 }
 .in-call .call-grid.solo .call-tile {
   width: min(100%, 920px);
-  aspect-ratio: 16/9;
-  min-height: 200px;
-  max-height: calc(100dvh - 220px);
-  height: auto;
+  aspect-ratio: auto;
+  min-height: 0;
+  max-height: none;
+  height: 100%;
   flex-shrink: 1;
   border-radius: 22px;
 }
@@ -1199,9 +1199,9 @@
   }
   .in-call .call-grid.solo .call-tile {
     border-radius: 18px;
-    max-height: calc(100dvh - 280px);
-    aspect-ratio: 3/4;
-    min-height: 180px;
+    max-height: none;
+    aspect-ratio: auto;
+    min-height: 0;
   }
   .in-call .call-control-dock {
     max-width: 100%;
@@ -1247,3 +1247,9 @@
   color: #84622c;
   border-color: #e7d9b5;
 }
+
+/* Give the solo video stage the available height instead of a 16:9 cap. */
+.in-call>header{padding-top:8px;padding-bottom:8px}
+.in-call .call-grid.solo{padding-top:4px;padding-bottom:4px}
+.in-call>footer{padding-top:6px;padding-bottom:8px}
+@media(max-width:680px){.in-call>header{padding-top:8px;padding-bottom:8px}.in-call .call-grid.solo{padding-top:4px;padding-bottom:4px}}
