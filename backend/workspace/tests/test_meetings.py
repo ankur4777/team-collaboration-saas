@@ -130,3 +130,39 @@ class MeetingTests(TestCase):
         self.login(self.member)
         self.assertEqual(self.client.get(f"/api/meetings/{row['id']}/").status_code,404)
         self.assertEqual(self.client.get('/api/meetings/notifications/').json()['results'],[])
+
+    def test_organizer_deletes_ended_meeting_and_related_records(self):
+        from workspace.models import MeetingAttendee,MeetingActionItem,MeetingCallPeer
+        row=self.create();record=Meeting.objects.get(pk=row['id'])
+        record.starts_at=timezone.now()-timedelta(hours=2);record.ends_at=timezone.now()-timedelta(hours=1);record.save()
+        action=MeetingActionItem.objects.create(meeting=record,title='Private notes task')
+        peer=MeetingCallPeer.objects.create(meeting=record,user=self.owner,channel_name='ended-delete-test',session_key='test-only')
+        with patch('workspace.meetings.publish_notification_refresh') as refresh:
+            with self.captureOnCommitCallbacks(execute=True):
+                response=self.client.delete(f"/api/meetings/{record.pk}/",{'revision':row['revision']},format='json')
+            self.assertEqual(response.status_code,200,response.content);refresh.assert_called_once()
+            self.assertEqual(set(refresh.call_args.args[1]),{self.owner.pk,self.member.pk})
+        self.assertFalse(Meeting.objects.filter(pk=row['id']).exists())
+        self.assertFalse(MeetingAttendee.objects.filter(meeting_id=row['id']).exists())
+        self.assertFalse(MeetingActionItem.objects.filter(pk=action.pk).exists())
+        self.assertFalse(MeetingCallPeer.objects.filter(pk=peer.pk).exists())
+        self.login(self.member);self.assertEqual(self.client.get(f"/api/meetings/{row['id']}/").status_code,404)
+        self.assertEqual(self.client.get('/api/meetings/notifications/').json()['results'],[])
+
+    def test_delete_permissions_revision_and_active_meeting_protection(self):
+        row=self.create();path=f"/api/meetings/{row['id']}/"
+        self.assertEqual(self.client.delete(path,{'revision':row['revision']},format='json').status_code,400)
+        self.login(self.member);self.assertEqual(self.client.delete(path,{'revision':row['revision']},format='json').status_code,403)
+        self.login(self.stranger);self.assertEqual(self.client.delete(path,{'revision':row['revision']},format='json').status_code,404)
+        self.login(self.other,self.org_b);self.assertEqual(self.client.delete(path,{'revision':row['revision']},format='json').status_code,404)
+        self.login(self.owner);Meeting.objects.filter(pk=row['id']).update(call_ended_at=timezone.now())
+        self.assertEqual(self.client.delete(path,{'revision':99},format='json').status_code,409)
+        self.assertTrue(Meeting.objects.filter(pk=row['id']).exists())
+        self.assertEqual(self.client.post(path+'cancel/',{'revision':row['revision']},format='json').status_code,400)
+        self.assertEqual(self.client.delete(path,{'revision':row['revision']},format='json').status_code,200)
+
+    def test_cancelled_meeting_can_be_deleted_before_its_scheduled_end(self):
+        row=self.create();path=f"/api/meetings/{row['id']}/"
+        response=self.client.post(path+'cancel/',{'revision':row['revision']},format='json')
+        self.assertEqual(response.status_code,200,response.content)
+        self.assertEqual(self.client.delete(path,{'revision':response.json()['revision']},format='json').status_code,200)

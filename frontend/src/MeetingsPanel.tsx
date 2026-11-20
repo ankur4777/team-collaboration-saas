@@ -562,6 +562,29 @@ export default function MeetingsPanel({
       setBusy(false);
     }
   }
+  async function deleteMeeting(row: MeetingRecord) {
+    if (
+      !window.confirm(
+        'Delete this meeting for all attendees? This permanently removes its notes and action items.',
+      )
+    )
+      return;
+    setBusy(true);
+    setError('');
+    try {
+      await meetingsApi.remove(row.id, row.revision);
+      setRows((old) => old.filter((m) => m.id !== row.id));
+      setSelectedId('');
+      setSelected(null);
+      setNotice('Meeting deleted.');
+      setVersion((v) => v + 1);
+      onChanged();
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
   const now = Date.now();
   const filtered = rows
     .filter((m) =>
@@ -582,9 +605,15 @@ export default function MeetingsPanel({
         .includes(query.toLowerCase()),
     );
   const organizer = selected?.organizer.id === userId;
+  const canDelete =
+    !!selected &&
+    (selected.cancelled ||
+      selected.call_ended ||
+      new Date(selected.ends_at).getTime() <= now);
   const active =
     selected &&
     !selected.cancelled &&
+    !selected.call_ended &&
     new Date(selected.ends_at).getTime() > now;
   const days = Array.from(
     { length: calendarMode === 'Month' ? 42 : calendarMode === 'Week' ? 7 : 1 },
@@ -905,28 +934,36 @@ export default function MeetingsPanel({
                     >
                       Edit
                     </button>
-                    <button
-                      className="meeting-cancel"
-                      disabled={busy}
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            'Cancel this meeting and notify all attendees?',
-                          )
-                        )
-                          void mutate(
-                            () =>
-                              meetingsApi.cancel(
-                                selected.id,
-                                selected.revision,
-                              ),
-                            'Meeting cancelled.',
-                          );
-                      }}
-                    >
-                      Cancel meeting
-                    </button>
                   </>
+                )}
+                {organizer && canDelete && (
+                  <button
+                    className="meeting-cancel"
+                    disabled={busy}
+                    onClick={() => void deleteMeeting(selected)}
+                  >
+                    Delete meeting
+                  </button>
+                )}
+                {organizer && !canDelete && (
+                  <button
+                    className="meeting-cancel"
+                    disabled={busy}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          'Cancel this meeting and notify all attendees?',
+                        )
+                      )
+                        void mutate(
+                          () =>
+                            meetingsApi.cancel(selected.id, selected.revision),
+                          'Meeting cancelled.',
+                        );
+                    }}
+                  >
+                    Cancel meeting
+                  </button>
                 )}
               </div>
               {!organizer && active && (

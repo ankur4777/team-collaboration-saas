@@ -18,6 +18,7 @@ vi.mock('./api', () => ({
     create: vi.fn(),
     update: vi.fn(),
     cancel: vi.fn(),
+    remove: vi.fn(),
     rsvp: vi.fn(),
     read: vi.fn(),
     addAction: vi.fn(),
@@ -70,6 +71,7 @@ beforeEach(() => {
   vi.mocked(meetingsApi.detail).mockResolvedValue(meeting);
   vi.mocked(meetingsApi.read).mockResolvedValue({ status: 'read' });
   vi.mocked(meetingsApi.create).mockResolvedValue(meeting);
+  vi.mocked(meetingsApi.remove).mockResolvedValue({ status: 'deleted' });
   vi.mocked(meetingsApi.rsvp).mockResolvedValue({
     ...meeting,
     my_response: 'accepted',
@@ -159,5 +161,115 @@ describe('Meetings dashboard', () => {
     );
     expect(await screen.findByText('This call has ended.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Join meeting' })).toBeNull();
+  });
+});
+
+describe('Ended meeting deletion', () => {
+  const ended = {
+    ...meeting,
+    starts_at: new Date(Date.now() - 7200000).toISOString(),
+    ends_at: new Date(Date.now() - 3600000).toISOString(),
+  };
+  it.each([ended, { ...meeting, call_ended: true }])(
+    'replaces Cancel with Delete and removes the completed meeting',
+    async (row) => {
+      vi.mocked(meetingsApi.list).mockResolvedValue({
+        results: [row],
+        limit: 500,
+      });
+      vi.mocked(meetingsApi.detail).mockResolvedValue(row);
+      const user = userEvent.setup();
+      mount('owner');
+      if (!row.call_ended)
+        await user.click(screen.getByRole('button', { name: 'Past' }));
+      await user.click(
+        await screen.findByRole('button', { name: /Project review/ }),
+      );
+      const button = await screen.findByRole('button', {
+        name: 'Delete meeting',
+      });
+      expect(
+        screen.queryByRole('button', { name: 'Cancel meeting' }),
+      ).toBeNull();
+      vi.mocked(meetingsApi.list).mockResolvedValue({
+        results: [],
+        limit: 500,
+      });
+      await user.click(button);
+      await waitFor(() =>
+        expect(meetingsApi.remove).toHaveBeenCalledWith('meeting-1', 1),
+      );
+      expect(window.confirm).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'permanently removes its notes and action items',
+        ),
+      );
+      expect(await screen.findByText('Meeting deleted.')).toBeTruthy();
+      expect(
+        screen.queryByRole('button', { name: /Project review/ }),
+      ).toBeNull();
+    },
+  );
+  it('keeps Cancel for upcoming meetings and hides Delete from attendees', async () => {
+    const user = userEvent.setup();
+    const ui = mount('owner');
+    await user.click(
+      await screen.findByRole('button', { name: /Project review/ }),
+    );
+    expect(
+      await screen.findByRole('button', { name: 'Cancel meeting' }),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Delete meeting' })).toBeNull();
+    ui.unmount();
+    vi.mocked(meetingsApi.list).mockResolvedValue({
+      results: [ended],
+      limit: 500,
+    });
+    vi.mocked(meetingsApi.detail).mockResolvedValue(ended);
+    mount('member');
+    await user.click(screen.getByRole('button', { name: 'Past' }));
+    await user.click(
+      await screen.findByRole('button', { name: /Project review/ }),
+    );
+    expect(await screen.findByText('Discuss the release')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Delete meeting' })).toBeNull();
+  });
+  it('does not delete when confirmation is declined', async () => {
+    vi.mocked(meetingsApi.detail).mockResolvedValue({
+      ...meeting,
+      call_ended: true,
+    });
+    vi.mocked(window.confirm).mockReturnValue(false);
+    const user = userEvent.setup();
+    mount('owner');
+    await user.click(
+      await screen.findByRole('button', { name: /Project review/ }),
+    );
+    await user.click(
+      await screen.findByRole('button', { name: 'Delete meeting' }),
+    );
+    expect(meetingsApi.remove).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Delete meeting' })).toBeTruthy();
+  });
+  it('keeps meeting details when deletion fails', async () => {
+    vi.mocked(meetingsApi.detail).mockResolvedValue({
+      ...meeting,
+      call_ended: true,
+    });
+    vi.mocked(meetingsApi.remove).mockRejectedValue(
+      new Error('Please refresh this meeting.'),
+    );
+    const user = userEvent.setup();
+    mount('owner');
+    await user.click(
+      await screen.findByRole('button', { name: /Project review/ }),
+    );
+    await user.click(
+      await screen.findByRole('button', { name: 'Delete meeting' }),
+    );
+    expect(
+      await screen.findByText('Please refresh this meeting.'),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Delete meeting' })).toBeTruthy();
   });
 });
