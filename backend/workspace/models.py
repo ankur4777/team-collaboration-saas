@@ -415,6 +415,8 @@ class MeetingCallPeer(models.Model):
     updated_at = models.DateTimeField(default=timezone.now)
     audio = models.BooleanField(default=True)
     video = models.BooleanField(default=True)
+    hand_raised = models.BooleanField(default=False)
+    screen_sharing = models.BooleanField(default=False)
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=['meeting', 'user'], name='uq_meeting_call_user')]
