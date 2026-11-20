@@ -239,7 +239,7 @@ meeting grid and a mini month sidebar. Day, Work week (Monday–Friday), Week
 sidebar date picker, Today, period arrows and Go to date control navigate the
 visible range. Search matches titles and organizer names in that range.
 
-Use **New event**, a date-cell plus button or an hourly time slot to open the
+Use a date-cell plus button or an hourly time slot to open the
 existing meeting editor with the selected date/time. Events open the same meeting
 details, including RSVP, joining calls and organizer edit/cancel/delete actions.
 Overlapping timed events are placed side by side; overnight meetings are clipped

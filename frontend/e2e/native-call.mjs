@@ -77,7 +77,7 @@ try {
       await page.goto(base + '/');
       await page.getByRole('button', { name: 'Calendar', exact: true }).click();
       await page
-        .getByRole('button', { name: 'New event', exact: true })
+        .getByRole('textbox', { name: 'Search calendar', exact: true })
         .waitFor();
       await page.locator('.wc-event').first().waitFor();
       await page.screenshot({ path: 'call-test-results/calendar-month.png' });

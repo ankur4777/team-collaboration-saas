@@ -270,14 +270,6 @@ export default function WorkspaceCalendar({
         >
           <Menu size={18} />
         </button>
-        <button
-          className="wc-new"
-          onClick={() => onCreate(suggestedStart(date))}
-          disabled={busy}
-        >
-          <Plus size={16} />
-          New event
-        </button>
         <nav aria-label="Calendar views">
           {(['Day', 'Work week', 'Week', 'Month'] as CalendarMode[]).map(
             (view) => (
