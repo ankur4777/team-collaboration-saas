@@ -150,6 +150,10 @@ try {
             .then((n) => n === 0),
         'Mini calendar did not adapt to mobile',
       );
+      await eventually(
+        () => page.locator('.sidebar').evaluate((el) => el.getBoundingClientRect().right <= 0),
+        'Workspace menu did not finish closing on mobile',
+      );
       await page.screenshot({ path: 'call-test-results/calendar-mobile.png' });
       assert.equal(
         await page.evaluate(
