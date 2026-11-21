@@ -626,13 +626,6 @@ export default function MeetingsPanel({
           </div>
           <div className="meeting-heading-actions">
             <button
-              className="outline-button"
-              onClick={() => setEditor({ meeting: null, now: true })}
-            >
-              <Video size={16} />
-              Meet now
-            </button>
-            <button
               className="primary-button"
               onClick={() => setEditor({ meeting: null, now: false })}
             >
