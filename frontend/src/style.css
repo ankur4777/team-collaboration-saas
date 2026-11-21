@@ -323,3 +323,17 @@
 .app-layout .sidebar-bottom{flex-shrink:0;margin-top:0;background:#fbfcfc}
 .app-layout .main-panel{min-height:0;overflow:hidden}
 .app-layout .top-bar{flex-shrink:0}
+
+/* Scroll content inside the viewport; keep dialog titles and sidebar controls accessible. */
+.main-panel>.settings-page{min-height:0;min-width:0;overflow-y:scroll;overflow-x:hidden;scrollbar-gutter:stable;overscroll-behavior:contain}
+.main-panel>.future-page{min-height:0;overflow-y:auto}
+.modal-backdrop>.modal{display:flex;flex-direction:column;max-height:calc(100dvh - 40px);overflow:hidden}
+.modal>.modal-head{flex-shrink:0}
+.modal>.modal-body{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.modal .member-list{max-height:min(320px,45dvh);min-height:0;overflow-y:scroll;overflow-x:hidden;scrollbar-gutter:stable;flex-shrink:0}
+.member-row>div:nth-child(2){min-width:0;overflow-wrap:anywhere}
+.sidebar-scroll,.settings-page,.modal-body,.member-list{scrollbar-width:thin;scrollbar-color:#7aa99b #edf4f0}
+.sidebar-scroll::-webkit-scrollbar,.settings-page::-webkit-scrollbar,.modal-body::-webkit-scrollbar,.member-list::-webkit-scrollbar{width:8px;height:8px}
+.sidebar-scroll::-webkit-scrollbar-track,.settings-page::-webkit-scrollbar-track,.modal-body::-webkit-scrollbar-track,.member-list::-webkit-scrollbar-track{background:#edf4f0}
+.sidebar-scroll::-webkit-scrollbar-thumb,.settings-page::-webkit-scrollbar-thumb,.modal-body::-webkit-scrollbar-thumb,.member-list::-webkit-scrollbar-thumb{background:#7aa99b;border-radius:8px;border:2px solid #edf4f0}
+@media(max-width:600px){.modal-backdrop{padding:10px}.modal-backdrop>.modal{max-height:calc(100dvh - 20px)}.member-row{flex-wrap:wrap}.member-actions{max-width:100%;flex-wrap:wrap}}
