@@ -1209,6 +1209,7 @@ export default function CallRoom({
                 }
                 stage={stageElement}
                 translationReady={translationReady}
+                showSpeechControls={false}
               />
               <button
                 className="call-leave"

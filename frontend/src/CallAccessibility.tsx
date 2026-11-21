@@ -83,6 +83,7 @@ export default function CallAccessibility({
   isMicActive,
   stage,
   translationReady,
+  showSpeechControls = true,
 }: {
   meetingId: string;
   userId: string;
@@ -92,6 +93,7 @@ export default function CallAccessibility({
   isMicActive: () => boolean;
   stage: HTMLElement | null;
   translationReady: boolean;
+  showSpeechControls?: boolean;
 }) {
   const [popover, setPopover] = useState<
     'emoji' | 'captions' | 'translate' | null
@@ -343,6 +345,7 @@ export default function CallAccessibility({
       >
         <Smile size={19} />
       </button>
+      {showSpeechControls && <>
       <button
         aria-label={enabled ? 'Turn off captions' : 'Turn on captions'}
         title={enabled ? 'Turn off captions' : 'Turn on captions'}
@@ -362,6 +365,7 @@ export default function CallAccessibility({
       >
         <Languages size={19} />
       </button>
+      </>}
       {popover && (
         <section
           className="call-access-popover"
