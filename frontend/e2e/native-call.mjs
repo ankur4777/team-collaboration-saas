@@ -80,14 +80,15 @@ try {
       for (const module of ['Teams & Channels', 'Chats & Groups', 'Search messages', 'Email inbox', 'Meetings', 'Calendar', 'Shared files', 'Settings']) {
         await page.locator('.sidebar').getByRole('button', { name: new RegExp('^' + module.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click();
         for (const label of ['Members', 'Settings']) {
-          const control = page.locator('.sidebar-bottom').getByRole('button', { name: new RegExp('^' + label) });
+          const control = page.locator('.sidebar').getByRole('button', { name: new RegExp('^' + label) });
           await control.waitFor();
+          await control.scrollIntoViewIfNeeded();
           assert.ok(await control.evaluate(el => {
             const r = el.getBoundingClientRect();
             return r.top >= 0 && r.bottom <= innerHeight && r.left >= 0;
           }), label + ' hidden in ' + module);
         }
-        await page.locator('.sidebar-bottom').getByRole('button', { name: /^Members/ }).click();
+        await page.locator('.sidebar').getByRole('button', { name: /^Members/ }).click();
         await page.getByRole('heading', { name: 'Workspace members', exact: true }).waitFor();
         await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
       }
