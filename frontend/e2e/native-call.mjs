@@ -257,60 +257,9 @@ try {
     .getByRole('status', { name: 'Live reactions', exact: true })
     .getByText('👍', { exact: true })
     .waitFor();
-  await owner
-    .getByRole('button', { name: 'Turn on captions', exact: true })
-    .click();
-  await owner
-    .getByRole('button', { name: 'Start my speech captions', exact: true })
-    .click();
-  await owner
-    .getByRole('button', { name: 'Close accessibility settings', exact: true })
-    .click();
-  await member
-    .getByRole('button', { name: 'Translate speech', exact: true })
-    .click();
-  await member
-    .getByRole('checkbox', { name: 'Translate new captions', exact: true })
-    .check();
-  await member
-    .getByRole('button', { name: 'Close accessibility settings', exact: true })
-    .click();
-  await owner.evaluate(() =>
-    window.__emitCallSpeech('Caption test from owner'),
-  );
-  await member
-    .getByRole('log', { name: 'Live captions', exact: true })
-    .getByText('मालिक की ओर से कैप्शन परीक्षण', { exact: true })
-    .waitFor();
-  await member
-    .getByRole('log', { name: 'Live captions', exact: true })
-    .getByText('Caption test from owner', { exact: true })
-    .waitFor();
-  await member.screenshot({
-    path: 'call-test-results/translated-captions.png',
-  });
-  await owner
-    .getByRole('button', { name: 'Mute microphone', exact: true })
-    .click();
-  await owner.evaluate(() =>
-    window.__emitCallSpeech('Muted caption should not be sent'),
-  );
-  await new Promise((r) => setTimeout(r, 300));
-  assert.equal(
-    await member
-      .getByText('Muted caption should not be sent', { exact: true })
-      .count(),
-    0,
-  );
-  await owner
-    .getByRole('button', { name: 'Unmute microphone', exact: true })
-    .click();
-  await owner
-    .getByRole('button', { name: 'Turn off captions', exact: true })
-    .click();
-  await member
-    .getByRole('button', { name: 'Turn off captions', exact: true })
-    .click();
+  for (const page of [owner, member]) {
+    assert.equal(await page.getByRole('button', { name: /Turn (on|off) captions|Translate speech/ }).count(), 0, 'Removed speech controls remain in call toolbar');
+  }
   await owner.getByRole('button', { name: 'Raise hand', exact: true }).click();
   await member
     .getByRole('button', { name: 'Participants', exact: true })
@@ -530,7 +479,7 @@ try {
     'Deleted meeting remains visible to an attendee',
   );
   console.log(
-    'PASS: native audio/video, reactions, deterministic speech/caption transport and translation adapter, hand raising, participant list, plain-text live chat, layouts, screen sharing/restoration, mute, camera, leave/rejoin, cleanup, organizer end and confirmed meeting deletion.',
+    'PASS: native audio/video, reactions, removed speech toolbar controls, hand raising, participant list, plain-text live chat, layouts, screen sharing/restoration, mute, camera, leave/rejoin, cleanup, organizer end and confirmed meeting deletion.',
   );
   await Promise.all(contexts.map((c) => c.close()));
 } finally {
