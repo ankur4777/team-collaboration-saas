@@ -75,6 +75,24 @@ try {
     await page.goto(base + '/?meeting=11111111-1111-4111-8111-111111111111');
     if (i === 0) {
       await page.goto(base + '/');
+      // Footer controls must stay inside short desktop viewports in every module.
+      await page.setViewportSize({ width: 1366, height: 633 });
+      for (const module of ['Teams & Channels', 'Chats & Groups', 'Search messages', 'Email inbox', 'Meetings', 'Calendar', 'Shared files', 'Settings']) {
+        await page.locator('.sidebar').getByRole('button', { name: new RegExp('^' + module.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click();
+        for (const label of ['Members', 'Settings']) {
+          const control = page.locator('.sidebar-bottom').getByRole('button', { name: new RegExp('^' + label) });
+          await control.waitFor();
+          assert.ok(await control.evaluate(el => {
+            const r = el.getBoundingClientRect();
+            return r.top >= 0 && r.bottom <= innerHeight && r.left >= 0;
+          }), label + ' hidden in ' + module);
+        }
+        await page.locator('.sidebar-bottom').getByRole('button', { name: /^Members/ }).click();
+        await page.getByRole('heading', { name: 'Workspace members', exact: true }).waitFor();
+        await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+      }
+      await page.screenshot({ path: 'call-test-results/sidebar-settings.png' });
+      await page.setViewportSize({ width: 1280, height: 720 });
       await page.getByRole('button', { name: 'Calendar', exact: true }).click();
       await page
         .getByRole('textbox', { name: 'Search calendar', exact: true })
