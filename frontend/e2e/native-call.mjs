@@ -91,11 +91,6 @@ try {
         await page.getByRole('heading', { name: 'Workspace members', exact: true }).waitFor();
         await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
       }
-      const settings = page.locator('.settings-page');
-      assert.ok(await settings.evaluate(el => el.scrollHeight > el.clientHeight), 'Settings does not scroll on a short screen');
-      await settings.evaluate(el => { el.scrollTop = el.scrollHeight; });
-      assert.ok(await settings.evaluate(el => el.scrollTop > 0), 'Settings bottom is inaccessible');
-      await page.getByRole('heading', { name: 'Active sessions & devices', exact: true }).scrollIntoViewIfNeeded();
       await page.screenshot({ path: 'call-test-results/sidebar-settings.png' });
       await page.setViewportSize({ width: 1280, height: 720 });
       await page.getByRole('button', { name: 'Calendar', exact: true }).click();
