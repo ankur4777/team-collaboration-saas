@@ -78,7 +78,7 @@ try {
       // Footer controls must stay inside short desktop viewports in every module.
       await page.setViewportSize({ width: 1366, height: 633 });
       for (const module of ['Teams & Channels', 'Chats & Groups', 'Search messages', 'Email inbox', 'Meetings', 'Calendar', 'Shared files', 'Settings']) {
-        await page.locator('.sidebar').getByRole('button', { name: module, exact: true }).click();
+        await page.locator('.sidebar').getByRole('button', { name: new RegExp('^' + module.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click();
         for (const label of ['Members', 'Settings']) {
           const control = page.locator('.sidebar-bottom').getByRole('button', { name: new RegExp('^' + label) });
           await control.waitFor();
