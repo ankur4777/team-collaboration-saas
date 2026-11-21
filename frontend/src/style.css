@@ -313,3 +313,13 @@
 .verification-notification button{font-size:11px;padding:8px 10px;margin-top:10px;white-space:normal;text-align:left}
 .verification-notification p[role=status]{color:#176f5b}
 .verification-notification .verification-error{color:#a34131}
+
+/* Keep workspace account controls reachable in every module and viewport. */
+.app-layout{height:100vh;height:100dvh;min-height:0}
+.app-layout .sidebar{min-height:0;overflow:hidden}
+.sidebar-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
+.sidebar-scroll>.sidebar-header,.sidebar-scroll>.org-picker,.sidebar-scroll>.sidebar-title,.sidebar-scroll>.nav-list{flex-shrink:0}
+.sidebar-scroll .team-tree{min-height:0;overflow:visible}
+.app-layout .sidebar-bottom{flex-shrink:0;margin-top:0;background:#fbfcfc}
+.app-layout .main-panel{min-height:0;overflow:hidden}
+.app-layout .top-bar{flex-shrink:0}

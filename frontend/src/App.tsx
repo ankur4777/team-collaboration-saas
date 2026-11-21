@@ -282,7 +282,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   function switchOrg(id:string){void action(async()=>{const next=await api.activate(id);onSession(next);setOpenChatRequest(null);setView('teams');},false);}
   async function signOut(){try{await api.logout();onLogout();}catch(e){setError(errorText(e));}}
 
-  return <div className={`app-layout${view==='inbox'?' mail-view':''}`}><aside className={`sidebar ${sidebarOpen?'mobile-visible':''}`}><div className="sidebar-header"><Brand/><button className="mobile-close icon-button" onClick={()=>setSidebarOpen(false)}><X size={20}/></button></div>
+  return <div className={`app-layout${view==='inbox'?' mail-view':''}`}><aside className={`sidebar ${sidebarOpen?'mobile-visible':''}`}><div className="sidebar-scroll"><div className="sidebar-header"><Brand/><button className="mobile-close icon-button" onClick={()=>setSidebarOpen(false)}><X size={20}/></button></div>
     <div className="org-picker"><div className="org-icon">{initials(activeOrg?.name||'TW')}</div><div className="org-label"><strong>{activeOrg?.name||'Choose workspace'}</strong><small>{activeOrg?.role||'No organization'}</small></div><ChevronDown size={16}/>
       <select aria-label="Switch organization" value={session.active_organization_id||''} onChange={e=>switchOrg(e.target.value)}>{session.organizations.map(org=><option key={org.id} value={org.id}>{org.name}</option>)}</select>
     </div>
@@ -291,6 +291,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
     <div className="team-tree">{teams.map(team=><div key={team.id}><button className={`tree-team ${selectedTeam===team.id&&view==='teams'?'selected':''}`} onClick={()=>{setSelectedTeam(team.id);setView('teams');setSidebarOpen(false);}}><span className="tree-team-icon">{initials(team.name)}</span><span>{team.name}</span><ChevronDown size={13}/></button>
       {selectedTeam===team.id&&view==='teams'&&channels.map(channel=><button className={`tree-channel ${selectedChannel===channel.id?'selected':''}`} key={channel.id} onClick={()=>setSelectedChannel(channel.id)}><Hash size={14}/>{channel.name}{channelUnread(channel.id)>0&&<span className="channel-unread-count" aria-label={`${channelUnread(channel.id)} unread messages`}>{channelUnread(channel.id)>99?'99+':channelUnread(channel.id)}</span>}</button>)}</div>)}
     {teams.length===0&&<div className="sidebar-empty">Your teams will appear here.</div>}</div>
+    </div>
     <div className="sidebar-bottom"><button className="nav-item" onClick={()=>setModal('members')}><Users size={18}/>Members <span className="count-chip">{members.length}</span></button><button className={`nav-item ${view==='settings'?'active':''}`} onClick={()=>{setView('settings');setSidebarOpen(false);}}><Settings2 size={18}/>Settings</button><div className="profile"><div className="avatar">{initials(session.user.full_name)}</div><div className="profile-name"><strong>{session.user.full_name}</strong><small>{session.user.email}</small></div><button className="icon-button" aria-label="Log out" title="Log out" onClick={signOut}><LogOut size={18}/></button></div></div>
   </aside>
   {sidebarOpen&&<div className="mobile-shade" onClick={()=>setSidebarOpen(false)}/>}
