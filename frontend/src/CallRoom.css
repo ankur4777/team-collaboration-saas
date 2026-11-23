@@ -1259,3 +1259,5 @@
 .in-call .call-stage-tools select{padding-top:4px;padding-bottom:4px}
 .in-call .call-grid.solo{padding:0 24px}
 .in-call>footer{padding-top:4px;padding-bottom:4px}
+
+.call-room{background:#050a12;color:#f3f7fb}.call-brand,.call-workspace,.call-sidebar{background:#080e18;border-color:#1b2a3d}.call-eyebrow{color:#55e7e9}.call-stage{background:#0b1421}.call-tile{background:#101b2a;border-color:#26384d}.call-initials,.call-avatar{background:#193c47;color:#69f1ee}.call-control-dock,.call-device-controls,.call-panel-controls{background:#0c1725;border-color:#263a51}.call-device-controls button,.call-panel-controls button{background:#152436;color:#e4edf6}.call-device-controls button:hover,.call-panel-controls button:hover{background:#1a3d47;color:#5beced}.call-leave,.call-end{background:#ff343d;color:#fff}.call-leave:hover,.call-end:hover{background:#e82b35}.call-sidebar-head,.call-person-row,.call-messages,.call-chat-form{border-color:#203147}.call-chat-form input{background:#0b1421;color:#f4f8fc;border-color:#34465b}.call-waiting,.call-panel-note,.call-person{color:#b3c2cf}

@@ -713,3 +713,5 @@
   font-size: 10px;
   margin-top: 4px;
 }
+
+.meetings-shell,.meetings-layout,.meetings-list,.meeting-detail,.calendar-layout,.meeting-calendar{background:#0a111d;color:#edf4fb}.meetings-heading,.meetings-controls{background:#080e18;border-color:#1b2a3d}.meeting-card,.meeting-detail,.meeting-modal{background:#0e1827;border-color:#283a50}.meeting-card:hover,.meeting-card.selected{background:#172b38;border-color:#28e7ec}.meeting-date-tile{background:#173540;color:#57eaeb}.meeting-card-copy,.meeting-prose,.meeting-detail-time,.meeting-hint,.meeting-back{color:#b3c1cf}.meeting-card h3,.meeting-detail h2,.meeting-modal h2{color:#f4f8fc}.meeting-status.accepted{background:#173b3d;color:#62eee5}.meeting-status.pending,.meeting-status.tentative{background:#2d2a1d;color:#f7d573}.meeting-status.cancelled,.meeting-status.declined,.meeting-cancel{background:#3a1d28;color:#ffb6bf}.meeting-rsvp,.meeting-task-form input,.meeting-task-form select,.meeting-form-grid input,.meeting-form-grid select,.meeting-form-grid textarea{background:#0a1320;color:#f1f6fb;border-color:#33465d}.meeting-check.done{background:#183a3a;color:#64ede2}.meeting-shade{background:#02050bbb}
