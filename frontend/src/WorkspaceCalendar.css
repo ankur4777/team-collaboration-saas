@@ -885,3 +885,5 @@
     margin: 0 !important;
   }
 }
+
+.calendar-shell,.workspace-calendar,.wc-body,.wc-main,.wc-sidebar{background:#0a111d;color:#edf4fb}.wc-brandbar,.wc-toolbar,.wc-navigator{background:#080e18;border-color:#1b2a3d}.wc-search{background:#101a29;border-color:#34465c;color:#edf4fb}.wc-search input{color:#edf4fb}.wc-search input::placeholder{color:#91a0b2}.wc-sidebar{border-color:#1b2a3d}.wc-mini-heading,.wc-calendars,.wc-agenda,.wc-sidebar-note,.wc-zone,.wc-eyebrow{color:#aebdcb}.wc-mini-days button,.wc-day-heading,.wc-time-label{color:#c2ced9}.wc-mini-days button.today,.wc-mini-days button.chosen,.wc-today{background:#173842;color:#57ebec}.wc-month,.wc-month-day,.wc-time-grid,.wc-time-slot{border-color:#223247}.wc-month-day{background:#0b1421}.wc-month-day.outside{background:#080e18}.wc-month-day:hover,.wc-month-day.selected{background:#142b38}.wc-event,.wc-timed-event{background:#153945;color:#66f0ef}.wc-event-dot{background:#28e7ec}.wc-filter-wrap select,.wc-nav-buttons button,.wc-sidebar-toggle{background:#101a29;border-color:#34465c;color:#eaf1f8}
