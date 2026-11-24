@@ -420,3 +420,31 @@ class MeetingCallPeer(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=['meeting', 'user'], name='uq_meeting_call_user')]
+
+
+
+
+def workspace_file_path(instance, filename):
+    """Use a random tenant-scoped storage key for workspace library files."""
+    from pathlib import Path
+    suffix = Path(instance.original_name).suffix.lower()
+    return f'organizations/{instance.organization_id}/workspace-files/{uuid.uuid4().hex}{suffix}'
+
+
+class WorkspaceFile(models.Model):
+    """A private file shared with every member of one workspace."""
+    id = models.UUIDField(primary_key=True, default=make_id, editable=False)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='workspace_files')
+    uploaded_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='workspace_files_uploaded')
+    file = models.FileField(upload_to=workspace_file_path)
+    original_name = models.CharField(max_length=120)
+    content_type = models.CharField(max_length=100)
+    size = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        indexes = [
+            models.Index(fields=['organization', 'created_at'], name='idx_workspace_file_date'),
+        ]
+

@@ -13,6 +13,7 @@ import MessageSearchPanel from './MessageSearchPanel';
 import ChatNotificationBell from './ChatNotificationBell';
 import SettingsPanel from './SettingsPanel';
 import AccountRecoveryScreen from './AccountRecoveryScreen';
+import SharedFilesPanel from './SharedFilesPanel';
 
 function initials(name: string) { return name.split(' ').filter(Boolean).slice(0, 2).map(t => t[0].toUpperCase()).join('') || 'TW'; }
 function errorText(error: unknown) { return error instanceof Error ? error.message : 'Something went wrong'; }
@@ -89,7 +90,7 @@ const navItems = [
   {id:'inbox', label:'Email inbox', icon:Mail, ready:true},
   {id:'meetings', label:'Meetings', icon:Video, ready:true},
   {id:'calendar', label:'Calendar', icon:CalendarDays, ready:true},
-  {id:'files', label:'Shared files', icon:FolderOpen, ready:false},
+  {id:'files', label:'Shared files', icon:FolderOpen, ready:true},
 ];
 function Workspace({ session, onSession, onLogout }: {session:Session;onSession:(value:Session)=>void;onLogout:()=>void}) {
   const [view,setView] = useState(new URLSearchParams(location.search).has('meeting')?'meetings':new URLSearchParams(location.search).has('mail')?'inbox':'teams'); const [teams,setTeams] = useState<Team[]>([]);
@@ -324,6 +325,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
     </>}
   </>:view==='chats' ? <ChatPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id} currentUser={session.user} members={members} requestedChat={openChatRequest} onRead={()=>setNotificationRefresh(current=>current+1)}/>
    :view==='inbox' ? <EmailPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id} user={session.user}/>
+   :view==='files' ? <SharedFilesPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id}/>
    :view==='meetings'||view==='calendar' ? <MeetingsPanel key={(session.active_organization_id||'none')+view} workspaceId={session.active_organization_id} userId={session.user.id} members={members} teams={teams} calendar={view==='calendar'} requestedMeeting={openMeetingRequest} onChanged={()=>setNotificationRefresh(v=>v+1)}/>
    :view==='settings' ? <SettingsPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id} workspaceName={activeOrg?.name||'your workspace'} user={session.user} onPreferencesSaved={()=>setNotificationRefresh(v=>v+1)}/>
    :view==='search' ? <MessageSearchPanel key={session.active_organization_id||'none'}

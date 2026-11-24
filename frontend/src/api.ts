@@ -27,6 +27,10 @@ export interface PrivateAttachment {
   id:string; name:string; size:number; content_type:string;
   created_at:string; uploaded_by:Pick<Person,'id'|'full_name'|'email'>;
 }
+export interface WorkspaceFile {
+  id:string; name:string; size:number; content_type:string;
+  created_at:string; uploaded_by:Pick<Person,'id'|'full_name'|'email'>;
+}
 export interface Message { id: string; body: string; created_at: string; edited_at: string|null; deleted_at: string|null; sender: Person }
 export interface ChannelMessageCursor { before:string; before_id:string }
 export interface ChannelMessagePage { items:Message[]; has_more:boolean; next_cursor:ChannelMessageCursor|null }
@@ -124,12 +128,26 @@ async function downloadPrivateFile(row:PrivateAttachment): Promise<void> {
   window.setTimeout(()=>URL.revokeObjectURL(url),30000);
 }
 
+async function downloadWorkspaceFile(row:WorkspaceFile): Promise<void> {
+  const response=await fetch(`/api/files/${encodeURIComponent(row.id)}/download/`,{credentials:'same-origin',cache:'no-store'});
+  if(!response.ok)throw new Error('File unavailable or access denied');
+  const blob=await response.blob();
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement('a');
+  link.href=url;link.download=row.name;
+  document.body.appendChild(link);link.click();link.remove();
+  window.setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
+
 export const api = {
   chatAttachments: (chatId:string) => request<PrivateAttachment[]>(`chats/${chatId}/attachments/`),
   channelAttachments: (channelId:string) => request<PrivateAttachment[]>(`channels/${channelId}/attachments/`),
   uploadChatAttachment: (chatId:string,file:File) => uploadPrivateFile(`chats/${chatId}/attachments/`,file),
   uploadChannelAttachment: (channelId:string,file:File) => uploadPrivateFile(`channels/${channelId}/attachments/`,file),
   downloadPrivateAttachment: (row:PrivateAttachment) => downloadPrivateFile(row),
+  workspaceFiles: (query='',category:'all'|'images'|'documents'='all') => request<{results:WorkspaceFile[];limit:number}>(`files/?${new URLSearchParams({q:query,category}).toString()}`),
+  uploadWorkspaceFile: (file:File) => uploadPrivateFile('files/',file) as Promise<WorkspaceFile>,
+  downloadWorkspaceFile: (row:WorkspaceFile) => downloadWorkspaceFile(row),
   me: () => request<Session>('auth/me/'),
   register: (body: {email:string; password:string;full_name:string;organization_name:string}) => secureLogin('auth/register/', body),
   login: (email: string, password: string) => secureLogin('auth/login/', {email, password}),

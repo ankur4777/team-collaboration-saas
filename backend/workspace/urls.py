@@ -3,6 +3,7 @@ from .call_access import CallTranslateView
 from . import meeting_calls
 from . import meetings
 from . import private_attachments
+from . import shared_files
 from . import auth_views, views, member_views, chat_views, channel_notifications, account_recovery, settings_views, session_views, message_search, mentions
 
 urlpatterns = [
@@ -59,5 +60,7 @@ urlpatterns = [
     path('channels/<uuid:channel_id>/messages/<uuid:message_id>/', views.ChannelMessageDetailView.as_view()),
     path('channels/<uuid:channel_id>/attachments/', private_attachments.ChannelAttachmentsView.as_view()),
     path('attachments/<uuid:attachment_id>/download/', private_attachments.AttachmentDownloadView.as_view()),
+    path('files/', shared_files.WorkspaceFilesView.as_view()),
+    path('files/<uuid:file_id>/download/', shared_files.WorkspaceFileDownloadView.as_view()),
 ]
 
