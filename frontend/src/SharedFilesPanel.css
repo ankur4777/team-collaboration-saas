@@ -1,20 +1,20 @@
 .shared-files-page{flex:1;overflow:auto;padding:30px 38px;background:#f9fbf9;color:#294a3d}.shared-files-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;max-width:1080px}.shared-files-heading h1{font-size:28px;color:#204a38;margin:7px 0 8px}.shared-files-heading p{font-size:12px;color:#81998d}.shared-files-upload{display:inline-flex;align-items:center;gap:8px;flex-shrink:0;border-radius:9px;padding:12px 15px;background:#208d74;color:#fff;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 5px 12px #208d7423}.shared-files-upload:hover{background:#176f5b}.shared-files-upload.busy{opacity:.6;cursor:wait}.shared-files-upload input{width:1px;height:1px;position:absolute;opacity:0;pointer-events:none}.shared-files-toolbar{max-width:1080px;display:flex;align-items:center;justify-content:space-between;gap:15px;margin:26px 0 18px}.shared-files-search{display:flex;align-items:center;gap:10px;flex:1;max-width:500px;padding:7px 8px 7px 13px;border:1px solid #dce9e2;background:#fff;border-radius:11px;color:#27856c}.shared-files-search input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:#365649;font-size:12px}.shared-files-search input::placeholder{color:#9caaa4}.shared-files-search .outline-button{padding:8px 12px;font-size:11px}.shared-files-filter{display:flex;gap:5px;padding:4px;border:1px solid #dce9e2;border-radius:10px;background:#fff}.shared-files-filter button{border:0;border-radius:7px;background:transparent;padding:7px 10px;color:#688176;font-size:11px;font-weight:700;cursor:pointer}.shared-files-filter button.active{background:#e5f4ec;color:#217c63}.shared-files-summary{max-width:1080px;color:#789187;font-size:11px;font-weight:600;margin:0 0 10px}.shared-files-list{max-width:1080px;display:flex;flex-direction:column;gap:8px}.shared-file-row{display:flex;align-items:center;gap:14px;min-width:0;background:#fff;border:1px solid #e0ebe4;border-radius:12px;padding:14px 15px;box-shadow:0 4px 14px #16442b06}.shared-file-icon{width:39px;height:39px;flex:0 0 auto;display:grid;place-items:center;border-radius:10px;background:#e8f5ee;color:#278a6e}.shared-file-main{min-width:0;flex:1}.shared-file-main strong,.shared-file-main small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.shared-file-main strong{font-size:13px;color:#28503f}.shared-file-main small{font-size:11px;color:#82998e;margin-top:5px}.shared-file-download{display:inline-flex;align-items:center;gap:6px;border:1px solid #d5e6dc;background:#fff;border-radius:8px;padding:8px 10px;color:#2a8065;font-size:11px;font-weight:700;cursor:pointer}.shared-file-download:hover{background:#edf7f1}.shared-files-empty{max-width:1080px;min-height:245px;border:1px dashed #cddfd3;border-radius:15px;background:#fff;color:#6e9885;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:25px;gap:9px}.shared-files-empty h2{font-size:17px;color:#315843}.shared-files-empty p{font-size:12px;max-width:370px;line-height:1.6}.shared-files-error{max-width:1080px;margin-bottom:12px;padding:11px 12px;border:1px solid #f0d3cd;border-radius:9px;background:#fff3f0;color:#ab453b;font-size:12px}.shared-files-note{max-width:1080px;margin-top:16px;color:#879d91;font-size:11px;line-height:1.6}@media(max-width:700px){.shared-files-page{padding:20px 16px}.shared-files-heading{align-items:stretch;flex-direction:column}.shared-files-upload{align-self:flex-start}.shared-files-toolbar{align-items:stretch;flex-direction:column}.shared-files-search{max-width:none}.shared-files-filter{align-self:flex-start}.shared-file-row{align-items:flex-start;flex-wrap:wrap}.shared-file-main{min-width:calc(100% - 55px)}.shared-file-download{margin-left:53px}}
 
-/* Shabdd Technology product surface */
+/* Shabdd Technology "Our Product" inspired light surface */
 .shared-files-page{
   background:
-    radial-gradient(circle at 78% 0,#12344d 0,transparent 35%),
-    radial-gradient(circle at 5% 100%,#331419 0,transparent 34%),
-    linear-gradient(145deg,#05080e,#09131e 57%,#06090f);
-  color:#eaf0f5;
+    radial-gradient(circle at 82% -12%,#fff0f1 0,transparent 32%),
+    radial-gradient(circle at 4% 108%,#fff4f5 0,transparent 30%),
+    #fff;
+  color:#202b38;
 }
-.shared-files-heading h1{color:#fff}.shared-files-heading p,.shared-files-summary,.shared-files-note{color:#9fb0bf}
-.shared-files-upload{background:#f42a32;box-shadow:0 8px 22px #f42a3238}.shared-files-upload:hover{background:#d91e28}
-.shared-files-search,.shared-files-filter{background:#101a26;border-color:#2a3d50;color:#63e0d2}
-.shared-files-search input{color:#edf2f7}.shared-files-search input::placeholder{color:#7e91a3}
-.shared-files-filter button{color:#a8b6c2}.shared-files-filter button.active{background:#173547;color:#65e5d6}
-.shared-file-row{background:#0f1925;border-color:#26394d;box-shadow:0 10px 26px #0000002e}
-.shared-file-icon{background:#17364a;color:#62e1d3}.shared-file-main strong{color:#edf2f7}.shared-file-main small{color:#9aacbd}
-.shared-file-download{background:#142130;border-color:#31465a;color:#70e8d9}.shared-file-download:hover{background:#1a3042}
-.shared-files-empty{background:#0f1925;border-color:#3a5267;color:#9fb1c1}.shared-files-empty h2{color:#edf2f7}
-.shared-files-error{background:#29171b;border-color:#743438;color:#ffb3ae}
+.shared-files-heading h1{color:#172431}.shared-files-heading p,.shared-files-summary,.shared-files-note{color:#758394}
+.shared-files-upload{background:#f42a32;box-shadow:0 9px 24px #f42a3235}.shared-files-upload:hover{background:#da2029}
+.shared-files-search,.shared-files-filter{background:#fff;border-color:#e7ebef;box-shadow:0 8px 22px #f42a3208}
+.shared-files-search input{color:#2b3947}.shared-files-search input::placeholder{color:#a1aab5}
+.shared-files-filter button{color:#708092}.shared-files-filter button.active{background:#fff0f1;color:#e82c34}
+.shared-file-row{background:#fff;border-color:#edf0f4;box-shadow:0 10px 28px #f42a320c}
+.shared-file-icon{background:#fff0f1;color:#ef3038}.shared-file-main strong{color:#233140}.shared-file-main small{color:#7d8b9b}
+.shared-file-download{background:#fff;border-color:#f3cfd2;color:#e72d35}.shared-file-download:hover{background:#fff3f4}
+.shared-files-empty{background:#fff;border-color:#f2cfd2;color:#8090a0;box-shadow:0 12px 32px #f42a3208}.shared-files-empty h2{color:#263443}
+.shared-files-error{background:#fff2f2;border-color:#f8c7ca;color:#b52d35}
