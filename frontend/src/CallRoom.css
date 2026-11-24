@@ -1259,3 +1259,8 @@
 .in-call .call-stage-tools select{padding-top:4px;padding-bottom:4px}
 .in-call .call-grid.solo{padding:0 24px}
 .in-call>footer{padding-top:4px;padding-bottom:4px}
+
+
+/* Shabdd light product styling — Meeting call */
+.call-room{background:radial-gradient(circle at 82% -12%,#fff0f1 0,transparent 35%),#fff;color:#202c39}.call-room > header{background:#fff;border-color:#edf0f4;box-shadow:0 5px 20px #f42a3208}.call-room h2{color:#1f2c39}.call-brand,.call-eyebrow{color:#ee3038}.call-count{background:#fff0f1;color:#db2a33}
+.call-room button{background:#fff;border-color:#e4e8ed;color:#4a5865}.call-room button:hover:not(:disabled){background:#fff4f5;border-color:#ffc7cb}.call-room button[aria-pressed='true'],.call-room button[aria-expanded='true']{background:#fff0f1;color:#df2932;border-color:#ffc3c8}.call-room button:focus-visible,.call-room select:focus-visible,.call-room textarea:focus-visible{outline-color:#ffb6bb}

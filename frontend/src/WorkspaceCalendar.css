@@ -885,3 +885,8 @@
     margin: 0 !important;
   }
 }
+
+
+/* Shabdd light product styling — Calendar */
+.workspace-calendar{background:radial-gradient(circle at 83% -12%,#fff0f1 0,transparent 34%),#fff;color:#25323f}.workspace-calendar button{border-color:#e5e9ee;color:#4a5867;background:#fff}.workspace-calendar button:hover:not(:disabled){background:#fff3f4;border-color:#ffc8cc;color:#e42a33}
+.wc-brandbar{background:#fff;border-color:#edf0f4;color:#1d2936;box-shadow:0 6px 22px #f42a320b}.wc-brandbar h1{color:#1d2936}.wc-brandbar svg{color:#f42a32}.wc-search{border-color:#e6e9ee;box-shadow:0 7px 18px #f42a3208}.calendar-shell .calendar-layout.meeting-selected .meeting-detail{box-shadow:-10px 0 30px #f42a3214}
