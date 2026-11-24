@@ -323,3 +323,50 @@
 .app-layout .sidebar-bottom{flex-shrink:0;margin-top:0;background:#fbfcfc}
 .app-layout .main-panel{min-height:0;overflow:hidden}
 .app-layout .top-bar{flex-shrink:0}
+
+
+/* Shabdd Technology product-inspired workspace palette */
+:root{
+  --shabdd-ink:#05080e;
+  --shabdd-surface:#0b111a;
+  --shabdd-raised:#111a27;
+  --shabdd-line:#233245;
+  --shabdd-text:#edf2f7;
+  --shabdd-muted:#9aabba;
+  --shabdd-cyan:#20d7c8;
+  --shabdd-red:#f42a32;
+}
+body,.page-loader{background:var(--shabdd-ink);color:var(--shabdd-text)}
+.app-layout{
+  background:
+    radial-gradient(circle at 72% -18%,#12314b 0,transparent 34%),
+    radial-gradient(circle at 12% 108%,#331419 0,transparent 32%),
+    linear-gradient(145deg,#05080e 0%,#07111a 54%,#05080e 100%);
+}
+.sidebar,.app-layout .sidebar-bottom{background:#080d14;border-color:var(--shabdd-line)}
+.main-panel{background:transparent}
+.top-bar{background:#0a1019;border-color:var(--shabdd-line)}
+.top-bar-left{color:#8c9cac}.top-bar-left strong{color:var(--shabdd-text)}
+.sidebar .brand{color:#fff}.sidebar .brand-accent{color:var(--shabdd-cyan)}
+.sidebar .brand-mark{background:linear-gradient(135deg,var(--shabdd-cyan),#0f8d9c);box-shadow:0 8px 24px #10e5d02d}
+.org-picker{background:#101926;border-color:#27384b;box-shadow:none}
+.org-label strong{color:#edf2f7}.org-label small,.sidebar-title{color:#8496a9}
+.org-icon{background:#173144;color:#6cebdc}
+.nav-item{color:#aab9c6}.nav-item:hover,.nav-item.active{background:#122739;color:#6cebdc}
+.nav-item.active{box-shadow:inset 3px 0 0 var(--shabdd-cyan)}
+.sidebar-bottom,.profile{border-color:#203043}.profile-name strong{color:#edf2f7}.profile-name small{color:#8394a6}
+.workspace-heading,.chat-workspace,.channels-panel,.conversation-panel,.message-area{background:transparent}
+.workspace-heading h1,.conversation-top h3,.channel-intro h2{color:#edf2f7}
+.workspace-heading p,.conversation-top p,.channel-intro p{color:#9caebe}
+.channels-panel,.conversation-top,.message-compose{border-color:#233245}
+.channels-panel{background:#0a111a}.panel-title{color:#8496a9}
+.channel-card{color:#aab9c6}.channel-card.active,.channel-card:hover{background:#14263a;color:#73e8d9}
+.channel-help{background:#101c29;border-color:#21384a;color:#6de2d4}.channel-help strong{color:#d8e6ec}.channel-help p{color:#9bb3c2}
+.message-area{background:#0b121c}.msg-body{color:#d4e0e7}.msg-meta strong{color:#edf2f7}.msg-meta span{color:#8fa0b0}
+.compose-box{background:#101923;border-color:#2a3c4e;box-shadow:none}.compose-box input{color:#edf2f7}.compose-box input::placeholder{color:#718397}
+.primary-button{background:var(--shabdd-red);box-shadow:0 8px 20px #f42a3233}.primary-button:hover{background:#d91e28}
+.send-button{background:var(--shabdd-red)}
+.outline-button{background:#111b27;border-color:#314355;color:#d9e4ec}.outline-button:hover{background:#19283a}
+.modal{background:#0d151f;color:#edf2f7}.modal-head,.member-row,.quick-add{border-color:#243447}.modal label,.member-row strong{color:#eaf0f5}.modal input,.modal select,.member-role-select{background:#111c28;border-color:#2d4154;color:#eaf0f5}
+.future-page,.future-page p{color:#afbdc8}.future-icon{background:#132a3b;color:#56e1d2}
+.notification-popover{background:#0d151f;border-color:#27394c}.notification-head,.notification-foot{background:#0d151f;border-color:#243447}.notification-head strong,.notification-item strong{color:#edf2f7}.notification-item{background:#101a26;border-color:#243447;color:#68ddcf}.notification-item:hover{background:#17283a}
