@@ -3,8 +3,8 @@ import { Hash, MessageCircle, Search } from 'lucide-react';
 import { api, type MessageSearchResult, type SearchScope } from './api';
 
 interface Props {
-  onOpenChat: (chatId:string)=>void;
-  onOpenChannel: (teamId:string,channelId:string)=>void;
+  onOpenChat: (chatId:string,messageId:string)=>void;
+  onOpenChannel: (teamId:string,channelId:string,messageId:string)=>void;
 }
 
 function destinationName(item:MessageSearchResult) {
@@ -49,8 +49,8 @@ export default function MessageSearchPanel({onOpenChat,onOpenChannel}:Props) {
   }
 
   function openResult(item:MessageSearchResult){
-    if(item.source==='chat') onOpenChat(item.source_id);
-    else if(item.team_id) onOpenChannel(item.team_id,item.source_id);
+    if(item.source==='chat') onOpenChat(item.source_id,item.id);
+    else if(item.team_id) onOpenChannel(item.team_id,item.source_id,item.id);
   }
 
   return <div className="message-search-page">
@@ -104,7 +104,7 @@ export default function MessageSearchPanel({onOpenChat,onOpenChannel}:Props) {
         </span>
       </button>)}
       {searched&&cursor&&<button type="button" className="outline-button" disabled={busy} onClick={()=>void search(undefined,true)}>{busy?'Loading…':'Load more results'}</button>}
-      {searched&&results.length>0&&<p className="message-search-note">Selecting a result opens its conversation. Older messages may require loading more conversation history.</p>}
+      {searched&&results.length>0&&<p className="message-search-note">Selecting a result opens its conversation and highlights the exact message with surrounding history.</p>}
     </div>
   </div>;
 }

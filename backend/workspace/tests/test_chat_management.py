@@ -269,3 +269,21 @@ class ChatManagementTests(TestCase):
         self.assertEqual(len(self.client.get(base+'messages/').json()),2)
         self.assertEqual(self.write('POST',base+'archive/',{'archived':False}).status_code,200)
         self.assertIsNone(self.client.get('/api/chats/').json()[0]['archived_at'])
+
+    def test_message_context_and_personal_preferences(self):
+        org = self.register()
+        colleague = self.user(org, 'context@company-a.test')
+        chat = self.write('POST','/api/chats/',{'kind':'direct','email':colleague.email}).json()
+        base = f"/api/chats/{chat['id']}/"
+        original = self.write('POST',base+'messages/',{'body':'Find this'}).json()
+        for i in range(12):
+            self.write('POST',base+'messages/',{'body':f'Later {i}'})
+        result = self.client.get(base+'messages/'+original['id']+'/context/')
+        self.assertEqual(result.status_code,200)
+        self.assertEqual(result.json()['items'][0]['id'],original['id'])
+        self.assertEqual(len(result.json()['items']),11)
+        self.assertEqual(self.write('POST',base+'preferences/',{'is_muted':True,'is_pinned':True}).status_code,200)
+        self.assertTrue(self.client.get('/api/chats/').json()[0]['is_muted'])
+        self.login(colleague.email)
+        self.assertFalse(self.client.get('/api/chats/').json()[0]['is_muted'])
+        self.assertFalse(self.client.get('/api/chats/').json()[0]['is_pinned'])

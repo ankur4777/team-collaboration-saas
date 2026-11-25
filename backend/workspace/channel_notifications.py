@@ -30,7 +30,7 @@ class ChannelNotificationsView(APIView):
             .select_related('team').order_by('team__name', 'name')[:500]
         )
         read_times = {
-            state.channel_id: state.last_read_at
+            state.channel_id: state
             for state in ChannelReadCursor.objects.filter(
                 channel_id__in=[channel.pk for channel in channels],
                 user=request.user,
@@ -38,7 +38,8 @@ class ChannelNotificationsView(APIView):
         }
         result = []
         for channel in channels:
-            last_read = read_times.get(channel.pk)
+            state = read_times.get(channel.pk)
+            last_read = state.last_read_at if state else None
             baseline = joined_teams[channel.team_id]
             if last_read and last_read > baseline:
                 baseline = last_read
@@ -51,6 +52,8 @@ class ChannelNotificationsView(APIView):
                 'team_name': channel.team.name,
                 'joined_at': joined_teams[channel.team_id].isoformat(),
                 'unread_count': count,
+                'is_muted': bool(state and state.is_muted),
+                'is_pinned': bool(state and state.is_pinned),
                 'last_read_at': last_read.isoformat() if last_read else None,
             })
         return Response(result)

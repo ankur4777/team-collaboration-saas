@@ -7,6 +7,7 @@ import {ApiError} from './api';
 import AttachmentPanel from './AttachmentPanel';
 import MentionInput from './MentionInput';
 import ReplyPreview from './ReplyPreview';
+import MessageContext from './MessageContext';
 import {PresenceStatus,presenceLabel} from './WorkspacePresence';
 import PinnedMessages from './PinnedMessages';
 import ForwardMessageDialog from './ForwardMessageDialog';
@@ -25,9 +26,10 @@ function messageOrder(a: ChatMessage, b: ChatMessage) {
   return a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id);
 }
 
-interface Props { workspaceId: string|null; currentUser: Person; members: Member[]; presence?: PresenceMap; requestedChat?: {id:string;nonce:number}|null; onRead?: ()=>void }
+interface Props { workspaceId: string|null; currentUser: Person; members: Member[]; presence?: PresenceMap; requestedChat?: {id:string;nonce:number;messageId?:string}|null; onRead?: ()=>void }
 
 export default function ChatPanel({workspaceId, currentUser, members, presence={}, requestedChat, onRead}: Props) {
+  const [jumpClosed,setJumpClosed]=useState<number|null>(null);
   const [showArchived,setShowArchived]=useState(false);
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [selected, setSelected] = useState<string|null>(null);
@@ -244,7 +246,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
   const groupCandidates = colleagues.filter(m => !active?.participants.some(p => p.user.id === m.user.id));
   const visibleThreads = threads.filter(thread =>
     Boolean(thread.archived_at)===showArchived && titleFor(thread, currentUser.id).toLowerCase().includes(filter.toLowerCase()),
-  );
+  ).sort((a,b)=>Number(Boolean(b.is_pinned))-Number(Boolean(a.is_pinned)));
 
   async function loadOlder() {
     if (!selected || !historyCursor || loadingOlder || loadedChatId!==selected) return;
@@ -371,6 +373,12 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
     finally{setWorking(false);}
   }
 
+  async function changeChatPreference(key:'is_muted'|'is_pinned'){
+    if(!active||working)return;setWorking(true);setError('');
+    try{const result=await api.chatPreferences(active.id,{[key]:!active[key]});setThreads(old=>old.map(row=>row.id===active.id?{...row,...result}:row));onReadRef.current?.();}
+    catch(e){setError(e instanceof Error?e.message:'Could not update settings');}finally{setWorking(false);}
+  }
+
   async function archiveActiveChat(){
     if(!active||working)return;
     const archived=!active.archived_at;
@@ -427,7 +435,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
         <input className="chat-filter" aria-label="Search conversations" placeholder="Search conversations" value={filter} onChange={e => setFilter(e.target.value)}/>
         {visibleThreads.map(thread => <button type="button" key={thread.id} className={`chat-thread ${selected === thread.id ? 'selected' : ''}`} onClick={() => setSelected(thread.id)}>
           <span className="chat-thread-avatar">{thread.kind === 'group' ? <Users size={17}/> : initials(titleFor(thread,currentUser.id))}</span>
-          <span className="chat-thread-details"><strong>{titleFor(thread,currentUser.id)}</strong><small>{thread.kind === 'group' ? `${thread.participants.length} participants` : presenceLabel(presence[thread.participants.find(p=>p.user.id!==currentUser.id)?.user.id||''])}</small></span>
+          <span className="chat-thread-details"><strong>{thread.is_pinned?'★ ':''}{titleFor(thread,currentUser.id)}{thread.is_muted?' · Muted':''}</strong><small>{thread.kind === 'group' ? `${thread.participants.length} participants` : presenceLabel(presence[thread.participants.find(p=>p.user.id!==currentUser.id)?.user.id||''])}</small></span>
           {thread.unread_count>0&&<span className="chat-unread-badge" aria-label={`${thread.unread_count} unread messages`}>{thread.unread_count>99?'99+':thread.unread_count}</span>}
         </button>)}
         {visibleThreads.length === 0 && <div className="chat-list-empty">No conversations yet. Start a new chat with a colleague.</div>}
@@ -441,8 +449,10 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
             {active.kind==='group' && active.created_by.id===currentUser.id && <button type="button" className="group-manage-button" onClick={() => setManagingGroup(true)}><Users size={15}/> Manage group</button>}
             {active.kind==='group' && active.created_by.id!==currentUser.id && <button type="button" className="group-manage-button" disabled={working} onClick={() => void leaveGroup()}>Leave group</button>}
             <button type="button" className="group-manage-button" disabled={working} onClick={()=>void archiveActiveChat()}>{active.archived_at?'Restore chat':'Archive chat'}</button>
+            <button className="group-manage-button" type="button" disabled={working} onClick={()=>void changeChatPreference('is_pinned')}>{active.is_pinned?'Unpin chat':'Pin chat'}</button><button className="group-manage-button" type="button" disabled={working} onClick={()=>void changeChatPreference('is_muted')}>{active.is_muted?'Unmute':'Mute'}</button>
             <span className={`chat-connected ${connected ? 'yes' : ''}`} title={connected ? 'Live updates connected' : 'Messages saved; live updates unavailable'}/>
           </header>
+          {requestedChat?.id===selected&&requestedChat.messageId&&jumpClosed!==requestedChat.nonce&&<MessageContext key={requestedChat.nonce} kind="chat" id={selected!} messageId={requestedChat.messageId} onClose={()=>setJumpClosed(requestedChat.nonce)}/>}
           <PinnedMessages key={selected!} kind="chat" id={selected!} version={pinVersion} onUnpin={updated=>{if("reactions" in updated){setMessages(old=>old.map(row=>row.id===updated.id?updated as ChatMessage:row));setPinVersion(value=>value+1);}}}/>
           <div className="private-chat-history" ref={historyRef}>
             {historyCursor && <div style={{textAlign:"center",padding:"8px"}}><button type="button" className="outline-button" disabled={loadingOlder} onClick={()=>void loadOlder()}>{loadingOlder?"Loading…":"Load older messages"}</button></div>}

@@ -174,6 +174,9 @@ class ChannelReadCursor(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='channel_read_cursors')
     last_read_at = models.DateTimeField(null=True, blank=True)
 
+    is_muted = models.BooleanField(default=False)
+    is_pinned = models.BooleanField(default=False)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=['channel', 'user'], name='uq_channel_read_user'),
@@ -211,6 +214,9 @@ class ChatParticipant(models.Model):
     last_read_at = models.DateTimeField(null=True, blank=True)
 
     archived_at = models.DateTimeField(null=True, blank=True)
+
+    is_muted = models.BooleanField(default=False)
+    is_pinned = models.BooleanField(default=False)
 
     class Meta:
         constraints = [

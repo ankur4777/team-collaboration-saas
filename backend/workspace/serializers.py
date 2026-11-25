@@ -48,6 +48,20 @@ class ChatConversationSerializer(serializers.ModelSerializer):
     created_by = UserSerializer(read_only=True)
     unread_count = serializers.SerializerMethodField()
     archived_at = serializers.SerializerMethodField()
+    is_muted = serializers.SerializerMethodField()
+    is_pinned = serializers.SerializerMethodField()
+
+    def get_preference(self, obj, field):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        return next((getattr(p, field) for p in obj.participants.all() if p.user_id == request.user.pk), False)
+
+    def get_is_muted(self, obj):
+        return self.get_preference(obj, 'is_muted')
+
+    def get_is_pinned(self, obj):
+        return self.get_preference(obj, 'is_pinned')
 
     def get_archived_at(self, obj):
         request = self.context.get('request')
@@ -59,7 +73,7 @@ class ChatConversationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ChatConversation
-        fields = ('id', 'kind', 'title', 'created_at', 'updated_at', 'created_by', 'participants', 'unread_count', 'archived_at')
+        fields = ('id', 'kind', 'title', 'created_at', 'updated_at', 'created_by', 'participants', 'unread_count', 'archived_at', 'is_muted', 'is_pinned')
 
     def get_unread_count(self, obj):
         request = self.context.get('request')

@@ -7,6 +7,7 @@ from . import shared_files
 from . import message_forwarding
 from . import message_pins
 from . import presence
+from . import conversation_tools
 from . import auth_views, views, member_views, chat_views, channel_notifications, account_recovery, settings_views, session_views, message_search, mentions
 
 urlpatterns = [
@@ -49,6 +50,8 @@ urlpatterns = [
     path('messages/forward/', message_forwarding.ForwardMessageView.as_view()),
     path('messages/forward/destinations/', message_forwarding.ForwardDestinationsView.as_view()),
     path('chats/', chat_views.ChatsView.as_view()),
+    path('chats/<uuid:chat_id>/preferences/', conversation_tools.ChatPreferencesView.as_view()),
+    path('chats/<uuid:chat_id>/messages/<uuid:message_id>/context/', conversation_tools.ChatContextView.as_view()),
     path('chats/<uuid:chat_id>/archive/', chat_views.ChatArchiveView.as_view()),
     path('chats/<uuid:chat_id>/', chat_views.ChatGroupDetailView.as_view()),
     path('chats/<uuid:chat_id>/pins/', message_pins.ChatPinsView.as_view()),
@@ -75,6 +78,8 @@ urlpatterns = [
     path('teams/<uuid:team_id>/channels/<uuid:channel_id>/', views.ChannelDetailView.as_view()),
     path('teams/<uuid:team_id>/channels/', views.TeamChannelsView.as_view()),
     path('teams/<uuid:team_id>/members/', views.TeamMembersView.as_view()),
+    path('channels/<uuid:channel_id>/preferences/', conversation_tools.ChannelPreferencesView.as_view()),
+    path('channels/<uuid:channel_id>/messages/<uuid:message_id>/context/', conversation_tools.ChannelContextView.as_view()),
     path('channels/<uuid:channel_id>/pins/', message_pins.ChannelPinsView.as_view()),
     path('channels/<uuid:channel_id>/messages/<uuid:message_id>/pin/', message_pins.ChannelPinView.as_view()),
     path('channels/<uuid:channel_id>/messages/', views.ChannelMessagesView.as_view()),

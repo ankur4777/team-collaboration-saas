@@ -10,7 +10,9 @@ export interface Org { id: string; name: string; slug: string; role: 'owner' | '
 export interface Session { user: Person; organizations: Org[]; active_organization_id: string | null }
 export interface Team { id: string; name: string; description: string; created_at: string; archived_at?: string|null }
 export interface Channel { id: string; name: string; description: string; created_at: string; archived_at?: string|null }
+export interface ConversationPreferences {is_muted:boolean;is_pinned:boolean}
 export interface ChannelNotice {
+  is_muted?:boolean;is_pinned?:boolean;
   channel_id: string; channel_name: string; team_id: string; team_name: string;
   joined_at: string; unread_count: number; last_read_at: string|null;
 }
@@ -39,6 +41,7 @@ export type ForwardResult = {kind:'chat'|'channel';destination_id:string;message
 export interface ChannelMessageCursor { before:string; before_id:string }
 export interface ChannelMessagePage { items:Message[]; has_more:boolean; next_cursor:ChannelMessageCursor|null }
 export interface ChatThread {
+  is_muted?:boolean;is_pinned?:boolean;
   archived_at?: string|null;
   id: string; kind: 'direct'|'group'; title: string;
   created_at: string; updated_at: string; created_by: Person; unread_count: number;
@@ -147,6 +150,9 @@ async function downloadWorkspaceFile(row:WorkspaceFile): Promise<void> {
 }
 
 export const api = {
+  chatPreferences: (id:string,values:Partial<ConversationPreferences>) => post<ConversationPreferences>(`chats/${id}/preferences/`,values),
+  channelPreferences: (id:string,values:Partial<ConversationPreferences>) => post<ConversationPreferences>(`channels/${id}/preferences/`,values),
+  messageContext: (kind:'chat'|'channel',id:string,messageId:string) => request<{items:Message[]}>(`${kind==='chat'?'chats':'channels'}/${id}/messages/${messageId}/context/`),
   workspacePresence: (id:string) => post<{workspace_id:string;members:Presence[]}>(`organizations/${id}/presence/`,{}),
   chatAttachments: (chatId:string) => request<PrivateAttachment[]>(`chats/${chatId}/attachments/`),
   channelAttachments: (channelId:string) => request<PrivateAttachment[]>(`channels/${channelId}/attachments/`),

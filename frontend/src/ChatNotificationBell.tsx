@@ -121,8 +121,8 @@ export default function ChatNotificationBell({workspaceId,userId,emailVerified,o
     };
   },[workspaceId,refresh]);
 
-  const unreadChats=threads.filter(t=>t.unread_count>0 && (t.kind==='direct'?preferences.direct_chats:preferences.group_chats));
-  const unreadChannels=channels.filter(c=>c.unread_count>0&&preferences.team_channels);
+  const unreadChats=threads.filter(t=>t.unread_count>0 && !t.is_muted && (t.kind==='direct'?preferences.direct_chats:preferences.group_chats));
+  const unreadChannels=channels.filter(c=>c.unread_count>0&&!c.is_muted&&preferences.team_channels);
   const unreadMentions=mentions.filter(m=>!m.read_at && (
     m.kind==='channel'?preferences.team_channels:
     m.chat_kind==='group'?preferences.group_chats:preferences.direct_chats
