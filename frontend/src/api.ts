@@ -31,7 +31,7 @@ export interface WorkspaceFile {
   id:string; name:string; size:number; content_type:string;
   created_at:string; uploaded_by:Pick<Person,'id'|'full_name'|'email'>;
 }
-export interface Message { id: string; body: string; created_at: string; edited_at: string|null; deleted_at: string|null; sender: Person; reply_to_id?: string|null; is_forwarded?: boolean }
+export interface Message { id: string; body: string; created_at: string; edited_at: string|null; deleted_at: string|null; sender: Person; reply_to_id?: string|null; is_forwarded?: boolean; pinned_at?: string|null }
 export type ForwardDestination = {kind:'chat'|'channel';id:string;label:string};
 export type ForwardResult = {kind:'chat'|'channel';destination_id:string;message:Message|ChatMessage};
 export interface ChannelMessageCursor { before:string; before_id:string }
@@ -183,6 +183,10 @@ export const api = {
     if(filters){params.set('page','1');for(const [key,value] of Object.entries(filters))if(value)params.set(key,value);}
     return request<MessageSearchResponse>(`search/messages/?${params.toString()}`);
   },
+  channelPins: (id:string) => request<{items:Message[];has_more:boolean}>(`channels/${id}/pins/`),
+  chatPins: (id:string) => request<{items:ChatMessage[];has_more:boolean}>(`chats/${id}/pins/`),
+  pinChannelMessage: (id:string,messageId:string,pinned:boolean) => post<Message>(`channels/${id}/messages/${messageId}/pin/`,{pinned}),
+  pinChatMessage: (id:string,messageId:string,pinned:boolean) => post<ChatMessage>(`chats/${id}/messages/${messageId}/pin/`,{pinned}),
   forwardDestinations: () => request<ForwardDestination[]>('messages/forward/destinations/'),
   forwardMessage: (sourceKind:'chat'|'channel',sourceId:string,messageId:string,destination:ForwardDestination) => post<ForwardResult>('messages/forward/',{source_kind:sourceKind,source_id:sourceId,message_id:messageId,destination_kind:destination.kind,destination_id:destination.id}),
   chats: () => request<ChatThread[]>('chats/'),

@@ -355,7 +355,8 @@ class ChannelMessageDetailView(APIView):
                 MentionNotification.objects.filter(channel_message=message).delete()
                 message.body = ''
                 message.deleted_at = timezone.now()
-                message.save(update_fields=['body', 'deleted_at'])
+                message.pinned_at = None
+                message.save(update_fields=['body', 'deleted_at', 'pinned_at'])
                 payload = MessageSerializer(message).data
                 transaction.on_commit(
                     lambda: broadcast_message(channel.pk, payload, action='message.deleted')

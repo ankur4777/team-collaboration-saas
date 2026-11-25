@@ -7,6 +7,7 @@ import ChatPanel from './ChatPanel';
 import MeetingsPanel, {ChannelMeetingCards} from './MeetingsPanel';
 import ChannelMessageItem from './ChannelMessageItem';
 import ReplyPreview from './ReplyPreview';
+import PinnedMessages from './PinnedMessages';
 import ForwardMessageDialog from './ForwardMessageDialog';
 import AttachmentPanel from './AttachmentPanel';
 import MentionInput from './MentionInput';
@@ -113,6 +114,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   const channelAutoScrollRef = useRef(true);
   const [selectedTeam,setSelectedTeam] = useState<string|null>(null);
   const [channels,setChannels] = useState<Channel[]>([]);const [selectedChannel,setSelectedChannel] = useState<string|null>(null);
+  const [pinVersion,setPinVersion]=useState(0);
   const [messages,setMessages] = useState<Message[]>([]); const [members,setMembers] = useState<Member[]>([]);
   const [newTeam,setNewTeam] = useState(''); const [newChannel,setNewChannel] = useState('');
   const [inviteEmail,setInviteEmail] = useState('');const [inviteRole,setInviteRole] = useState('member');
@@ -199,7 +201,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
       const payload=JSON.parse(event.data) as {type:string;message:Message};
       if(!open||!payload.message)return;
       if(payload.type==='message')setMessages(old=>old.some(m=>m.id===payload.message.id)?old:[...old,payload.message]);
-      else if(payload.type==='message.updated'||payload.type==='message.deleted')setMessages(old=>old.map(row=>row.id===payload.message.id?payload.message:row));
+      else if(payload.type==='message.updated'||payload.type==='message.deleted'){setMessages(old=>old.map(row=>row.id===payload.message.id?payload.message:row));setPinVersion(value=>value+1);}
     }catch{/* Ignore malformed server messages */}};
     return()=>{open=false;socket.close();};
   },[selectedChannel]);
@@ -338,6 +340,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
     <><div className="workspace-heading"><div><div className="eyebrow">YOUR WORKSPACE / TEAMS</div><h1>{activeTeam.name}</h1><p className="muted">Collaborate, share updates, and keep your team in sync.</p></div><div className="heading-actions">{(myTeamRole==='owner'||activeOrg?.role==='owner'||activeOrg?.role==='admin')&&<button className="outline-button" disabled={pending} onClick={()=>renameTeamOrChannel()}>Rename team</button>}<button className="outline-button" onClick={()=>setModal('members')}><Users size={16}/> Manage members</button><button className="primary-button" onClick={()=>setModal('channel')}><Plus size={17}/> New channel</button></div></div>
       <div className="chat-workspace"><section className="channels-panel"><div className="panel-title">CHANNELS <button className="icon-button" title="New channel" onClick={()=>setModal('channel')}><Plus size={17}/></button></div>{channels.map(ch=><button className={`channel-card ${selectedChannel===ch.id?'active':''}`} key={ch.id} onClick={()=>setSelectedChannel(ch.id)}><span className="channel-symbol"><Hash size={17}/></span><span>{ch.name}</span>{channelUnread(ch.id)>0&&<span className="channel-unread-count" aria-label={`${channelUnread(ch.id)} unread messages`}>{channelUnread(ch.id)>99?'99+':channelUnread(ch.id)}</span>}{selectedChannel===ch.id&&<span className="selected-indicator"/>}</button>)}<div className="channel-help"><Sparkles size={18}/><strong>A place for every topic</strong><p>Create channels to keep discussions organized.</p></div></section>
         <section className="conversation-panel">{activeChannel?<><div className="conversation-top"><div className="channel-avatar"><Hash size={23}/></div><div><h3>{activeChannel.name}</h3><p>{activeTeam.name} · {connected?'Live updates connected':'Messages are saved securely'}</p></div>{(myTeamRole==='owner'||activeOrg?.role==='owner'||activeOrg?.role==='admin')&&<button className="outline-button" disabled={pending} onClick={()=>renameTeamOrChannel(true)}>Rename channel</button>}<span className={`connection-light ${connected?'online':''}`} title={connected?'WebSocket connected':'WebSocket disconnected'}/></div>
+          <PinnedMessages key={selectedChannel!} kind="channel" id={selectedChannel!} version={pinVersion} onUnpin={updated=>{setMessages(old=>old.map(row=>row.id===updated.id?updated:row));setPinVersion(value=>value+1);}}/>
           <div className="message-area" ref={channelScrollRef} onScroll={e=>{
               const el=e.currentTarget;
               if(!olderRequestRef.current&&!channelScrollAnchorRef.current){
@@ -348,7 +351,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
             <button className="channel-load-older" type="button" disabled={channelLoadingOlder}
               aria-label="Load older channel messages"
               onClick={()=>void loadOlderChannelMessages()}>{channelLoadingOlder?'Loading older messages…':'Load older messages'}</button>}
-            {messages.map((message,index)=><ChannelMessageItem key={message.id} channelId={selectedChannel!} message={message} onForward={()=>setForwardId(message.id)} replyTarget={messages.find(row=>row.id===message.reply_to_id)} onReply={()=>setReplyTo({channelId:selectedChannel!,messageId:message.id})} isMine={message.sender.id===session.user.id} samePerson={messages[index-1]?.sender.id===message.sender.id} onUpdated={updated=>setMessages(current=>current.map(row=>row.id===updated.id?updated:row))}/>)}</div></div>
+            {messages.map((message,index)=><ChannelMessageItem key={message.id} channelId={selectedChannel!} message={message} onForward={()=>setForwardId(message.id)} replyTarget={messages.find(row=>row.id===message.reply_to_id)} onReply={()=>setReplyTo({channelId:selectedChannel!,messageId:message.id})} isMine={message.sender.id===session.user.id} samePerson={messages[index-1]?.sender.id===message.sender.id} onUpdated={updated=>{setMessages(current=>current.map(row=>row.id===updated.id?updated:row));setPinVersion(value=>value+1);}}/>)}</div></div>
           <ChannelMeetingCards key={'meetings-'+selectedChannel} channelId={selectedChannel!} onOpen={id=>{setOpenMeetingRequest({id,nonce:Date.now()});setView('meetings');setSidebarOpen(false);}}/>
           <div className="channel-meeting-shortcut"><button className="text-link" onClick={()=>{setView('meetings');setSidebarOpen(false);}}><Video size={15}/>Open workspace meetings</button></div>
           <AttachmentPanel key={selectedChannel!} kind="channel" parentId={selectedChannel!}/>

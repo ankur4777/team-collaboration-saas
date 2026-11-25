@@ -36,13 +36,21 @@ export default function ChannelMessageItem({channelId,message,isMine,samePerson,
     finally{setBusy(false);}
   }
 
+  async function pin(){
+    if(busy||message.deleted_at)return;
+    setBusy(true);setError('');
+    try{onUpdated(await api.pinChannelMessage(channelId,message.id,!message.pinned_at));}
+    catch(e){setError(e instanceof Error?e.message:'Could not change pin');}
+    finally{setBusy(false);}
+  }
+
   async function remove() {
     if(busy || !window.confirm('Delete this message?'))return;
     setBusy(true);setError('');
     try {
       await api.deleteChannelMessage(channelId,message.id);
       setEditing(false);
-      onUpdated({...message,body:'',deleted_at:new Date().toISOString()});
+      onUpdated({...message,body:'',pinned_at:null,deleted_at:new Date().toISOString()});
     }catch(err){setError(err instanceof Error?err.message:'Could not delete message');}
     finally{setBusy(false);}
   }
@@ -51,6 +59,7 @@ export default function ChannelMessageItem({channelId,message,isMine,samePerson,
     {!samePerson?<div className="msg-avatar">{initials(message.sender.full_name)}</div>:<div className="msg-avatar-placeholder"/>}
     <div className="msg-content">
       {!samePerson&&<div className="msg-meta"><strong>{message.sender.full_name}</strong><span>{new Date(message.created_at).toLocaleString([], {hour:'2-digit',minute:'2-digit'})}</span></div>}
+      {!message.deleted_at&&message.pinned_at&&<div className="forwarded-label">Pinned</div>}
       {!message.deleted_at&&message.is_forwarded&&<div className="forwarded-label">Forwarded</div>}
       {!message.deleted_at&&message.reply_to_id&&<ReplyPreview message={replyTarget}/>}
       {editing && !message.deleted_at
@@ -65,6 +74,7 @@ export default function ChannelMessageItem({channelId,message,isMine,samePerson,
         </div>}
       {!message.deleted_at && !editing && onReply&&<div className="channel-message-actions"><button type="button" onClick={onReply}>Reply</button></div>}
       {!message.deleted_at&&!editing&&onForward&&<div className="channel-message-actions"><button type="button" onClick={onForward}>Forward</button></div>}
+      {!message.deleted_at&&!editing&&<div className="channel-message-actions"><button type="button" disabled={busy} onClick={()=>void pin()}>{message.pinned_at?'Unpin':'Pin'}</button></div>}
       {isMine && !message.deleted_at && !editing &&
         <div className="channel-message-actions">
           <button type="button" disabled={busy} onClick={()=>{setDraft(message.body);setError('');setEditing(true);}}>Edit</button>

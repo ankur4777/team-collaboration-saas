@@ -5,6 +5,7 @@ import ChatReactionBar from './ChatReactionBar';
 import AttachmentPanel from './AttachmentPanel';
 import MentionInput from './MentionInput';
 import ReplyPreview from './ReplyPreview';
+import PinnedMessages from './PinnedMessages';
 import ForwardMessageDialog from './ForwardMessageDialog';
 
 function titleFor(chat: ChatThread, userId: string) {
@@ -26,6 +27,7 @@ interface Props { workspaceId: string|null; currentUser: Person; members: Member
 export default function ChatPanel({workspaceId, currentUser, members, requestedChat, onRead}: Props) {
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [selected, setSelected] = useState<string|null>(null);
+  const [pinVersion,setPinVersion]=useState(0);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [historyCursor, setHistoryCursor] = useState<ChannelMessageCursor|null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -159,7 +161,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
             ? current : [...current, payload.message].sort(messageOrder));
           void loadThreads();
         } else if ((payload.type === 'message.updated' || payload.type === 'message.deleted') && payload.message) {
-          setMessages(current => current.map(row => row.id === payload.message.id ? payload.message : row));
+          setMessages(current => current.map(row => row.id === payload.message.id ? payload.message : row));setPinVersion(value=>value+1);
         } else if (payload.type === 'participants_changed') {
           void loadThreads();
         }
@@ -289,7 +291,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
     setError('');
     try {
       const updated = await api.editChatMessage(selected, messageId, editDraft);
-      setMessages(current => current.map(row => row.id === updated.id ? updated : row));
+      setMessages(current => current.map(row => row.id === updated.id ? updated : row));setPinVersion(value=>value+1);
       setEditingId(null);
       setEditDraft('');
     } catch (e) {
@@ -305,8 +307,9 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
       await api.deleteChatMessage(selected, message.id);
       if(scopeRef.current.selected===selected && scopeRef.current.workspaceId===workspaceId) {
         setMessages(current => current.map(row => row.id===message.id && !row.deleted_at
-          ? {...row, body:'', deleted_at:new Date().toISOString(), reactions:[]} : row));
+          ? {...row, body:'', pinned_at:null, deleted_at:new Date().toISOString(), reactions:[]} : row));
       }
+      setPinVersion(value=>value+1);
       if (editingId === message.id) setEditingId(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not delete message');
@@ -337,6 +340,16 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not remove teammate');
     } finally { setWorking(false); }
+  }
+
+  async function pinMessage(message:ChatMessage){
+    if(!selected||working||message.deleted_at)return;
+    const chatId=selected,orgId=workspaceId;
+    setWorking(true);setError('');
+    try{const updated=await api.pinChatMessage(chatId,message.id,!message.pinned_at);
+      if(scopeRef.current.selected===chatId&&scopeRef.current.workspaceId===orgId){setMessages(old=>old.map(row=>row.id===updated.id?updated:row));setPinVersion(value=>value+1);}
+    }catch(e){setError(e instanceof Error?e.message:'Could not change pin');}
+    finally{setWorking(false);}
   }
 
   async function renameGroup(){
@@ -401,11 +414,13 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
             {active.kind==='group' && active.created_by.id!==currentUser.id && <button type="button" className="group-manage-button" disabled={working} onClick={() => void leaveGroup()}>Leave group</button>}
             <span className={`chat-connected ${connected ? 'yes' : ''}`} title={connected ? 'Live updates connected' : 'Messages saved; live updates unavailable'}/>
           </header>
+          <PinnedMessages key={selected!} kind="chat" id={selected!} version={pinVersion} onUnpin={updated=>{if("reactions" in updated){setMessages(old=>old.map(row=>row.id===updated.id?updated as ChatMessage:row));setPinVersion(value=>value+1);}}}/>
           <div className="private-chat-history" ref={historyRef}>
             {historyCursor && <div style={{textAlign:"center",padding:"8px"}}><button type="button" className="outline-button" disabled={loadingOlder} onClick={()=>void loadOlder()}>{loadingOlder?"Loading…":"Load older messages"}</button></div>}
             {messages.length === 0 && <div className="private-chat-welcome"><MessageCircle size={30}/><h3>Start the conversation</h3><p>Only participants in this workspace can read these messages.</p></div>}
             {messages.map(message => <div key={message.id} className={`private-message ${message.sender.id===currentUser.id ? 'mine' : ''}`}>
               <div className="private-message-meta"><strong>{message.sender.full_name}</strong><time>{timeFor(message.created_at)}</time></div>
+              {!message.deleted_at&&message.pinned_at&&<div className="forwarded-label">Pinned</div>}
               {!message.deleted_at&&message.is_forwarded&&<div className="forwarded-label">Forwarded</div>}
               {!message.deleted_at&&message.reply_to_id&&<ReplyPreview message={messages.find(row=>row.id===message.reply_to_id)}/>}
               {editingId===message.id ? <form className="message-edit-form" onSubmit={e => void editMessage(e,message.id)}>
@@ -419,7 +434,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
               }</div>}
               <ChatReactionBar chatId={selected!} message={message} currentUserId={currentUser.id}
                 onUpdated={updated=>setMessages(current=>current.map(item=>item.id===updated.id?updated:item))}/>
-              {!message.deleted_at&&editingId!==message.id&&<div className="private-message-actions"><button type="button" disabled={working} onClick={()=>setReplyTo({chatId:selected!,messageId:message.id})} >Reply</button><button type="button" disabled={working} onClick={()=>setForwardId(message.id)}>Forward</button></div>}
+              {!message.deleted_at&&editingId!==message.id&&<div className="private-message-actions"><button type="button" disabled={working} onClick={()=>setReplyTo({chatId:selected!,messageId:message.id})} >Reply</button><button type="button" disabled={working} onClick={()=>setForwardId(message.id)} >Forward</button><button type="button" disabled={working} onClick={()=>void pinMessage(message)}>{message.pinned_at?'Unpin':'Pin'}</button></div>}
               {message.sender.id===currentUser.id && !message.deleted_at && editingId!==message.id && <div className="private-message-actions"><button type="button" disabled={working} onClick={() => {setEditingId(message.id);setEditDraft(message.body);}}>Edit</button><button type="button" disabled={working} onClick={() => void deleteMessage(message)}>Delete</button></div>}
             </div>)}
             <div ref={bottomRef}/>

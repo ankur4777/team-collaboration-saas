@@ -206,3 +206,21 @@ class ChannelMessageEditDeleteTests(TestCase):
         self.login(self.owner.email)
         self.assertEqual(self.delete(self.detail_url(original['id'])).status_code, 204)
         self.assertEqual(self.post(url, {'body':'Wrong','reply_to_id':original['id']}).status_code, 400)
+
+    def test_shared_channel_pins_are_visible_only_to_current_history(self):
+        original = self.send_message('Important')
+        base = f'/api/channels/{self.channel.pk}/'
+        url = base+'messages/'+original['id']+'/pin/'
+        self.assertEqual(self.post(url,{'pinned':True}).status_code,200)
+        self.assertEqual(self.client.get(base+'pins/').json()['items'][0]['id'],original['id'])
+        late = self.employee('late@a.test','Late',join_team=True)
+        outsider = self.employee('outside@a.test','Outside')
+        self.login(late.email)
+        self.assertEqual(self.client.get(base+'pins/').json()['items'],[])
+        self.assertEqual(self.post(url,{'pinned':False}).status_code,404)
+        self.login(outsider.email)
+        self.assertEqual(self.client.get(base+'pins/').status_code,403)
+        self.login(self.owner.email)
+        self.assertEqual(self.delete(self.detail_url(original['id'])).status_code,204)
+        self.assertEqual(self.client.get(base+'pins/').json()['items'],[])
+        self.assertIsNone(Message.objects.get(pk=original['id']).pinned_at)

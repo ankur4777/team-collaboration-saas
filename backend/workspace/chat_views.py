@@ -386,7 +386,8 @@ class ChatMessageDetailView(APIView):
                 # Soft-delete without retaining deleted message contents.
                 message.body = ''
                 message.deleted_at = timezone.now()
-                message.save(update_fields=['body', 'deleted_at'])
+                message.pinned_at = None
+                message.save(update_fields=['body', 'deleted_at', 'pinned_at'])
                 message.reactions.all().delete()
                 payload = ChatMessageSerializer(message).data
                 transaction.on_commit(

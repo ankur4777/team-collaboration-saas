@@ -32,7 +32,7 @@ class MessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
     class Meta:
         model = Message
-        fields = ('id', 'body', 'created_at', 'edited_at', 'deleted_at', 'sender', 'reply_to_id', 'is_forwarded')
+        fields = ('id', 'body', 'created_at', 'edited_at', 'deleted_at', 'sender', 'reply_to_id', 'is_forwarded', 'pinned_at')
 
 
 class ChatParticipantSerializer(serializers.ModelSerializer):
@@ -85,4 +85,4 @@ class ChatMessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ChatMessage
-        fields = ('id', 'body', 'created_at', 'edited_at', 'deleted_at', 'sender', 'reactions', 'reply_to_id', 'is_forwarded')
+        fields = ('id', 'body', 'created_at', 'edited_at', 'deleted_at', 'sender', 'reactions', 'reply_to_id', 'is_forwarded', 'pinned_at')
