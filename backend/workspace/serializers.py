@@ -28,10 +28,11 @@ class ChannelSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'description', 'created_at')
 
 class MessageSerializer(serializers.ModelSerializer):
+    reply_to_id = serializers.UUIDField(read_only=True, allow_null=True)
     sender = UserSerializer(read_only=True)
     class Meta:
         model = Message
-        fields = ('id', 'body', 'created_at', 'edited_at', 'deleted_at', 'sender')
+        fields = ('id', 'body', 'created_at', 'edited_at', 'deleted_at', 'sender', 'reply_to_id')
 
 
 class ChatParticipantSerializer(serializers.ModelSerializer):
@@ -66,6 +67,7 @@ class ChatConversationSerializer(serializers.ModelSerializer):
 
 
 class ChatMessageSerializer(serializers.ModelSerializer):
+    reply_to_id = serializers.UUIDField(read_only=True, allow_null=True)
     sender = UserSerializer(read_only=True)
     reactions = serializers.SerializerMethodField()
 
@@ -83,4 +85,4 @@ class ChatMessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ChatMessage
-        fields = ('id', 'body', 'created_at', 'edited_at', 'deleted_at', 'sender', 'reactions')
+        fields = ('id', 'body', 'created_at', 'edited_at', 'deleted_at', 'sender', 'reactions', 'reply_to_id')

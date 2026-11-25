@@ -171,3 +171,25 @@ class ChatManagementTests(TestCase):
         self.login(first.email)
         self.assertEqual(self.write('PATCH', url, {'title':'Forbidden'}).status_code, 403)
         self.assertEqual(self.client.get('/api/chats/').json()[0]['title'], 'Renamed')
+
+    def test_reply_targets_require_visible_history_in_same_chat(self):
+        org = self.register()
+        a = self.user(org, 'alice@company-a.test')
+        b = self.user(org, 'bob@company-a.test')
+        late = self.user(org, 'late@company-a.test')
+        group = self.write('POST', '/api/chats/', {'kind':'group','title':'Replies','emails':[a.email,b.email]}).json()
+        url = f"/api/chats/{group['id']}/messages/"
+        original = self.write('POST', url, {'body':'Original secret'}).json()
+        sent = self.write('POST', url, {'body':'Reply','reply_to_id':original['id']})
+        self.assertEqual(sent.status_code, 201, sent.content)
+        self.assertEqual(sent.json()['reply_to_id'], original['id'])
+        self.assertNotIn('Original secret', str(sent.json()))
+        direct = self.write('POST','/api/chats/',{'kind':'direct','email':a.email}).json()
+        other = f"/api/chats/{direct['id']}/messages/"
+        self.assertEqual(self.write('POST', other, {'body':'Wrong','reply_to_id':original['id']}).status_code, 400)
+        self.assertEqual(self.write('POST',f"/api/chats/{group['id']}/participants/",{'email':late.email}).status_code,201)
+        self.login(late.email)
+        self.assertEqual(self.write('POST',url,{'body':'Wrong','reply_to_id':original['id']}).status_code,400)
+        self.login('owner@company-a.test')
+        self.assertEqual(self.write('DELETE',url+original['id']+'/').status_code,204)
+        self.assertEqual(self.write('POST',url,{'body':'Wrong','reply_to_id':original['id']}).status_code,400)

@@ -20,6 +20,7 @@ from .models import Channel, Invitation, MentionNotification, Message, Organizat
 from .permissions import get_active_membership, require_channel_access, require_team_access
 from .notification_events import publish_notification_refresh
 from .mentions import create_mentions
+from .message_replies import resolve_reply_target
 from .serializers import OrganizationMemberSerializer, TeamSerializer, ChannelSerializer, MessageSerializer
 
 logger = logging.getLogger(__name__)
@@ -288,7 +289,9 @@ class ChannelMessagesView(APIView):
         if not body or len(body) > 4000:
             raise ValidationError({'body': 'Message must contain 1–4000 characters'})
         with transaction.atomic():
-            message = Message.objects.create(channel=channel, sender=request.user, body=body)
+            joined = TeamMember.objects.get(team=channel.team, user=request.user).joined_at
+            reply_id = resolve_reply_target(request, Message.objects.filter(channel=channel, created_at__gte=joined))
+            message = Message.objects.create(channel=channel, sender=request.user, body=body, reply_to_id=reply_id)
             eligible_members = list(TeamMember.objects.filter(
                 team=channel.team,
                 user__organization_memberships__organization_id=channel.team.organization_id,

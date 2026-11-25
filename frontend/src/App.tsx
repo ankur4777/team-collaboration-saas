@@ -6,6 +6,7 @@ import { api, csrf, type Channel, type ChannelMessageCursor, type ChannelNotice,
 import ChatPanel from './ChatPanel';
 import MeetingsPanel, {ChannelMeetingCards} from './MeetingsPanel';
 import ChannelMessageItem from './ChannelMessageItem';
+import ReplyPreview from './ReplyPreview';
 import AttachmentPanel from './AttachmentPanel';
 import MentionInput from './MentionInput';
 import EmailPanel from './EmailPanel';
@@ -117,6 +118,8 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   const [teamMemberEmail,setTeamMemberEmail] = useState('');
   const [inviteResult,setInviteResult] = useState('');
   const [memberBusyId,setMemberBusyId] = useState<string|null>(null);
+  const [replyTo,setReplyTo] = useState<{channelId:string;messageId:string}|null>(null);
+  const replyTarget=replyTo?.channelId===selectedChannel?messages.find(row=>row.id===replyTo.messageId&&!row.deleted_at):undefined;
   const [draft,setDraft] = useState(''); const [pending,setPending] = useState(false);
   const [teamMentionPeople,setTeamMentionPeople] = useState<Person[]>([]);
   const [teamRoster,setTeamRoster] = useState<Array<{user:Person;role:string}>>([]);
@@ -261,7 +264,15 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   }
   async function changeMemberRole(member:Member, role:'admin'|'member') {if(!activeOrg || member.role===role)return;setError('');setMemberBusyId(member.id);try {await api.updateMemberRole(activeOrg.id,member.id,role);setMembers(await api.members(activeOrg.id));}catch(e){setError(errorText(e));}finally{setMemberBusyId(null);}}
   async function removeEmployee(member:Member) {if(!activeOrg)return;if(!window.confirm(`Remove ${member.user.full_name} from ${activeOrg.name}? They will lose access to its teams and channels.`))return;setError('');setMemberBusyId(member.id);try{await api.removeMember(activeOrg.id,member.id);setMembers(await api.members(activeOrg.id));}catch(e){setError(errorText(e));}finally{setMemberBusyId(null);}}
-  async function send(e:FormEvent){e.preventDefault();if(!selectedChannel||!draft.trim())return;const body=draft;setDraft('');try{const message=await api.sendMessage(selectedChannel,body);channelAutoScrollRef.current=true;setMessages(old=>old.some(m=>m.id===message.id)?old:[...old,message]);}catch(err){setDraft(body);setError(errorText(err));}}
+  useEffect(()=>{setReplyTo(null);},[selectedChannel,session.active_organization_id]);
+  async function send(e:FormEvent){e.preventDefault();if(!selectedChannel||!draft.trim())return;
+    const channelId=selectedChannel,orgId=session.active_organization_id,body=draft,original=replyTarget?.id;
+    setDraft('');setReplyTo(null);
+    try{const message=await api.sendMessage(channelId,body,original);
+      if(selectedChannelRef.current!==channelId||currentOrgRef.current!==orgId)return;
+      channelAutoScrollRef.current=true;setMessages(old=>old.some(m=>m.id===message.id)?old:[...old,message]);
+    }catch(err){if(selectedChannelRef.current===channelId&&currentOrgRef.current===orgId){setDraft(current=>current||body);if(original)setReplyTo(current=>current||{channelId,messageId:original});setError(errorText(err));}}
+  }
 
   async function loadOlderChannelMessages(){
     const channelId=selectedChannel;
@@ -334,11 +345,11 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
             <button className="channel-load-older" type="button" disabled={channelLoadingOlder}
               aria-label="Load older channel messages"
               onClick={()=>void loadOlderChannelMessages()}>{channelLoadingOlder?'Loading older messages…':'Load older messages'}</button>}
-            {messages.map((message,index)=><ChannelMessageItem key={message.id} channelId={selectedChannel!} message={message} isMine={message.sender.id===session.user.id} samePerson={messages[index-1]?.sender.id===message.sender.id} onUpdated={updated=>setMessages(current=>current.map(row=>row.id===updated.id?updated:row))}/>)}</div></div>
+            {messages.map((message,index)=><ChannelMessageItem key={message.id} channelId={selectedChannel!} message={message} replyTarget={messages.find(row=>row.id===message.reply_to_id)} onReply={()=>setReplyTo({channelId:selectedChannel!,messageId:message.id})} isMine={message.sender.id===session.user.id} samePerson={messages[index-1]?.sender.id===message.sender.id} onUpdated={updated=>setMessages(current=>current.map(row=>row.id===updated.id?updated:row))}/>)}</div></div>
           <ChannelMeetingCards key={'meetings-'+selectedChannel} channelId={selectedChannel!} onOpen={id=>{setOpenMeetingRequest({id,nonce:Date.now()});setView('meetings');setSidebarOpen(false);}}/>
           <div className="channel-meeting-shortcut"><button className="text-link" onClick={()=>{setView('meetings');setSidebarOpen(false);}}><Video size={15}/>Open workspace meetings</button></div>
           <AttachmentPanel key={selectedChannel!} kind="channel" parentId={selectedChannel!}/>
-           <form className="message-compose" onSubmit={send}><div className="compose-box"><MentionInput value={draft} onChange={setDraft} people={teamMentionPeople.filter(person=>person.id!==session.user.id)} placeholder={`Message #${activeChannel.name}`} ariaLabel="New message"/><button type="submit" className="send-button" disabled={!draft.trim()} aria-label="Send message"><Send size={18}/></button></div><div className="compose-caption">Type @ to mention a teammate · Enter to send · Only team members can read this channel</div></form>
+           <form className="message-compose" onSubmit={send}>{replyTarget&&<ReplyPreview message={replyTarget} onCancel={()=>setReplyTo(null)}/>}<div className="compose-box"><MentionInput value={draft} onChange={setDraft} people={teamMentionPeople.filter(person=>person.id!==session.user.id)} placeholder={`Message #${activeChannel.name}`} ariaLabel="New message"/><button type="submit" className="send-button" disabled={!draft.trim()} aria-label="Send message"><Send size={18}/></button></div><div className="compose-caption">Type @ to mention a teammate · Enter to send · Only team members can read this channel</div></form>
         </>:<Empty icon={<Hash size={32}/>} title="Choose a channel" description="Select a channel to see its conversations."/>}</section></div>
     </>}
   </>:view==='chats' ? <ChatPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id} currentUser={session.user} members={members} requestedChat={openChatRequest} onRead={()=>setNotificationRefresh(current=>current+1)}/>

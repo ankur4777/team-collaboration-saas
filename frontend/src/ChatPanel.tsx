@@ -4,6 +4,7 @@ import { api, type ChatMessage, type ChannelMessageCursor, type ChatThread, type
 import ChatReactionBar from './ChatReactionBar';
 import AttachmentPanel from './AttachmentPanel';
 import MentionInput from './MentionInput';
+import ReplyPreview from './ReplyPreview';
 
 function titleFor(chat: ChatThread, userId: string) {
   if (chat.kind === 'group') return chat.title;
@@ -33,6 +34,8 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
   const scopeRef = useRef({selected,workspaceId});
   scopeRef.current = {selected,workspaceId};
   const [draft, setDraft] = useState('');
+  const [replyTo,setReplyTo] = useState<{chatId:string;messageId:string}|null>(null);
+  const replyTarget=replyTo?.chatId===selected?messages.find(row=>row.id===replyTo.messageId&&!row.deleted_at):undefined;
   const [mode, setMode] = useState<'direct'|'group'|null>(null);
   const [directEmail, setDirectEmail] = useState('');
   const [groupTitle, setGroupTitle] = useState('');
@@ -94,6 +97,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
   },[currentUser.id]);
 
   useEffect(() => {
+    setReplyTo(null);
     historyRequestRef.current++;
     setHistoryCursor(null);
     setLoadingOlder(false);
@@ -258,19 +262,20 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
     e.preventDefault();
     if (!selected || !draft.trim() || working) return;
     const body = draft.trim();
-    setDraft('');
+    const chatId=selected,orgId=workspaceId,original=replyTarget?.id;
+    setDraft('');setReplyTo(null);
     emitTyping(false);
     if(stopTypingRef.current) clearTimeout(stopTypingRef.current);
     setError('');
     setWorking(true);
     try {
-      const sent = await api.sendChatMessage(selected, body);
+      const sent = await api.sendChatMessage(chatId, body, original);
+      if(scopeRef.current.selected!==chatId||scopeRef.current.workspaceId!==orgId)return;
       setMessages(current => current.some(row => row.id === sent.id)
         ? current : [...current, sent].sort(messageOrder));
       await loadThreads();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not send message');
-      setDraft(body);
+      if(scopeRef.current.selected===chatId&&scopeRef.current.workspaceId===orgId){setError(e instanceof Error ? e.message : 'Could not send message');setDraft(current=>current||body);if(original)setReplyTo(current=>current||{chatId,messageId:original});}
     } finally { setWorking(false); }
   }
 
@@ -397,6 +402,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
             {messages.length === 0 && <div className="private-chat-welcome"><MessageCircle size={30}/><h3>Start the conversation</h3><p>Only participants in this workspace can read these messages.</p></div>}
             {messages.map(message => <div key={message.id} className={`private-message ${message.sender.id===currentUser.id ? 'mine' : ''}`}>
               <div className="private-message-meta"><strong>{message.sender.full_name}</strong><time>{timeFor(message.created_at)}</time></div>
+              {!message.deleted_at&&message.reply_to_id&&<ReplyPreview message={messages.find(row=>row.id===message.reply_to_id)}/>}
               {editingId===message.id ? <form className="message-edit-form" onSubmit={e => void editMessage(e,message.id)}>
                 <input autoFocus aria-label="Edit message" maxLength={4000} value={editDraft} onChange={e => setEditDraft(e.target.value)}/>
                 <div><button type="button" onClick={() => setEditingId(null)} disabled={working}>Cancel</button><button type="submit" disabled={working || !editDraft.trim()}>Save</button></div>
@@ -408,12 +414,14 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
               }</div>}
               <ChatReactionBar chatId={selected!} message={message} currentUserId={currentUser.id}
                 onUpdated={updated=>setMessages(current=>current.map(item=>item.id===updated.id?updated:item))}/>
+              {!message.deleted_at&&editingId!==message.id&&<div className="private-message-actions"><button type="button" disabled={working} onClick={()=>setReplyTo({chatId:selected!,messageId:message.id})}>Reply</button></div>}
               {message.sender.id===currentUser.id && !message.deleted_at && editingId!==message.id && <div className="private-message-actions"><button type="button" disabled={working} onClick={() => {setEditingId(message.id);setEditDraft(message.body);}}>Edit</button><button type="button" disabled={working} onClick={() => void deleteMessage(message)}>Delete</button></div>}
             </div>)}
             <div ref={bottomRef}/>
           </div>
           {Object.keys(typingUsers).length>0&&<div className="chat-typing-indicator" aria-live="polite">{Object.values(typingUsers).join(', ')} {Object.keys(typingUsers).length>1?'are':'is'} typing…</div>}
           <AttachmentPanel key={selected!} kind="chat" parentId={selected!}/>
+          {replyTarget&&<div className="chat-reply-compose"><ReplyPreview message={replyTarget} onCancel={()=>setReplyTo(null)}/></div>}
           <form className="private-chat-compose" onSubmit={send}><MentionInput ariaLabel="Write a message" value={draft} placeholder="Write a message... (@ to mention)" people={active.participants.map(p=>p.user).filter(user=>user.id!==currentUser.id)} onChange={changeDraft} onBlur={()=>emitTyping(false)}/><button className="send-button" aria-label="Send message" disabled={!draft.trim()||working}><Send size={18}/></button></form>
         </> : <div className="private-chat-welcome"><MessageCircle size={32}/><h3>Connect with your team</h3><p>Choose a conversation or start a new one.</p></div>}
       </div>

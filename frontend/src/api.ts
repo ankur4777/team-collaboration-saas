@@ -31,7 +31,7 @@ export interface WorkspaceFile {
   id:string; name:string; size:number; content_type:string;
   created_at:string; uploaded_by:Pick<Person,'id'|'full_name'|'email'>;
 }
-export interface Message { id: string; body: string; created_at: string; edited_at: string|null; deleted_at: string|null; sender: Person }
+export interface Message { id: string; body: string; created_at: string; edited_at: string|null; deleted_at: string|null; sender: Person; reply_to_id?: string|null }
 export interface ChannelMessageCursor { before:string; before_id:string }
 export interface ChannelMessagePage { items:Message[]; has_more:boolean; next_cursor:ChannelMessageCursor|null }
 export interface ChatThread {
@@ -190,7 +190,7 @@ export const api = {
     if(cursor) { query.set('before',cursor.before); query.set('before_id',cursor.before_id); }
     return request<ChatMessagePage>(`chats/${id}/messages/?${query.toString()}`);
   },
-  sendChatMessage: (id:string, body:string) => post<ChatMessage>(`chats/${id}/messages/`,{body}),
+  sendChatMessage: (id:string, body:string, replyTo?:string|null) => post<ChatMessage>(`chats/${id}/messages/`,{body,...(replyTo?{reply_to_id:replyTo}:{})}),
   toggleChatReaction: (chatId:string,messageId:string,emoji:string) => post<ChatMessage>(`chats/${chatId}/messages/${messageId}/reactions/`,{emoji}),
   markChatRead: (id:string, messageId:string) => post<{last_read_at:string}>(`chats/${id}/read/`,{message_id:messageId}),
   editChatMessage: (chatId:string, messageId:string, body:string) => request<ChatMessage>(`chats/${chatId}/messages/${messageId}/`, 'PATCH', {body}),
@@ -221,7 +221,7 @@ export const api = {
     }
     return request<ChannelMessagePage>(`channels/${channelId}/messages/?${query.toString()}`);
   },
-  sendMessage: (channelId:string,body:string) => post<Message>(`channels/${channelId}/messages/`,{body}),
+  sendMessage: (channelId:string,body:string,replyTo?:string|null) => post<Message>(`channels/${channelId}/messages/`,{body,...(replyTo?{reply_to_id:replyTo}:{})}),
   editChannelMessage: (channelId:string,messageId:string,body:string) => request<Message>(`channels/${channelId}/messages/${messageId}/`, 'PATCH', {body}),
   deleteChannelMessage: (channelId:string,messageId:string) => request<void>(`channels/${channelId}/messages/${messageId}/`, 'DELETE'),
 };

@@ -23,6 +23,7 @@ from .models import ChatConversation, ChatMessage, ChatParticipant, ChatReaction
 from .permissions import get_active_membership
 from .notification_events import publish_notification_refresh
 from .mentions import create_mentions
+from .message_replies import resolve_reply_target
 from .serializers import ChatConversationSerializer, ChatMessageSerializer
 
 
@@ -316,7 +317,8 @@ class ChatMessagesView(APIView):
         if not body or len(body) > 4000:
             raise ValidationError({'body': 'Message must contain 1–4000 characters'})
         with transaction.atomic():
-            message = ChatMessage.objects.create(conversation=chat, sender=request.user, body=body)
+            reply_id = resolve_reply_target(request, visible_chat_messages(request, chat))
+            message = ChatMessage.objects.create(conversation=chat, sender=request.user, body=body, reply_to_id=reply_id)
             ChatConversation.objects.filter(pk=chat.pk).update(updated_at=timezone.now())
             payload = ChatMessageSerializer(message).data
             transaction.on_commit(lambda: publish_chat_message(chat.pk, payload))

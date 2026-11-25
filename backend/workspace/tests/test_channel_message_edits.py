@@ -189,3 +189,20 @@ class ChannelMessageEditDeleteTests(TestCase):
         self.assertEqual(self.patch(old, {'body':'Change from B'}).status_code, 403)
         self.assertEqual(self.delete(old).status_code, 403)
         self.assertEqual(Message.objects.get(pk=sent['id']).body, 'Project update')
+
+    def test_reply_targets_are_scoped_and_deleted_messages_cannot_be_quoted(self):
+        original = self.send_message('Original')
+        url = f'/api/channels/{self.channel.pk}/messages/'
+        sent = self.post(url, {'body':'Reply','reply_to_id':original['id']})
+        self.assertEqual(sent.status_code, 201, sent.content)
+        self.assertEqual(sent.json()['reply_to_id'], original['id'])
+        self.assertNotIn('Original', str(sent.json()))
+        other = Channel.objects.create(team=self.team, name='Other')
+        self.assertEqual(self.post(f'/api/channels/{other.pk}/messages/', {'body':'Wrong','reply_to_id':original['id']}).status_code, 400)
+        self.assertEqual(self.post(url, {'body':'Wrong','reply_to_id':'bad'}).status_code, 400)
+        alice = self.employee('alice@a.test', 'Alice', join_team=True)
+        self.login(alice.email)
+        self.assertEqual(self.post(url, {'body':'Wrong','reply_to_id':original['id']}).status_code, 400)
+        self.login(self.owner.email)
+        self.assertEqual(self.delete(self.detail_url(original['id'])).status_code, 204)
+        self.assertEqual(self.post(url, {'body':'Wrong','reply_to_id':original['id']}).status_code, 400)
