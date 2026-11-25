@@ -123,6 +123,19 @@ class ChatParticipantDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class ChatGroupDetailView(APIView):
+    @transaction.atomic
+    def patch(self, request, chat_id):
+        chat = manage_group(request, chat_id)
+        title = request.data.get('title')
+        if not isinstance(title, str) or not 2 <= len(title.strip()) <= 100:
+            raise ValidationError({'title': 'Group name must be 2–100 characters'})
+        chat.title = title.strip()
+        chat.save(update_fields=['title'])
+        transaction.on_commit(lambda: publish_chat_participants(chat.pk))
+        return Response(ChatConversationSerializer(chat, context={'request': request}).data)
+
+
 class ChatOwnershipView(APIView):
     @transaction.atomic
     def post(self, request, chat_id):

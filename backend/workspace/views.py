@@ -109,6 +109,75 @@ class TeamsView(APIView):
         return Response(TeamSerializer(team).data, status=status.HTTP_201_CREATED)
 
 
+def locked_team(request, team_id):
+    team = get_object_or_404(Team.objects.select_for_update(), pk=team_id)
+    require_team_access(request, team, manage=True)
+    return team
+
+
+def update_name(request, obj, serializer, maximum):
+    name = request.data.get('name')
+    if not isinstance(name, str) or not 1 <= len(name.strip()) <= maximum:
+        raise ValidationError({'name': f'Enter a name of 1–{maximum} characters'})
+    obj.name = name.strip()
+    try:
+        with transaction.atomic():
+            obj.save(update_fields=['name'])
+    except IntegrityError:
+        raise ValidationError({'name': 'This name is already in use'})
+    return Response(serializer(obj).data)
+
+
+class TeamDetailView(APIView):
+    @transaction.atomic
+    def patch(self, request, team_id):
+        return update_name(request, locked_team(request, team_id), TeamSerializer, 120)
+
+
+class ChannelDetailView(APIView):
+    @transaction.atomic
+    def patch(self, request, team_id, channel_id):
+        team = locked_team(request, team_id)
+        channel = get_object_or_404(Channel, pk=channel_id, team=team)
+        return update_name(request, channel, ChannelSerializer, 100)
+
+
+class TeamOwnershipView(APIView):
+    @transaction.atomic
+    def post(self, request, team_id):
+        team = locked_team(request, team_id)
+        actor = TeamMember.objects.get(team=team, user=request.user)
+        if actor.role != TeamMember.Role.OWNER:
+            raise PermissionDenied('Only a team owner can transfer ownership')
+        try:
+            target_id = UUID(str(request.data.get('user_id', '')))
+        except (TypeError, ValueError):
+            raise ValidationError({'user_id': 'Choose a valid team member'})
+        if target_id == request.user.pk:
+            raise ValidationError({'user_id': 'Choose another member'})
+        target = get_object_or_404(
+            TeamMember, team=team, user_id=target_id, user__is_active=True,
+            user__organization_memberships__organization_id=team.organization_id,
+        )
+        target.role = TeamMember.Role.OWNER
+        target.save(update_fields=['role'])
+        actor.role = TeamMember.Role.MEMBER
+        actor.save(update_fields=['role'])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TeamMemberDetailView(APIView):
+    @transaction.atomic
+    def delete(self, request, team_id, user_id):
+        team = locked_team(request, team_id)
+        target = get_object_or_404(TeamMember, team=team, user_id=user_id)
+        if target.role == TeamMember.Role.OWNER:
+            raise PermissionDenied('Transfer ownership before removing a team owner')
+        target.delete()
+        transaction.on_commit(lambda: publish_notification_refresh(team.organization_id, [user_id]))
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class TeamChannelsView(APIView):
     def get_team(self, request, team_id, manage=False):
         team = get_object_or_404(Team, pk=team_id)
@@ -119,13 +188,15 @@ class TeamChannelsView(APIView):
         team = self.get_team(request, team_id)
         return Response(ChannelSerializer(team.channels.order_by('created_at'), many=True).data)
 
+    @transaction.atomic
     def post(self, request, team_id):
-        team = self.get_team(request, team_id, manage=True)
+        team = locked_team(request, team_id)
         name = str(request.data.get('name', '')).strip()
         if not name or len(name) > 100:
             raise ValidationError({'name': 'Channel name is required (max 100 characters)'})
         try:
-            channel = Channel.objects.create(team=team, name=name)
+            with transaction.atomic():
+                channel = Channel.objects.create(team=team, name=name)
         except IntegrityError:
             raise ValidationError({'name': 'This channel already exists'})
         return Response(ChannelSerializer(channel).data, status=status.HTTP_201_CREATED)
@@ -140,9 +211,9 @@ class TeamMembersView(APIView):
         return Response([{'user': {'id': str(m['user__id']), 'email': m['user__email'],
                                     'full_name': m['user__full_name']}, 'role': m['role']} for m in members])
 
+    @transaction.atomic
     def post(self, request, team_id):
-        team = get_object_or_404(Team, pk=team_id)
-        require_team_access(request, team, manage=True)
+        team = locked_team(request, team_id)
         email = str(request.data.get('email', '')).lower().strip()
         member = (OrganizationMember.objects.select_related('user')
                   .filter(organization=team.organization, user__email__iexact=email).first())

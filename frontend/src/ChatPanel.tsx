@@ -331,6 +331,16 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
     } finally { setWorking(false); }
   }
 
+  async function renameGroup(){
+    if(!selected||!active||working)return;
+    const title=window.prompt('Group name',active.title)?.trim();
+    if(!title||title===active.title)return;
+    setWorking(true);setError('');
+    try{await api.renameGroup(selected,title);await loadThreads();}
+    catch(e){setError(e instanceof Error?e.message:'Could not rename group');}
+    finally{setWorking(false);}
+  }
+
   async function transferOwnership(user: Person) {
     if (!selected || working || !window.confirm(`Transfer group ownership to ${user.full_name}?`)) return;
     setWorking(true); setError('');
@@ -410,9 +420,10 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
     </div>
     {managingGroup && active?.kind==='group' && active.created_by.id===currentUser.id && <div className="modal-backdrop" onMouseDown={e => {if (e.target===e.currentTarget) setManagingGroup(false);}}>
       <div className="modal" role="dialog" aria-modal="true" aria-label="Manage group participants">
-        <div className="modal-head"><div><div className="eyebrow">GROUP CHAT</div><h2>Manage participants</h2></div><button className="icon-button" onClick={() => setManagingGroup(false)} aria-label="Close"><X size={19}/></button></div>
+        <div className="modal-head"><div><div className="eyebrow">GROUP CHAT</div><h2>Manage group</h2></div><button className="icon-button" onClick={() => setManagingGroup(false)} aria-label="Close"><X size={19}/></button></div>
         <div className="modal-body">
           <p className="muted">New participants see messages from the time they join, not earlier chat history. Transfer ownership before leaving this group.</p>
+          <button type="button" className="outline-button" disabled={working} onClick={()=>void renameGroup()}>Rename group</button>
           <div className="member-list">{active.participants.map(p => <div className="member-row" key={p.user.id}><div className="avatar small-avatar">{initials(p.user.full_name)}</div><div><strong>{p.user.full_name}</strong><small>{p.user.email}</small></div>{p.user.id===active.created_by.id ? <span className="role-pill">Owner</span> : <div><button type="button" className="member-remove" disabled={working} onClick={() => void transferOwnership(p.user)}>Transfer ownership</button><button type="button" className="member-remove" disabled={working} onClick={() => void removeParticipant(p.user)}>Remove</button></div>}</div>)}</div>
           <form className="group-manage-add" onSubmit={addParticipant}>
             <label>Add teammate<select aria-label="Select teammate to add" value={addEmail} onChange={e => setAddEmail(e.target.value)} required><option value="">Choose a member</option>{groupCandidates.map(m => <option key={m.id} value={m.user.email}>{m.user.full_name} ({m.user.email})</option>)}</select></label>

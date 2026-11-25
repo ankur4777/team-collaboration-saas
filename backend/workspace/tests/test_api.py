@@ -82,3 +82,29 @@ class WorkspaceAPITests(TestCase):
         self.post('/api/auth/logout/', {})
         self.assertEqual(self.post('/api/auth/login/', {'email': user.email, 'password': 'SecurePass123!'}).status_code, 200)
         self.assertEqual(self.post(f'/api/organizations/{org.pk}/invitations/', {'email': 'new@example.test'}).status_code, 403)
+
+    def test_team_management_transfer_rename_and_remove(self):
+        session = self.register()
+        org = Organization.objects.get(pk=session['active_organization_id'])
+        staff = get_user_model().objects.create_user('staff@company-a.test', 'SecurePass123!', full_name='Staff')
+        peer = get_user_model().objects.create_user('peer@company-a.test', 'SecurePass123!', full_name='Peer')
+        for user in (staff, peer):
+            OrganizationMember.objects.create(organization=org, user=user)
+        team_id = self.post('/api/teams/', {'name': 'Before'}).json()['id']
+        base = f'/api/teams/{team_id}/'
+        channel_id = self.client.get(base + 'channels/').json()[0]['id']
+        for user in (staff, peer):
+            self.assertEqual(self.post(base + 'members/', {'email': user.email}).status_code, 201)
+        def patch(path, data):
+            return self.client.patch(path, data=json.dumps(data), content_type='application/json', HTTP_X_CSRFTOKEN=self.csrf)
+        self.assertEqual(patch(base, {'name': 'After'}).status_code, 200)
+        self.assertEqual(patch(base + f'channels/{channel_id}/', {'name':'Updates'}).status_code, 200)
+        self.assertEqual(self.post(base + 'ownership/', {'user_id': str(staff.pk)}).status_code, 204)
+        self.assertEqual(TeamMember.objects.get(team_id=team_id, user=staff).role, 'owner')
+        self.assertEqual(self.client.delete(base + f'members/{staff.pk}/', HTTP_X_CSRFTOKEN=self.csrf).status_code, 403)
+        self.assertEqual(self.client.delete(base + f'members/{peer.pk}/', HTTP_X_CSRFTOKEN=self.csrf).status_code, 204)
+        self.assertTrue(OrganizationMember.objects.filter(organization=org, user=peer).exists())
+        self.post('/api/auth/logout/', {})
+        self.post('/api/auth/login/', {'email': peer.email, 'password':'SecurePass123!'})
+        self.assertEqual(self.client.get(base + 'channels/').status_code, 403)
+        self.assertEqual(patch(base, {'name':'Unauthorized'}).status_code, 403)

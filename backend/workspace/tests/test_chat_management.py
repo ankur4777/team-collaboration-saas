@@ -157,3 +157,17 @@ class ChatManagementTests(TestCase):
         self.login(second.email)
         self.assertEqual(self.write('POST', base + 'leave/').status_code, 204)
         self.assertEqual(self.client.get(base + 'messages/').status_code, 404)
+
+    def test_only_group_owner_can_rename(self):
+        org = self.register()
+        first = self.user(org, 'first@company-a.test')
+        second = self.user(org, 'second@company-a.test')
+        chat = self.write('POST', '/api/chats/', {
+            'kind':'group', 'title':'Original', 'emails':[first.email, second.email],
+        }).json()
+        url = f"/api/chats/{chat['id']}/"
+        self.assertEqual(self.write('PATCH', url, {'title':'x'}).status_code, 400)
+        self.assertEqual(self.write('PATCH', url, {'title':'Renamed'}).status_code, 200)
+        self.login(first.email)
+        self.assertEqual(self.write('PATCH', url, {'title':'Forbidden'}).status_code, 403)
+        self.assertEqual(self.client.get('/api/chats/').json()[0]['title'], 'Renamed')
