@@ -4,7 +4,7 @@ import json
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase, override_settings
 
-from workspace.models import Organization, OrganizationMember, TeamMember
+from workspace.models import Organization, OrganizationMember, TeamMember, ChatConversation, ChatParticipant, ChatMessage
 
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
@@ -109,3 +109,32 @@ class MemberManagementTests(TestCase):
             self.member_url(second_org, member), data=json.dumps({'role': 'admin'}),
             content_type='application/json',
         ).status_code, 403)
+
+    def test_group_owner_must_transfer_before_workspace_removal(self):
+        org = self.register()
+        staff, membership = self.employee(org, 'staff@company-a.test')
+        first, _ = self.employee(org, 'first@company-a.test')
+        second, _ = self.employee(org, 'second@company-a.test')
+        self.login(staff.email)
+        result = self.write('POST', '/api/chats/', {
+            'kind': 'group', 'title': 'Operations', 'emails': [first.email, second.email],
+        })
+        self.assertEqual(result.status_code, 201, result.content)
+        chat_id = result.json()['id']
+        base = f'/api/chats/{chat_id}/'
+        self.assertEqual(self.write('POST', base + 'messages/', {'body': 'Keep history'}).status_code, 201)
+        self.login('owner@company-a.test')
+        url = self.member_url(org, membership)
+        self.assertEqual(self.write('DELETE', url).status_code, 409)
+        self.assertTrue(OrganizationMember.objects.filter(pk=membership.pk).exists())
+        self.assertTrue(ChatParticipant.objects.filter(conversation_id=chat_id, user=staff).exists())
+        self.login(staff.email)
+        self.assertEqual(self.write('POST', base + 'ownership/', {'user_id': str(first.pk)}).status_code, 204)
+        self.login('owner@company-a.test')
+        self.assertEqual(self.write('DELETE', url).status_code, 204)
+        self.assertFalse(OrganizationMember.objects.filter(pk=membership.pk).exists())
+        self.assertFalse(ChatParticipant.objects.filter(conversation_id=chat_id, user=staff).exists())
+        self.assertEqual(ChatConversation.objects.get(pk=chat_id).created_by_id, first.pk)
+        self.assertTrue(ChatMessage.objects.filter(conversation_id=chat_id, body='Keep history').exists())
+        self.login(first.email)
+        self.assertEqual(self.client.get(base + 'messages/').status_code, 200)

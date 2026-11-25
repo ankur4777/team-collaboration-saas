@@ -12,6 +12,8 @@ from rest_framework.views import APIView
 
 from .models import OrganizationMember, TeamMember, ChatConversation, ChatParticipant
 from .permissions import get_active_membership
+from .chat_views import publish_chat_participants
+from .notification_events import publish_notification_refresh
 from .serializers import OrganizationMemberSerializer
 
 
@@ -79,6 +81,25 @@ class OrganizationMemberDetailView(APIView):
                     status=status.HTTP_409_CONFLICT,
                 )
 
+            # Serialize removal against group ownership transfers and invitations.
+            # Lock all current group rows in a stable order before checking ownership.
+            group_ids = list(ChatParticipant.objects.filter(
+                conversation__organization_id=pk,
+                conversation__kind=ChatConversation.Kind.GROUP,
+                user_id=target.user_id,
+            ).values_list('conversation_id', flat=True))
+            groups = list(ChatConversation.objects.select_for_update().filter(
+                organization_id=pk, pk__in=group_ids,
+            ).order_by('pk'))
+            if any(group.created_by_id == target.user_id for group in groups):
+                return Response(
+                    {'detail': 'Transfer this employee’s group chat ownership before removing them'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            affected_chats = list(ChatParticipant.objects.filter(
+                conversation__organization_id=pk, user_id=target.user_id,
+            ).values_list('conversation_id', flat=True))
+
             # Do not delete the global user account: it may belong to other
             # companies. Remove access only in this organization.
             TeamMember.objects.filter(
@@ -97,5 +118,9 @@ class OrganizationMemberDetailView(APIView):
                 conversation__organization_id=pk,
                 user_id=target.user_id,
             ).delete()
+            removed_user_id = target.user_id
             target.delete()
+            for chat_id in affected_chats:
+                transaction.on_commit(lambda chat_id=chat_id: publish_chat_participants(chat_id))
+            transaction.on_commit(lambda: publish_notification_refresh(pk, [removed_user_id]))
         return Response(status=status.HTTP_204_NO_CONTENT)
