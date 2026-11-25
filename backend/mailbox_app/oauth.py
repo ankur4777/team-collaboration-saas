@@ -99,10 +99,25 @@ def token_request(provider, data):
     except httpx.HTTPError:
         raise MailError("The authorization server is unavailable. Try connecting again.")
     if response.status_code != 200:
-        # Do not forward token responses, request headers, secrets or authorization codes.
-        raise ReconnectRequired("The provider rejected authorization. Reconnect the mailbox.")
-    result = response.json()
-    if not result.get("access_token"):
+        # Do not mark a mailbox disconnected because of provider downtime,
+        # rate limiting or a server-side OAuth configuration problem.
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = {}
+        error = payload.get("error") if isinstance(payload, dict) else None
+        if response.status_code in (408, 429) or response.status_code >= 500 or error in (
+            "temporarily_unavailable", "server_error",
+        ):
+            raise MailError("The authorization server is temporarily unavailable. Try refreshing later.")
+        if error in ("invalid_grant", "interaction_required", "consent_required"):
+            raise ReconnectRequired("The provider rejected authorization. Reconnect the mailbox.")
+        raise MailError("The authorization request failed. Check the provider configuration or try again.")
+    try:
+        result = response.json()
+    except ValueError:
+        raise MailError("The authorization server returned an unreadable response.")
+    if not isinstance(result, dict) or not isinstance(result.get("access_token"), str) or not result["access_token"]:
         raise MailError("The provider returned no access token.")
     return result
 

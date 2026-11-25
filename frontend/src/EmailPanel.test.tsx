@@ -72,6 +72,16 @@ describe('Email inbox interactions',()=>{
     expect((screen.getByRole('button',{name:'Send'}) as HTMLButtonElement).disabled).toBe(true);
     expect(mailApi.send).toHaveBeenCalledTimes(1);
   });
+  it('keeps the composer open when sending is explicitly rejected',async()=>{
+    vi.mocked(mailApi.send).mockResolvedValue({status:'failed',detail:'Provider rejected delivery.',draft_id:'saved-draft'});
+    const user=userEvent.setup();mount();
+    await user.click(await screen.findByRole('button',{name:'New Email'}));
+    await user.type(screen.getByRole('textbox',{name:'To recipients'}),'bob@example.test');
+    await user.click(screen.getByRole('button',{name:'Send'}));
+    expect(await screen.findByText('Provider rejected delivery.')).toBeTruthy();
+    expect(screen.getByRole('dialog',{name:'New Email'})).toBeTruthy();
+    expect(screen.queryByText('Message sent.')).toBeNull();
+  });
   it('submits a folder search to the backend',async()=>{
     const user=userEvent.setup();mount();await screen.findByRole('heading',{name:'Inbox'});
     await user.type(screen.getByRole('textbox',{name:'Search mailbox'}),'invoice');

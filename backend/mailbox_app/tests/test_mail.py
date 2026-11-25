@@ -10,7 +10,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 from workspace.models import User, Organization, OrganizationMember
 from mailbox_app.models import MailAccount, LocalMessage, SendAttempt, OAuthAttempt
-from mailbox_app.common import MailError, opaque_id, plain_html
+from mailbox_app.common import MailError, ReconnectRequired, opaque_id, plain_html
 from mailbox_app.local import LocalMailbox
 from mailbox_app.providers import RemoteMailbox
 from mailbox_app import oauth
@@ -278,6 +278,34 @@ class ProviderTests(TestCase):
         bad = self.adapter.cursor("https://attacker.example/steal", "inbox", "")
         with self.assertRaises(ValidationError):
             self.adapter.messages("inbox", cursor=bad)
+
+    def test_temporary_oauth_errors_do_not_require_reconnect(self):
+        for status, code in ((429, "invalid_grant"), (503, "server_error"),
+                             (400, "temporarily_unavailable"), (401, "invalid_client")):
+            response = Mock(status_code=status)
+            response.json.return_value = {"error": code}
+            with patch("mailbox_app.oauth.httpx.post", return_value=response):
+                with self.assertRaises(MailError):
+                    oauth.token_request("gmail", {"grant_type": "refresh_token"})
+        response = Mock(status_code=400)
+        response.json.return_value = {"error": "invalid_grant"}
+        with patch("mailbox_app.oauth.httpx.post", return_value=response):
+            with self.assertRaises(ReconnectRequired):
+                oauth.token_request("gmail", {"grant_type": "refresh_token"})
+
+    def test_send_timeout_or_invalid_success_is_uncertain_and_not_retried(self):
+        for status in (408, 503, 200):
+            response = Mock(status_code=status, content=b"invalid")
+            response.json.side_effect = ValueError("invalid response")
+            with patch("mailbox_app.providers.httpx.request", return_value=response) as request:
+                with self.assertRaises(MailError) as error:
+                    self.adapter.send_draft(opaque_id("draft1", "draft"))
+                self.assertTrue(error.exception.uncertain)
+                self.assertEqual(request.call_count, 1)
+        self.adapter.call = Mock(return_value={})
+        with self.assertRaises(MailError) as error:
+            self.adapter.send_draft(opaque_id("draft1", "draft"))
+        self.assertTrue(error.exception.uncertain)
 
     def test_token_refresh_preserves_rotated_refresh_token(self):
         from mailbox_app.models import MailAccount

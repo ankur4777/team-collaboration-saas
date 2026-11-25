@@ -45,11 +45,25 @@ class RemoteMailbox:
             raise ReconnectRequired()
         if response.status_code == 404:
             raise NotFound("This message no longer exists in the connected mailbox.")
+        if response.status_code == 429:
+            raise MailError("The mail provider is rate limiting requests. Wait briefly before trying again.")
         if not 200 <= response.status_code < 300:
             error = MailError("The provider rejected the request (" + str(response.status_code) + "). Refresh or reconnect the mailbox.")
-            error.uncertain = sending and response.status_code >= 500
+            error.uncertain = sending and (response.status_code >= 500 or response.status_code == 408)
             raise error
-        return response.json() if response.content else {}
+        if not response.content:
+            return {}
+        try:
+            result = response.json()
+        except ValueError:
+            error = MailError("The mail provider returned an unreadable response." + (" Check Sent before sending again." if sending else ""))
+            error.uncertain = sending
+            raise error
+        if not isinstance(result, dict):
+            error = MailError("The mail provider returned an unexpected response.")
+            error.uncertain = sending
+            raise error
+        return result
 
     def cursor(self, value, folder, query):
         return signing.dumps({"account": str(self.account.pk), "folder": folder, "q": query, "value": value}, salt="mail-page") if value else ""
@@ -326,6 +340,10 @@ class RemoteMailbox:
             raise ValidationError("A draft is required.")
         if self.account.provider == "gmail":
             result = self.call("POST", "/drafts/send", data={"id": raw}, sending=True)
+            if not isinstance(result.get("id"), str) or not result["id"]:
+                error = MailError("Gmail did not confirm the sent message ID. Check Sent before sending again.")
+                error.uncertain = True
+                raise error
             return {"status": "sent", "message_id": opaque_id(result["id"])}
         self.call("POST", "/messages/" + quote(raw, safe="") + "/send", sending=True)
         return {"status": "sent", "message_id": ""}

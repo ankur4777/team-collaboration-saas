@@ -249,7 +249,12 @@ export default function EmailPanel({workspaceId,user}:{workspaceId:string|null;u
       if(result.status==='uncertain'){
         setEditor(current=>current?{...current,uncertain:true,draft_id:result.draft_id||current.draft_id}:current);
         setComposeError(result.detail||'Send status is uncertain. Check Sent in the provider mailbox before sending another copy.');
-      }else{setEditor(null);setNotice('Message sent.');setVersion(v=>v+1);}
+      }else if(result.status==='sent'){
+        setEditor(null);setNotice('Message sent.');setVersion(v=>v+1);
+      }else{
+        setEditor(current=>current?{...current,draft_id:result.draft_id||current.draft_id,key:crypto.randomUUID()}:current);
+        setComposeError(result.detail||'The provider rejected this send. Review the draft before retrying.');
+      }
     }catch(err){
       if(err instanceof MailApiError){
         const rejected=err.payload.status==='failed';const draft=typeof err.payload.draft_id==='string'?err.payload.draft_id:'';

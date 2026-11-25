@@ -53,5 +53,10 @@ export const mailApi={
   action:(account:string,message:string,action:string)=>call(base(account)+'messages/'+encodeURIComponent(message)+'/actions/','POST',{action}),
   draft:(account:string,payload:ComposePayload)=>call<{draft_id:string}>(base(account)+'drafts/','POST',payload),
   discard:(account:string,message:string)=>call<void>(base(account)+'drafts/'+encodeURIComponent(message)+'/','DELETE'),
-  send:(account:string,payload:ComposePayload,key:string)=>call<SendResult>(base(account)+'send/','POST',payload,{'Idempotency-Key':key}),
+  send:async(account:string,payload:ComposePayload,key:string)=>{
+    const result=await call<SendResult>(base(account)+'send/','POST',payload,{'Idempotency-Key':key});
+    if(result?.status!=='sent'&&result?.status!=='uncertain'&&result?.status!=='failed')
+      return {status:'uncertain',detail:'The server did not confirm delivery. Check Sent before sending again.'} as SendResult;
+    return result;
+  },
 };
