@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {api,type Message} from './api';
 
-export default function PinnedMessages({kind,id,version,onUnpin}:{kind:'chat'|'channel';id:string;version:number;onUnpin:(message:Message)=>void}){
+export default function PinnedMessages({kind,id,version,onUnpin,readOnly=false}:{kind:'chat'|'channel';id:string;version:number;onUnpin:(message:Message)=>void;readOnly?:boolean}){
   const [open,setOpen]=useState(false);
   const [rows,setRows]=useState<Message[]>([]);
   const [more,setMore]=useState(false);
@@ -25,7 +25,7 @@ export default function PinnedMessages({kind,id,version,onUnpin}:{kind:'chat'|'c
     return()=>{active=false;window.clearInterval(timer);};
   },[open,id,kind,version]);
   async function unpin(message:Message){
-    if(busy)return;
+    if(busy||readOnly)return;
     setBusy(message.id);setError('');
     try{
       const updated=await (kind==='chat'?api.pinChatMessage(id,message.id,false):api.pinChannelMessage(id,message.id,false));
@@ -39,7 +39,7 @@ export default function PinnedMessages({kind,id,version,onUnpin}:{kind:'chat'|'c
       {error&&<p role="alert">{error}</p>}
       {loading&&rows.length===0&&<p>Loading pins…</p>}
       {!loading&&!error&&rows.length===0&&<p>No pinned messages yet.</p>}
-      {rows.map(row=><div className="pinned-message-row" key={row.id}><div><strong>{row.sender.full_name}</strong><small>{new Date(row.created_at).toLocaleString()}</small><p>{row.body}</p></div><button type="button" className="outline-button" disabled={Boolean(busy)} onClick={()=>void unpin(row)}>{busy===row.id?'Working…':'Unpin'}</button></div>)}
+      {rows.map(row=><div className="pinned-message-row" key={row.id}><div><strong>{row.sender.full_name}</strong><small>{new Date(row.created_at).toLocaleString()}</small><p>{row.body}</p></div><button type="button" className="outline-button" disabled={Boolean(busy)||readOnly} onClick={()=>void unpin(row)}>{busy===row.id?'Working…':'Unpin'}</button></div>)}
       {more&&<p className="muted">Showing the latest 100 pins. Earlier pins are available in message history.</p>}
     </div>}
   </div>;

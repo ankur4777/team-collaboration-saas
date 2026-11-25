@@ -129,6 +129,30 @@ def update_name(request, obj, serializer, maximum):
     return Response(serializer(obj).data)
 
 
+def archive_record(request, obj, serializer):
+    desired = request.data.get('archived')
+    if type(desired) is not bool:
+        raise ValidationError({'archived': 'Provide true or false'})
+    if bool(obj.archived_at) != desired:
+        obj.archived_at = timezone.now() if desired else None
+        obj.save(update_fields=['archived_at'])
+    return Response(serializer(obj).data)
+
+
+class TeamArchiveView(APIView):
+    @transaction.atomic
+    def post(self, request, team_id):
+        return archive_record(request, locked_team(request, team_id), TeamSerializer)
+
+
+class ChannelArchiveView(APIView):
+    @transaction.atomic
+    def post(self, request, team_id, channel_id):
+        team = locked_team(request, team_id)
+        channel = get_object_or_404(Channel, pk=channel_id, team=team)
+        return archive_record(request, channel, ChannelSerializer)
+
+
 class TeamDetailView(APIView):
     @transaction.atomic
     def patch(self, request, team_id):
@@ -192,6 +216,8 @@ class TeamChannelsView(APIView):
     @transaction.atomic
     def post(self, request, team_id):
         team = locked_team(request, team_id)
+        if team.archived_at:
+            raise PermissionDenied('Restore this team before creating channels')
         name = str(request.data.get('name', '')).strip()
         if not name or len(name) > 100:
             raise ValidationError({'name': 'Channel name is required (max 100 characters)'})
@@ -284,7 +310,7 @@ class ChannelMessagesView(APIView):
         return Response(MessageSerializer(rows, many=True).data)
 
     def post(self, request, channel_id):
-        channel = require_channel_access(request, channel_id)
+        channel = require_channel_access(request, channel_id, write=True)
         body = str(request.data.get('body', '')).strip()
         if not body or len(body) > 4000:
             raise ValidationError({'body': 'Message must contain 1–4000 characters'})
@@ -315,7 +341,7 @@ class ChannelMessageDetailView(APIView):
     """Only an authorized message author can edit or soft-delete their channel post."""
 
     def patch(self, request, channel_id, message_id):
-        channel = require_channel_access(request, channel_id)
+        channel = require_channel_access(request, channel_id, write=True)
         joined = TeamMember.objects.get(team=channel.team, user=request.user).joined_at
         body = request.data.get('body')
         if not isinstance(body, str) or not 1 <= len(body.strip()) <= 4000:
@@ -339,7 +365,7 @@ class ChannelMessageDetailView(APIView):
         return Response(payload)
 
     def delete(self, request, channel_id, message_id):
-        channel = require_channel_access(request, channel_id)
+        channel = require_channel_access(request, channel_id, write=True)
         joined = TeamMember.objects.get(team=channel.team, user=request.user).joined_at
         with transaction.atomic():
             message = get_object_or_404(

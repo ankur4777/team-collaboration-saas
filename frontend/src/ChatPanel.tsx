@@ -25,6 +25,7 @@ function messageOrder(a: ChatMessage, b: ChatMessage) {
 interface Props { workspaceId: string|null; currentUser: Person; members: Member[]; requestedChat?: {id:string;nonce:number}|null; onRead?: ()=>void }
 
 export default function ChatPanel({workspaceId, currentUser, members, requestedChat, onRead}: Props) {
+  const [showArchived,setShowArchived]=useState(false);
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [selected, setSelected] = useState<string|null>(null);
   const [pinVersion,setPinVersion]=useState(0);
@@ -224,7 +225,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
   const colleagues = members.filter(member => member.user.id !== currentUser.id);
   const groupCandidates = colleagues.filter(m => !active?.participants.some(p => p.user.id === m.user.id));
   const visibleThreads = threads.filter(thread =>
-    titleFor(thread, currentUser.id).toLowerCase().includes(filter.toLowerCase()),
+    Boolean(thread.archived_at)===showArchived && titleFor(thread, currentUser.id).toLowerCase().includes(filter.toLowerCase()),
   );
 
   async function loadOlder() {
@@ -257,7 +258,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
       setGroupTitle('');
       setGroupEmails([]);
       await loadThreads();
-      setSelected(thread.id);
+      setShowArchived(false);setSelected(thread.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not create conversation');
     } finally { setWorking(false); }
@@ -352,6 +353,15 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
     finally{setWorking(false);}
   }
 
+  async function archiveActiveChat(){
+    if(!active||working)return;
+    const archived=!active.archived_at;
+    setWorking(true);setError('');
+    try{const result=await api.archiveChat(active.id,archived);setThreads(old=>old.map(row=>row.id===active.id?{...row,archived_at:result.archived_at}:row));setShowArchived(archived);}
+    catch(e){setError(e instanceof Error?e.message:'Could not change archive status');}
+    finally{setWorking(false);}
+  }
+
   async function renameGroup(){
     if(!selected||!active||working)return;
     const title=window.prompt('Group name',active.title)?.trim();
@@ -395,7 +405,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
     {error && <div className="chat-alert" role="alert">{error}<button type="button" onClick={() => setError('')} aria-label="Dismiss error"><X size={16}/></button></div>}
     <div className="private-chat-layout">
       <aside className="private-chat-list">
-        <div className="private-chat-list-heading"><strong>Conversations</strong><button type="button" className="icon-button" aria-label="Refresh chats" title="Refresh chats" onClick={() => void loadThreads()}><RefreshCw size={16}/></button></div>
+        <div className="private-chat-list-heading"><strong>Conversations</strong><button type="button" className="outline-button" aria-pressed={showArchived} onClick={()=>setShowArchived(value=>!value)}>{showArchived?'Active':'Archived'}</button><button type="button" className="icon-button" aria-label="Refresh chats" title="Refresh chats" onClick={() => void loadThreads()}><RefreshCw size={16}/></button></div>
         <input className="chat-filter" aria-label="Search conversations" placeholder="Search conversations" value={filter} onChange={e => setFilter(e.target.value)}/>
         {visibleThreads.map(thread => <button type="button" key={thread.id} className={`chat-thread ${selected === thread.id ? 'selected' : ''}`} onClick={() => setSelected(thread.id)}>
           <span className="chat-thread-avatar">{thread.kind === 'group' ? <Users size={17}/> : initials(titleFor(thread,currentUser.id))}</span>
@@ -412,6 +422,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
             <div><h2>{titleFor(active,currentUser.id)}</h2><p>{active.participants.map(p => p.user.full_name).join(', ')}</p></div>
             {active.kind==='group' && active.created_by.id===currentUser.id && <button type="button" className="group-manage-button" onClick={() => setManagingGroup(true)}><Users size={15}/> Manage group</button>}
             {active.kind==='group' && active.created_by.id!==currentUser.id && <button type="button" className="group-manage-button" disabled={working} onClick={() => void leaveGroup()}>Leave group</button>}
+            <button type="button" className="group-manage-button" disabled={working} onClick={()=>void archiveActiveChat()}>{active.archived_at?'Restore chat':'Archive chat'}</button>
             <span className={`chat-connected ${connected ? 'yes' : ''}`} title={connected ? 'Live updates connected' : 'Messages saved; live updates unavailable'}/>
           </header>
           <PinnedMessages key={selected!} kind="chat" id={selected!} version={pinVersion} onUnpin={updated=>{if("reactions" in updated){setMessages(old=>old.map(row=>row.id===updated.id?updated as ChatMessage:row));setPinVersion(value=>value+1);}}}/>

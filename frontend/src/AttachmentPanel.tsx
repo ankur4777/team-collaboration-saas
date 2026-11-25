@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { api, type PrivateAttachment } from './api';
 
 type Kind = 'chat'|'channel';
-interface Props { kind:Kind; parentId:string }
+interface Props { kind:Kind; parentId:string; readOnly?:boolean }
 
 const FILE_LIMIT = 5 * 1024 * 1024;
 function displaySize(bytes:number){
   return bytes < 1024*1024 ? `${Math.ceil(bytes/1024)} KB` : `${(bytes/(1024*1024)).toFixed(1)} MB`;
 }
 
-export default function AttachmentPanel({kind,parentId}:Props) {
+export default function AttachmentPanel({kind,parentId,readOnly=false}:Props) {
   const [files,setFiles] = useState<PrivateAttachment[]>([]);
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState('');
@@ -31,7 +31,7 @@ export default function AttachmentPanel({kind,parentId}:Props) {
   },[kind,parentId]);
 
   async function upload(file:File|undefined) {
-    if(!file)return;
+    if(!file||readOnly)return;
     if(file.size===0||file.size>FILE_LIMIT){setError('Select a nonempty file up to 5 MB');return;}
     setError('');setBusy(true);
     try {
@@ -52,11 +52,11 @@ export default function AttachmentPanel({kind,parentId}:Props) {
       <button type="button" className="attachment-toggle" aria-expanded={opened} onClick={()=>setOpened(current=>!current)}>
         Shared files ({files.length}) {opened?'▴':'▾'}
       </button>
-      <label className={`attachment-upload ${busy?'busy':''}`}>
+      {!readOnly&&<label className={`attachment-upload ${busy?'busy':''}`}>
         {busy?'Uploading...':'Attach file'}
         <input ref={inputRef} aria-label="Attach a file" type="file" disabled={busy}
           accept=".png,.jpg,.jpeg,.webp,.pdf,.txt" onChange={event=>void upload(event.target.files?.[0])}/>
-      </label>
+      </label>}
     </div>
     {error&&<div className="attachment-error" role="alert">{error}</div>}
     {opened&&<div className="attachment-list">

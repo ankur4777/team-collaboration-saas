@@ -7,7 +7,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import Channel, ChatConversation, ChatMessage, ChatParticipant, Message, TeamMember
-from .permissions import get_active_membership
+from .permissions import get_active_membership, require_channel_writable
 from .chat_views import publish_chat_message
 from .views import broadcast_message
 from .notification_events import publish_notification_refresh
@@ -37,7 +37,7 @@ class ForwardDestinationsView(APIView):
         org = get_active_membership(request).organization_id
         user = request.user
         chats = chat_rows(org, user).prefetch_related('participants__user').order_by('-updated_at')[:200]
-        channels = channel_rows(org, user).select_related('team').order_by('team__name', 'name')[:200]
+        channels = channel_rows(org, user).filter(archived_at__isnull=True, team__archived_at__isnull=True).select_related('team').order_by('team__name', 'name')[:200]
         results = []
         for chat in chats:
             name = chat.title if chat.kind == ChatConversation.Kind.GROUP else next(
@@ -82,7 +82,8 @@ class ForwardMessageView(APIView):
             ).values_list('user_id', flat=True).distinct())
             transaction.on_commit(lambda: publish_chat_message(dest.pk, payload))
         else:
-            dest = get_object_or_404(channel_rows(org, user), pk=dest_id)
+            dest = get_object_or_404(channel_rows(org, user).select_related('team'), pk=dest_id)
+            require_channel_writable(dest)
             message = Message.objects.create(channel=dest, sender=user, body=original.body, is_forwarded=True)
             payload = MessageSerializer(message).data
             recipients = list(TeamMember.objects.filter(

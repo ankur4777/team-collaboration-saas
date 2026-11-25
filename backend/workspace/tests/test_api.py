@@ -108,3 +108,22 @@ class WorkspaceAPITests(TestCase):
         self.post('/api/auth/login/', {'email': peer.email, 'password':'SecurePass123!'})
         self.assertEqual(self.client.get(base + 'channels/').status_code, 403)
         self.assertEqual(patch(base, {'name':'Unauthorized'}).status_code, 403)
+
+    def test_archive_restore_preserves_channel_history(self):
+        session = self.register()
+        team = self.post('/api/teams/', {'name':'Archive example'}).json()
+        base = f"/api/teams/{team['id']}/"
+        channel = self.client.get(base+'channels/').json()[0]
+        messages = f"/api/channels/{channel['id']}/messages/"
+        original = self.post(messages, {'body':'Keep history'}).json()
+        archive_channel = base+f"channels/{channel['id']}/archive/"
+        self.assertEqual(self.post(archive_channel, {'archived':True}).status_code,200)
+        self.assertEqual(self.post(messages, {'body':'Blocked'}).status_code,403)
+        self.assertEqual(self.client.get(messages).json()[0]['id'],original['id'])
+        self.assertEqual(self.post(archive_channel, {'archived':False}).status_code,200)
+        self.assertEqual(self.post(base+'archive/', {'archived':True}).status_code,200)
+        self.assertEqual(self.post(messages, {'body':'Blocked'}).status_code,403)
+        self.assertEqual(self.post(base+'channels/', {'name':'Blocked'}).status_code,403)
+        self.assertEqual(self.post(base+'archive/', {'archived':False}).status_code,200)
+        self.assertEqual(self.post(messages, {'body':'Restored'}).status_code,201)
+        self.assertEqual(Message.objects.filter(channel_id=channel['id']).count(),2)

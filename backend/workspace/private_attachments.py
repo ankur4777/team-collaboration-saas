@@ -122,7 +122,7 @@ class ChannelAttachmentsView(APIView):
         return Response([response_row(row) for row in rows])
 
     def post(self, request, channel_id):
-        channel = require_channel_access(request, channel_id)
+        channel = require_channel_access(request, channel_id, write=True)
         upload = request.FILES.get('file')
         name, kind = validate_upload(upload)
         with transaction.atomic():

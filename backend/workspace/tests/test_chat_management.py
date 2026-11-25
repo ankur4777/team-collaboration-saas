@@ -253,3 +253,19 @@ class ChatManagementTests(TestCase):
         self.assertEqual(self.client.get(base+'pins/').json()['items'],[])
         self.assertIsNone(ChatMessage.objects.get(pk=original['id']).pinned_at)
         self.assertEqual(self.write('POST',url,{'pinned':True}).status_code,404)
+
+    def test_chat_archive_is_personal_and_preserves_access(self):
+        org = self.register()
+        colleague = self.user(org, 'archive@company-a.test')
+        chat = self.write('POST','/api/chats/',{'kind':'direct','email':colleague.email}).json()
+        base = f"/api/chats/{chat['id']}/"
+        self.assertEqual(self.write('POST',base+'messages/',{'body':'Keep this'}).status_code,201)
+        self.assertEqual(self.write('POST',base+'archive/',{'archived':True}).status_code,200)
+        self.assertIsNotNone(self.client.get('/api/chats/').json()[0]['archived_at'])
+        self.login(colleague.email)
+        self.assertIsNone(self.client.get('/api/chats/').json()[0]['archived_at'])
+        self.assertEqual(self.write('POST',base+'messages/',{'body':'Still active'}).status_code,201)
+        self.login('owner@company-a.test')
+        self.assertEqual(len(self.client.get(base+'messages/').json()),2)
+        self.assertEqual(self.write('POST',base+'archive/',{'archived':False}).status_code,200)
+        self.assertIsNone(self.client.get('/api/chats/').json()[0]['archived_at'])

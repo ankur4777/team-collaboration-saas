@@ -11,6 +11,7 @@ interface Props {
   replyTarget?: Message;
   onReply?: () => void;
   onForward?: () => void;
+  readOnly?:boolean;
 }
 
 function initials(name: string) {
@@ -18,7 +19,7 @@ function initials(name: string) {
     .map(value => value[0].toUpperCase()).join('') || '?';
 }
 
-export default function ChannelMessageItem({channelId,message,isMine,samePerson,onUpdated,replyTarget,onReply,onForward}:Props) {
+export default function ChannelMessageItem({channelId,message,isMine,samePerson,onUpdated,replyTarget,onReply,onForward,readOnly=false}:Props) {
   const [editing,setEditing] = useState(false);
   const [draft,setDraft] = useState(message.body);
   const [busy,setBusy] = useState(false);
@@ -62,7 +63,7 @@ export default function ChannelMessageItem({channelId,message,isMine,samePerson,
       {!message.deleted_at&&message.pinned_at&&<div className="forwarded-label">Pinned</div>}
       {!message.deleted_at&&message.is_forwarded&&<div className="forwarded-label">Forwarded</div>}
       {!message.deleted_at&&message.reply_to_id&&<ReplyPreview message={replyTarget}/>}
-      {editing && !message.deleted_at
+      {editing && !message.deleted_at && !readOnly
         ? <form className="channel-message-edit" onSubmit={event=>void save(event)}>
           <textarea aria-label="Edit channel message" maxLength={4000} rows={2} value={draft} onChange={event=>setDraft(event.target.value)} disabled={busy}/>
           <div><button type="button" disabled={busy} onClick={()=>{setEditing(false);setError('');}}>Cancel</button>
@@ -72,10 +73,10 @@ export default function ChannelMessageItem({channelId,message,isMine,samePerson,
           {message.deleted_at?'Message deleted':message.body}
           {!message.deleted_at&&message.edited_at&&<small className="channel-edited-note"> (edited)</small>}
         </div>}
-      {!message.deleted_at && !editing && onReply&&<div className="channel-message-actions"><button type="button" onClick={onReply}>Reply</button></div>}
+      {!readOnly&&!message.deleted_at && !editing && onReply&&<div className="channel-message-actions"><button type="button" onClick={onReply}>Reply</button></div>}
       {!message.deleted_at&&!editing&&onForward&&<div className="channel-message-actions"><button type="button" onClick={onForward}>Forward</button></div>}
-      {!message.deleted_at&&!editing&&<div className="channel-message-actions"><button type="button" disabled={busy} onClick={()=>void pin()}>{message.pinned_at?'Unpin':'Pin'}</button></div>}
-      {isMine && !message.deleted_at && !editing &&
+      {!readOnly&&!message.deleted_at&&!editing&&<div className="channel-message-actions"><button type="button" disabled={busy} onClick={()=>void pin()}>{message.pinned_at?'Unpin':'Pin'}</button></div>}
+      {!readOnly&&isMine && !message.deleted_at && !editing &&
         <div className="channel-message-actions">
           <button type="button" disabled={busy} onClick={()=>{setDraft(message.body);setError('');setEditing(true);}}>Edit</button>
           <button type="button" disabled={busy} onClick={()=>void remove()}>Delete</button>

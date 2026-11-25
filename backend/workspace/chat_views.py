@@ -172,6 +172,21 @@ class ChatLeaveView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class ChatArchiveView(APIView):
+    @transaction.atomic
+    def post(self, request, chat_id):
+        chat = accessible_chat(request, chat_id)
+        desired = request.data.get('archived')
+        if type(desired) is not bool:
+            raise ValidationError({'archived': 'Provide true or false'})
+        participant = get_object_or_404(ChatParticipant.objects.select_for_update(),
+                                       conversation=chat, user=request.user)
+        if bool(participant.archived_at) != desired:
+            participant.archived_at = timezone.now() if desired else None
+            participant.save(update_fields=['archived_at'])
+        return Response({'archived_at': participant.archived_at})
+
+
 class ChatsView(APIView):
     def get(self, request):
         membership = get_active_membership(request)
@@ -210,6 +225,7 @@ class ChatsView(APIView):
                         ChatParticipant(conversation=chat, user=request.user),
                         ChatParticipant(conversation=chat, user=target.user),
                     ])
+            ChatParticipant.objects.filter(conversation=chat, user=request.user).update(archived_at=None)
             chat = ChatConversation.objects.prefetch_related('participants__user').get(pk=chat.pk)
             if created:
                 publish_notification_refresh(chat.organization_id, [request.user.pk, target.user_id])

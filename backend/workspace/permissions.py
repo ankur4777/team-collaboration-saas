@@ -25,10 +25,17 @@ def require_team_access(request, team, *, manage=False):
     return team_member
 
 
-def require_channel_access(request, channel_id):
+def require_channel_access(request, channel_id, *, write=False):
     channel = Channel.objects.select_related('team').filter(id=channel_id).first()
     if not channel:
         from rest_framework.exceptions import NotFound
         raise NotFound('Channel not found')
     require_team_access(request, channel.team)
+    if write:
+        require_channel_writable(channel)
     return channel
+
+
+def require_channel_writable(channel):
+    if channel.archived_at or channel.team.archived_at:
+        raise PermissionDenied('This channel is archived and read-only. Restore it to make changes.')

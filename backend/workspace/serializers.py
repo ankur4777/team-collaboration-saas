@@ -20,12 +20,12 @@ class OrganizationMemberSerializer(serializers.ModelSerializer):
 class TeamSerializer(serializers.ModelSerializer):
     class Meta:
         model = Team
-        fields = ('id', 'name', 'description', 'created_at')
+        fields = ('id', 'name', 'description', 'created_at', 'archived_at')
 
 class ChannelSerializer(serializers.ModelSerializer):
     class Meta:
         model = Channel
-        fields = ('id', 'name', 'description', 'created_at')
+        fields = ('id', 'name', 'description', 'created_at', 'archived_at')
 
 class MessageSerializer(serializers.ModelSerializer):
     reply_to_id = serializers.UUIDField(read_only=True, allow_null=True)
@@ -47,10 +47,19 @@ class ChatConversationSerializer(serializers.ModelSerializer):
     participants = ChatParticipantSerializer(many=True, read_only=True)
     created_by = UserSerializer(read_only=True)
     unread_count = serializers.SerializerMethodField()
+    archived_at = serializers.SerializerMethodField()
+
+    def get_archived_at(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            participant = next((p for p in obj.participants.all() if p.user_id == request.user.pk), None)
+            if participant and participant.archived_at:
+                return participant.archived_at.isoformat()
+        return None
 
     class Meta:
         model = ChatConversation
-        fields = ('id', 'kind', 'title', 'created_at', 'updated_at', 'created_by', 'participants', 'unread_count')
+        fields = ('id', 'kind', 'title', 'created_at', 'updated_at', 'created_by', 'participants', 'unread_count', 'archived_at')
 
     def get_unread_count(self, obj):
         request = self.context.get('request')

@@ -112,6 +112,8 @@ class Team(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='teams_created')
     created_at = models.DateTimeField(auto_now_add=True)
 
+    archived_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         constraints = [models.UniqueConstraint(fields=['organization', 'name'], name='uq_team_name_per_org')]
 
@@ -137,6 +139,8 @@ class Channel(models.Model):
     name = models.CharField(max_length=100)
     description = models.CharField(max_length=500, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    archived_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=['team', 'name'], name='uq_channel_name_per_team')]
@@ -204,6 +208,8 @@ class ChatParticipant(models.Model):
     joined_at = models.DateTimeField(auto_now_add=True)
     # Latest message timestamp explicitly viewed by this participant.
     last_read_at = models.DateTimeField(null=True, blank=True)
+
+    archived_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [

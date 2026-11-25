@@ -6,8 +6,8 @@ export interface AccountDeviceSession {
 }
 export interface Org { id: string; name: string; slug: string; role: 'owner' | 'admin' | 'member' }
 export interface Session { user: Person; organizations: Org[]; active_organization_id: string | null }
-export interface Team { id: string; name: string; description: string; created_at: string }
-export interface Channel { id: string; name: string; description: string; created_at: string }
+export interface Team { id: string; name: string; description: string; created_at: string; archived_at?: string|null }
+export interface Channel { id: string; name: string; description: string; created_at: string; archived_at?: string|null }
 export interface ChannelNotice {
   channel_id: string; channel_name: string; team_id: string; team_name: string;
   joined_at: string; unread_count: number; last_read_at: string|null;
@@ -37,6 +37,7 @@ export type ForwardResult = {kind:'chat'|'channel';destination_id:string;message
 export interface ChannelMessageCursor { before:string; before_id:string }
 export interface ChannelMessagePage { items:Message[]; has_more:boolean; next_cursor:ChannelMessageCursor|null }
 export interface ChatThread {
+  archived_at?: string|null;
   id: string; kind: 'direct'|'group'; title: string;
   created_at: string; updated_at: string; created_by: Person; unread_count: number;
   participants: Array<{user: Person; joined_at: string; last_read_at: string|null}>;
@@ -189,6 +190,9 @@ export const api = {
   pinChatMessage: (id:string,messageId:string,pinned:boolean) => post<ChatMessage>(`chats/${id}/messages/${messageId}/pin/`,{pinned}),
   forwardDestinations: () => request<ForwardDestination[]>('messages/forward/destinations/'),
   forwardMessage: (sourceKind:'chat'|'channel',sourceId:string,messageId:string,destination:ForwardDestination) => post<ForwardResult>('messages/forward/',{source_kind:sourceKind,source_id:sourceId,message_id:messageId,destination_kind:destination.kind,destination_id:destination.id}),
+  archiveChat: (id:string,archived:boolean) => post<{archived_at:string|null}>(`chats/${id}/archive/`,{archived}),
+  archiveTeam: (id:string,archived:boolean) => post<Team>(`teams/${id}/archive/`,{archived}),
+  archiveChannel: (teamId:string,id:string,archived:boolean) => post<Channel>(`teams/${teamId}/channels/${id}/archive/`,{archived}),
   chats: () => request<ChatThread[]>('chats/'),
   startDirectChat: (email:string) => post<ChatThread>('chats/', {kind:'direct',email}),
   startGroupChat: (title:string,emails:string[]) => post<ChatThread>('chats/', {kind:'group',title,emails}),

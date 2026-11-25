@@ -13,8 +13,8 @@ from .serializers import MessageSerializer, ChatMessageSerializer
 from .views import broadcast_message
 
 
-def channel_history(request, channel_id):
-    channel = require_channel_access(request, channel_id)
+def channel_history(request, channel_id, *, write=False):
+    channel = require_channel_access(request, channel_id, write=write)
     membership = get_object_or_404(TeamMember, team=channel.team, user=request.user)
     return Message.objects.filter(channel=channel, created_at__gte=membership.joined_at)
 
@@ -57,7 +57,7 @@ class ChatPinsView(APIView):
 class ChannelPinView(APIView):
     @transaction.atomic
     def post(self, request, channel_id, message_id):
-        return set_pin(request, channel_history(request, channel_id), message_id, MessageSerializer,
+        return set_pin(request, channel_history(request, channel_id, write=True), message_id, MessageSerializer,
                        lambda payload: broadcast_message(channel_id, payload, action='message.updated'))
 
 
