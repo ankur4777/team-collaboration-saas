@@ -6,6 +6,7 @@ import { api, csrf, type Channel, type ChannelMessageCursor, type ChannelNotice,
 import ChatPanel from './ChatPanel';
 import PlatformAdmin from './PlatformAdmin';
 import SubscriptionBlocked from './SubscriptionBlocked';
+import {SubscriptionSummary} from './SubscriptionSummary';
 import {connectConversationSocket,mergeFreshHistory} from './conversationSocket';
 import {ApiError} from './api';
 import {useWorkspacePresence,PresenceStatus} from './WorkspacePresence';
@@ -399,6 +400,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
     <div className="org-picker"><div className="org-icon">{initials(activeOrg?.name||'TW')}</div><div className="org-label"><strong>{activeOrg?.name||'Choose workspace'}</strong><small>{activeOrg?.role||'No organization'}</small></div><ChevronDown size={16}/>
       <select aria-label="Switch organization" value={session.active_organization_id||''} onChange={e=>switchOrg(e.target.value)}>{session.organizations.map(org=><option key={org.id} value={org.id}>{org.name}</option>)}</select>
     </div>
+    {activeOrg?.subscription&&<SubscriptionSummary subscription={activeOrg.subscription} compact onDetails={()=>{setView('settings');setSidebarOpen(false);}}/>}
     <div className="sidebar-title">WORKSPACE</div><nav className="nav-list">{visibleNav.map(item=><button key={item.id} className={`nav-item ${view===item.id?'active':''}`} onClick={()=>{setView(item.id);setSidebarOpen(false);}}><item.icon size={18}/><span>{item.label}</span>{!item.ready&&<span className="soon-dot" title="Coming next"/>}</button>)}</nav>
     <button className="nav-item" onClick={()=>{setModal('members');setSidebarOpen(false);}}><Users size={18}/><span>Members</span><span className="count-chip">{members.length}</span></button>
     <button className={`nav-item ${view==='settings'?'active':''}`} onClick={()=>{setView('settings');setSidebarOpen(false);}}><Settings2 size={18}/>Settings</button>
@@ -442,7 +444,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
    :view==='inbox' ? <EmailPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id} user={session.user}/>
    :view==='files' ? <SharedFilesPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id}/>
    :view==='meetings'||view==='calendar' ? <MeetingsPanel key={(session.active_organization_id||'none')+view} workspaceId={session.active_organization_id} userId={session.user.id} members={members} teams={teams} calendar={view==='calendar'} callsEnabled={meetingsEnabled} requestedMeeting={openMeetingRequest} onChanged={()=>setNotificationRefresh(v=>v+1)}/>
-   :view==='settings' ? <SettingsPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id} workspaceName={activeOrg?.name||'your workspace'} user={session.user} onPreferencesSaved={()=>setNotificationRefresh(v=>v+1)}/>
+   :view==='settings' ? <SettingsPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id} workspaceName={activeOrg?.name||'your workspace'} subscription={activeOrg?.subscription} user={session.user} onPreferencesSaved={()=>setNotificationRefresh(v=>v+1)}/>
    :view==='search' ? <MessageSearchPanel key={session.active_organization_id||'none'}
         onOpenChat={(id,messageId)=>{setOpenChatRequest({id,messageId,nonce:Date.now()});setView('chats');setSidebarOpen(false);}}
         onOpenChannel={(teamId,channelId,messageId)=>{setChannelJump({id:channelId,messageId,nonce:Date.now()});setSelectedTeam(teamId);setSelectedChannel(channelId);setView('teams');setSidebarOpen(false);}}/>

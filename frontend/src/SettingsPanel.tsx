@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Bell, CheckCircle2, KeyRound, LockKeyhole, MailCheck, ShieldCheck, Laptop, RefreshCw } from 'lucide-react';
-import { api, type AccountDeviceSession, type NotificationPreferences, type Person } from './api';
+import { api, type AccountDeviceSession, type NotificationPreferences, type Person, type SubscriptionAccess } from './api';
+
+import {SubscriptionSummary} from './SubscriptionSummary';
 
 const initialPrefs:NotificationPreferences={direct_chats:true,group_chats:true,team_channels:true};
 const options: Array<{key:keyof NotificationPreferences;title:string;description:string}>=[
@@ -12,6 +14,7 @@ const options: Array<{key:keyof NotificationPreferences;title:string;description
 interface Props{
   workspaceId:string|null;
   workspaceName:string;
+  subscription?:SubscriptionAccess;
   user:Person;
   onPreferencesSaved:()=>void;
 }
@@ -23,7 +26,7 @@ function deviceName(agent:string){
 }
 function dateTime(value:string){return new Date(value).toLocaleString();}
 
-export default function SettingsPanel({workspaceId,workspaceName,user,onPreferencesSaved}:Props){
+export default function SettingsPanel({workspaceId,workspaceName,subscription,user,onPreferencesSaved}:Props){
   const [prefs,setPrefs]=useState<NotificationPreferences>(initialPrefs);
   const [loading,setLoading]=useState(true);
   const [saving,setSaving]=useState(false);
@@ -122,6 +125,7 @@ export default function SettingsPanel({workspaceId,workspaceName,user,onPreferen
   return <div className="settings-page">
     <div className="settings-title"><div className="eyebrow">WORKSPACE / SETTINGS</div><h1>Account & notifications</h1>
       <p>Manage your personal security and notification choices for {workspaceName}.</p></div>
+    {subscription&&<SubscriptionSummary subscription={subscription}/>}
     <div className="settings-layout">
       <section className="settings-card">
         <div className="settings-card-head"><Bell size={19}/><div><h2>In-app notifications</h2><p>Choose what appears in your notification bell.</p></div></div>

@@ -17,7 +17,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import CompanyLicense, Invitation, Organization, OrganizationMember, PlatformAuditEntry
 
-from .license_access import effective_status, MODULES
+from .license_access import effective_status, expiry_summary, MODULES
 from .seat_limits import seat_available, seat_usage, SEAT_LIMIT_MESSAGE
 
 logger = logging.getLogger(__name__)
@@ -90,7 +90,7 @@ def company_data(org):
         'created_at': org.created_at.isoformat(), 'employee_count': org.employee_count,
         'team_count': org.team_count, 'owner_emails': owners,
         'pending_owner_email': pending.email if pending else None,
-        'effective_status': effective, **data,
+        'effective_status': effective, **data, **expiry_summary(license_row),
         'seats_remaining': None if license_row.seat_limit is None else max(0, license_row.seat_limit-org.employee_count),
     }
 

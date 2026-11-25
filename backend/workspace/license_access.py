@@ -3,6 +3,7 @@
 Unassigned/legacy workspaces are deliberately unrestricted during rollout.
 Dates are inclusive, interpreted in the application's configured timezone.
 """
+from datetime import date, datetime, time, timedelta
 from django.utils import timezone
 from .models import CompanyLicense
 
@@ -68,9 +69,23 @@ def route_modules(path):
     return ()
 
 
+def expiry_summary(row, now=None):
+    """End date is inclusive; access expires at the next local midnight."""
+    now = now or timezone.now()
+    end = row.ends_on if row else None
+    expires_at = None
+    if end and end < date.max:
+        expires_at = timezone.make_aware(datetime.combine(end + timedelta(days=1), time.min),
+                                         timezone.get_default_timezone())
+    return {'server_now': now.isoformat(), 'expires_at': expires_at.isoformat() if expires_at else None,
+            'subscription_timezone': str(timezone.get_default_timezone()),
+            'remaining_seconds': max(0, int((expires_at-now).total_seconds())) if expires_at else None}
+
+
 def access_summary(row):
-    status = effective_status(row)
-    return {'status': status, 'allowed': status not in BLOCKED,
+    now = timezone.now()
+    status = effective_status(row, timezone.localdate(now, timezone.get_default_timezone()))
+    return {**expiry_summary(row, now), 'status': status, 'allowed': status not in BLOCKED,
             'plan': row.plan if row else '',
             'modules': sorted(enabled_modules(row)),
             'enforce_modules': bool(row and row.enforce_modules),

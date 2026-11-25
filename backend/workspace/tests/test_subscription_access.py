@@ -76,3 +76,20 @@ class SubscriptionAccessTests(TestCase):
         row.save()
         self.assertEqual(self.client.get('/api/teams/').status_code,200)
         self.assertTrue(Team.objects.filter(organization=self.org,name='Entitled').exists())
+
+    def test_countdown_uses_inclusive_utc_end_date(self):
+        from datetime import datetime, timezone as utc
+        from unittest.mock import patch
+        from workspace.license_access import access_summary
+        now = datetime(2026, 11, 25, 12, 30, tzinfo=utc.utc)
+        row = CompanyLicense.objects.create(organization=self.org, status='active', ends_on=now.date())
+        with patch('workspace.license_access.timezone.now', return_value=now):
+            info = access_summary(row)
+            self.assertEqual(info['remaining_seconds'], 41400)
+            self.assertEqual(info['expires_at'], '2026-11-26T00:00:00+00:00')
+            self.assertEqual(info['status'], 'active')
+            row.ends_on = now.date()-timedelta(days=1)
+            self.assertEqual(access_summary(row)['remaining_seconds'], 0)
+            self.assertEqual(access_summary(row)['status'], 'expired')
+            row.ends_on = None
+            self.assertIsNone(access_summary(row)['expires_at'])
