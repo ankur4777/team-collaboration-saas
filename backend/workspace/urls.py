@@ -14,6 +14,7 @@ from . import auth_views, views, member_views, chat_views, channel_notifications
 urlpatterns = [
     path('platform/companies/', platform_admin.CompanyListView.as_view()),
     path('platform/companies/<uuid:company_id>/', platform_admin.CompanyDetailView.as_view()),
+    path('platform/companies/<uuid:company_id>/renewals/', platform_admin.CompanyRenewalView.as_view()),
     path('platform/companies/<uuid:company_id>/invite-owner/', platform_admin.OwnerInviteView.as_view()),
     path('meetings/<uuid:meeting_id>/call/translate/', CallTranslateView.as_view()),
     path('meetings/<uuid:meeting_id>/call/', meeting_calls.MeetingCallConfigView.as_view()),

@@ -155,8 +155,13 @@ export type LicenseStatus='unassigned'|'trial'|'active'|'suspended'|'cancelled';
 export interface CompanyLicense {contact_email:string;plan:string;status:LicenseStatus;seat_limit:number|null;starts_on:string|null;ends_on:string|null;modules:string[];enforce_modules?:boolean}
 export interface PlatformCompany extends CompanyLicense, SubscriptionTiming {id:string;name:string;slug:string;created_at:string;employee_count:number;seats_remaining?:number|null;team_count:number;owner_emails:string[];pending_owner_email:string|null;effective_status:string}
 export interface PlatformCompanies {items:PlatformCompany[];total:number;page:number;page_size:number;stats:{companies:number;active:number;trial:number;expired:number;suspended:number;memberships:number}}
+export interface SubscriptionRenewal {id:string;days:number;previous_start:string|null;previous_end:string|null;previous_status:string;new_start:string;new_end:string;new_status:string;reactivate:boolean;note:string;actor:string;created_at:string}
+export interface RenewalInput {request_id:string;days:number;reactivate:boolean;note:string}
+export interface RenewalPage {items:SubscriptionRenewal[];total:number;page:number;page_size:number}
 export interface PlatformAudit {action:string;actor:string;created_at:string;changes:Record<string,unknown>}
 export const api = {
+  platformRenewals: (id:string,page=1) => request<RenewalPage>(`platform/companies/${id}/renewals/?page=${page}`),
+  renewPlatformCompany: (id:string,data:RenewalInput) => post<{company:PlatformCompany;renewal:SubscriptionRenewal;replayed:boolean}>(`platform/companies/${id}/renewals/`,data),
   platformCompanies: (q='',status='',page=1) => request<PlatformCompanies>(`platform/companies/?${new URLSearchParams({q,status,page:String(page)})}`),
   platformCompany: (id:string) => request<{company:PlatformCompany;audit:PlatformAudit[]}>(`platform/companies/${id}/`),
   createPlatformCompany: (data:CompanyLicense&{name:string;owner_email:string}) => post<{company:PlatformCompany;invitation_sent:boolean}>('platform/companies/',data),

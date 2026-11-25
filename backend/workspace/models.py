@@ -88,6 +88,26 @@ class CompanyLicense(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
+class SubscriptionRenewal(models.Model):
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name='subscription_renewals')
+    actor = models.ForeignKey(User, on_delete=models.PROTECT, related_name='subscription_renewals')
+    request_id = models.UUIDField()
+    days = models.PositiveIntegerField()
+    previous_start = models.DateField(null=True, blank=True)
+    previous_end = models.DateField(null=True, blank=True)
+    previous_status = models.CharField(max_length=16)
+    new_start = models.DateField()
+    new_end = models.DateField()
+    new_status = models.CharField(max_length=16)
+    reactivate = models.BooleanField(default=False)
+    note = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+        constraints = [models.UniqueConstraint(fields=['organization', 'request_id'], name='uq_company_renewal_request')]
+
+
 class PlatformAuditEntry(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name='platform_audit_entries')
     actor = models.ForeignKey(User, on_delete=models.PROTECT, related_name='platform_audit_entries')

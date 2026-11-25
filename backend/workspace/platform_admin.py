@@ -1,4 +1,5 @@
 """Provider-only commercial administration. No tenant message/content access."""
+from datetime import timedelta
 import hashlib
 import logging
 import secrets
@@ -15,7 +16,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import CompanyLicense, Invitation, Organization, OrganizationMember, PlatformAuditEntry
+from .models import CompanyLicense, Invitation, Organization, OrganizationMember, PlatformAuditEntry, SubscriptionRenewal
 
 from .license_access import effective_status, expiry_summary, MODULES
 from .seat_limits import seat_available, seat_usage, SEAT_LIMIT_MESSAGE
@@ -223,3 +224,87 @@ class OwnerInviteView(PlatformView):
             token = invite_owner(org,request.user,email)
             audit(org,request.user,'owner_invited',{'email':email})
         return Response({'invitation_sent':deliver_owner_invite(org,email,token)})
+
+
+class RenewalInput(serializers.Serializer):
+    request_id = serializers.UUIDField()
+    days = serializers.IntegerField(min_value=1, max_value=3650)
+    reactivate = serializers.BooleanField(default=False)
+    note = serializers.CharField(max_length=500, required=False, allow_blank=True, default='')
+
+
+def renewal_data(row):
+    return {
+        'id': str(row.pk), 'days': row.days,
+        'previous_start': row.previous_start.isoformat() if row.previous_start else None,
+        'previous_end': row.previous_end.isoformat() if row.previous_end else None,
+        'previous_status': row.previous_status,
+        'new_start': row.new_start.isoformat(), 'new_end': row.new_end.isoformat(),
+        'new_status': row.new_status, 'reactivate': row.reactivate, 'note': row.note,
+        'actor': row.actor.email, 'created_at': row.created_at.isoformat(),
+    }
+
+
+class CompanyRenewalView(PlatformView):
+    def get(self, request, company_id):
+        org = get_object_or_404(Organization, pk=company_id)
+        try:
+            page = int(request.query_params.get('page', '1'))
+        except (ValueError, TypeError):
+            raise ValidationError({'page': 'Invalid page'})
+        if not 1 <= page <= 100000:
+            raise ValidationError({'page': 'Invalid page'})
+        rows = org.subscription_renewals.select_related('actor')
+        offset = (page-1)*PAGE_SIZE
+        return Response({'items': [renewal_data(row) for row in rows[offset:offset+PAGE_SIZE]],
+                         'total': rows.count(), 'page': page, 'page_size': PAGE_SIZE})
+
+    @transaction.atomic
+    def post(self, request, company_id):
+        serializer = RenewalInput(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        org = get_object_or_404(Organization.objects.select_for_update(), pk=company_id)
+        prior = SubscriptionRenewal.objects.select_related('actor').filter(
+            organization=org, request_id=data['request_id']).first()
+        if prior:
+            if (prior.days != data['days'] or prior.reactivate != data['reactivate'] or prior.note != data['note']):
+                raise ValidationError({'request_id': 'This renewal request has already been used with different details'})
+            return Response({'company': company_data(companies().get(pk=org.pk)),
+                             'renewal': renewal_data(prior), 'replayed': True})
+        row, _ = CompanyLicense.objects.get_or_create(organization=org)
+        today = timezone.localdate()
+        previous = license_data(row)
+        try:
+            if row.ends_on and row.ends_on >= today:
+                # Keep the remaining paid period and add exactly N days.
+                start = row.starts_on or today
+                end = row.ends_on + timedelta(days=data['days'])
+            else:
+                # Lapsed or undated licenses receive a fresh term.
+                start = max(today, row.starts_on or today)
+                end = start + timedelta(days=data['days']-1)
+        except OverflowError:
+            raise ValidationError({'days': 'Renewal end date is out of range'})
+        if end < start:
+            raise ValidationError({'days': 'Renewal end date precedes the start date'})
+        status = row.status
+        if status not in ('suspended', 'cancelled') or data['reactivate']:
+            status = 'active'
+        record = SubscriptionRenewal.objects.create(
+            organization=org, actor=request.user, request_id=data['request_id'],
+            days=data['days'], previous_start=row.starts_on, previous_end=row.ends_on,
+            previous_status=row.status, new_start=start, new_end=end,
+            new_status=status, reactivate=data['reactivate'], note=data['note'],
+        )
+        row.starts_on, row.ends_on, row.status = start, end, status
+        row.save(update_fields=['starts_on','ends_on','status','updated_at'])
+        updated = license_data(row)
+        audit(org, request.user, 'subscription_renewed', {
+            'renewal_id': str(record.pk), 'days': data['days'],
+            'starts_on': {'from': previous['starts_on'], 'to': updated['starts_on']},
+            'ends_on': {'from': previous['ends_on'], 'to': updated['ends_on']},
+            'status': {'from': previous['status'], 'to': updated['status']},
+        })
+        return Response({'company': company_data(companies().get(pk=org.pk)),
+                         'renewal': renewal_data(record), 'replayed': False}, status=201)
