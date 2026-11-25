@@ -25,7 +25,7 @@ class TeamSerializer(serializers.ModelSerializer):
 class ChannelSerializer(serializers.ModelSerializer):
     class Meta:
         model = Channel
-        fields = ('id', 'name', 'description', 'created_at', 'archived_at')
+        fields = ('id', 'name', 'description', 'created_at', 'archived_at', 'is_private')
 
 class MessageSerializer(serializers.ModelSerializer):
     reply_to_id = serializers.UUIDField(read_only=True, allow_null=True)

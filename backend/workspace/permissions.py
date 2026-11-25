@@ -1,5 +1,6 @@
 from rest_framework.exceptions import PermissionDenied
-from .models import OrganizationMember, TeamMember, Channel
+from django.db.models import Q
+from .models import OrganizationMember, TeamMember, Channel, PrivateChannelMember
 
 
 def get_active_membership(request):
@@ -25,12 +26,36 @@ def require_team_access(request, team, *, manage=False):
     return team_member
 
 
+def channel_access_filter(user_id):
+    return Q(is_private=False) | Q(private_members__team_member__user_id=user_id)
+
+
+def channel_joined_at(channel, user_id):
+    member = TeamMember.objects.filter(team_id=channel.team_id, user_id=user_id).first()
+    if not member:
+        raise PermissionDenied('No access to this channel')
+    if not channel.is_private:
+        return member.joined_at
+    private = PrivateChannelMember.objects.filter(channel=channel, team_member=member).first()
+    if not private:
+        raise PermissionDenied('No access to this private channel')
+    return max(member.joined_at, private.joined_at)
+
+
+def channel_team_members(channel):
+    rows = TeamMember.objects.filter(team_id=channel.team_id)
+    if channel.is_private:
+        rows = rows.filter(private_channel_memberships__channel=channel)
+    return rows
+
+
 def require_channel_access(request, channel_id, *, write=False):
     channel = Channel.objects.select_related('team').filter(id=channel_id).first()
     if not channel:
         from rest_framework.exceptions import NotFound
         raise NotFound('Channel not found')
     require_team_access(request, channel.team)
+    channel_joined_at(channel, request.user.pk)
     if write:
         require_channel_writable(channel)
     return channel

@@ -7,7 +7,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import Channel, ChatConversation, ChatMessage, ChatParticipant, Message, TeamMember
-from .permissions import get_active_membership, require_channel_writable
+from .permissions import get_active_membership, require_channel_writable, channel_access_filter, channel_joined_at, channel_team_members
 from .chat_views import publish_chat_message
 from .views import broadcast_message
 from .notification_events import publish_notification_refresh
@@ -19,7 +19,7 @@ def chat_rows(org, user):
 
 
 def channel_rows(org, user):
-    return Channel.objects.filter(team__organization_id=org, team__members__user=user)
+    return Channel.objects.filter(team__organization_id=org, team__members__user=user).filter(channel_access_filter(user.pk))
 
 
 def parse_location(data, prefix):
@@ -65,7 +65,7 @@ class ForwardMessageView(APIView):
                                          conversation=source, deleted_at__isnull=True, created_at__gte=joined)
         else:
             source = get_object_or_404(channel_rows(org, user), pk=source_id)
-            joined = get_object_or_404(TeamMember, team_id=source.team_id, user=user).joined_at
+            joined = channel_joined_at(source, user.pk)
             original = get_object_or_404(Message.objects.select_for_update(), pk=message_id,
                                          channel=source, deleted_at__isnull=True, created_at__gte=joined)
         if not original.body.strip():
@@ -86,8 +86,8 @@ class ForwardMessageView(APIView):
             require_channel_writable(dest)
             message = Message.objects.create(channel=dest, sender=user, body=original.body, is_forwarded=True)
             payload = MessageSerializer(message).data
-            recipients = list(TeamMember.objects.filter(
-                team_id=dest.team_id, user__is_active=True,
+            recipients = list(channel_team_members(dest).filter(
+                user__is_active=True,
                 user__organization_memberships__organization_id=org,
             ).values_list('user_id', flat=True).distinct())
             transaction.on_commit(lambda: broadcast_message(dest.pk, payload))

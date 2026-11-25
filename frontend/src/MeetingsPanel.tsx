@@ -127,7 +127,7 @@ function MeetingEditor({
     Promise.all([api.channels(teamId), api.teamMembers(teamId)])
       .then(([c, m]) => {
         if (active) {
-          setChannels(c);
+          setChannels(c.filter(row=>!row.is_private));
           setTeamUsers(m.map((v) => v.user.id));
         }
       })

@@ -9,7 +9,7 @@ export interface AccountDeviceSession {
 export interface Org { id: string; name: string; slug: string; role: 'owner' | 'admin' | 'member' }
 export interface Session { user: Person; organizations: Org[]; active_organization_id: string | null }
 export interface Team { id: string; name: string; description: string; created_at: string; archived_at?: string|null }
-export interface Channel { id: string; name: string; description: string; created_at: string; archived_at?: string|null }
+export interface Channel { id: string; name: string; description: string; created_at: string; archived_at?: string|null; is_private?:boolean }
 export interface ConversationPreferences {is_muted:boolean;is_pinned:boolean}
 export interface ChannelNotice {
   is_muted?:boolean;is_pinned?:boolean;
@@ -231,7 +231,10 @@ export const api = {
   channelNotifications: () => request<ChannelNotice[]>('channel-notifications/'),
   markChannelRead: (channelId:string, messageId:string) => post<{last_read_at:string}>(`channels/${channelId}/read/`, {message_id:messageId}),
   channels: (teamId:string) => request<Channel[]>(`teams/${teamId}/channels/`),
-  createChannel: (teamId:string, name:string) => post<Channel>(`teams/${teamId}/channels/`, {name}),
+  createChannel: (teamId:string, name:string, isPrivate=false) => post<Channel>(`teams/${teamId}/channels/`, {name,is_private:isPrivate}),
+  privateChannelMembers: (id:string) => request<Array<Pick<Person,'id'|'email'|'full_name'>>>(`channels/${id}/members/`),
+  addPrivateChannelMember: (id:string,email:string) => post<{id:string}>(`channels/${id}/members/`,{email}),
+  removePrivateChannelMember: (id:string,userId:string) => request<void>(`channels/${id}/members/${userId}/`,'DELETE'),
   teamMembers: (teamId:string) => request<Array<{user:Person;role:string}>>(`teams/${teamId}/members/`),
   addTeamMember: (teamId:string,email:string) => post(`teams/${teamId}/members/`,{email}),
   messages: (channelId:string) => request<Message[]>(`channels/${channelId}/messages/`),

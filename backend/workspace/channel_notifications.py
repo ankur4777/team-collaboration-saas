@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Channel, ChannelReadCursor, Message, TeamMember
-from .permissions import get_active_membership, require_channel_access
+from .permissions import get_active_membership, require_channel_access, channel_access_filter, channel_joined_at
 
 
 class ChannelNotificationsView(APIView):
@@ -26,7 +26,7 @@ class ChannelNotificationsView(APIView):
             ).only('team_id', 'joined_at')
         }
         channels = list(
-            Channel.objects.filter(team_id__in=joined_teams)
+            Channel.objects.filter(team_id__in=joined_teams).filter(channel_access_filter(request.user.pk))
             .select_related('team').order_by('team__name', 'name')[:500]
         )
         read_times = {
@@ -40,7 +40,8 @@ class ChannelNotificationsView(APIView):
         for channel in channels:
             state = read_times.get(channel.pk)
             last_read = state.last_read_at if state else None
-            baseline = joined_teams[channel.team_id]
+            joined = channel_joined_at(channel, request.user.pk)
+            baseline = joined
             if last_read and last_read > baseline:
                 baseline = last_read
             count = (Message.objects.filter(channel=channel, created_at__gt=baseline, deleted_at__isnull=True)
@@ -50,7 +51,7 @@ class ChannelNotificationsView(APIView):
                 'channel_name': channel.name,
                 'team_id': str(channel.team_id),
                 'team_name': channel.team.name,
-                'joined_at': joined_teams[channel.team_id].isoformat(),
+                'joined_at': joined.isoformat(),
                 'unread_count': count,
                 'is_muted': bool(state and state.is_muted),
                 'is_pinned': bool(state and state.is_pinned),
@@ -68,8 +69,7 @@ class ChannelReadView(APIView):
         except (TypeError, ValueError, AttributeError):
             raise ValidationError({'message_id': 'Provide a valid message ID'})
         message = get_object_or_404(Message, pk=message_id, channel=channel)
-        team_member = TeamMember.objects.get(team=channel.team, user=request.user)
-        if message.created_at < team_member.joined_at:
+        if message.created_at < channel_joined_at(channel, request.user.pk):
             raise ValidationError({'message_id': 'Message predates your team membership'})
 
         with transaction.atomic():

@@ -16,8 +16,8 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .auth_views import auth_payload
-from .models import Channel, ChannelReadCursor, Invitation, MentionNotification, Message, Organization, OrganizationMember, Team, TeamMember, User
-from .permissions import get_active_membership, require_channel_access, require_team_access
+from .models import Channel, ChannelReadCursor, PrivateChannelMember, Invitation, MentionNotification, Message, Organization, OrganizationMember, Team, TeamMember, User
+from .permissions import get_active_membership, require_channel_access, require_team_access, channel_access_filter, channel_joined_at, channel_team_members
 from .notification_events import publish_notification_refresh
 from .mentions import create_mentions
 from .message_replies import resolve_reply_target
@@ -150,6 +150,7 @@ class ChannelArchiveView(APIView):
     def post(self, request, team_id, channel_id):
         team = locked_team(request, team_id)
         channel = get_object_or_404(Channel, pk=channel_id, team=team)
+        channel_joined_at(channel, request.user.pk)
         return archive_record(request, channel, ChannelSerializer)
 
 
@@ -164,6 +165,7 @@ class ChannelDetailView(APIView):
     def patch(self, request, team_id, channel_id):
         team = locked_team(request, team_id)
         channel = get_object_or_404(Channel, pk=channel_id, team=team)
+        channel_joined_at(channel, request.user.pk)
         return update_name(request, channel, ChannelSerializer, 100)
 
 
@@ -243,7 +245,7 @@ class TeamChannelsView(APIView):
 
     def get(self, request, team_id):
         team = self.get_team(request, team_id)
-        return Response(ChannelSerializer(team.channels.order_by('created_at'), many=True).data)
+        return Response(ChannelSerializer(team.channels.filter(channel_access_filter(request.user.pk)).order_by('created_at'), many=True).data)
 
     @transaction.atomic
     def post(self, request, team_id):
@@ -253,12 +255,65 @@ class TeamChannelsView(APIView):
         name = str(request.data.get('name', '')).strip()
         if not name or len(name) > 100:
             raise ValidationError({'name': 'Channel name is required (max 100 characters)'})
+        private = request.data.get('is_private', False)
+        if type(private) is not bool:
+            raise ValidationError({'is_private': 'Provide true or false'})
         try:
             with transaction.atomic():
-                channel = Channel.objects.create(team=team, name=name)
+                channel = Channel.objects.create(team=team, name=name, is_private=private)
+                if private:
+                    PrivateChannelMember.objects.create(channel=channel, team_member=TeamMember.objects.get(team=team, user=request.user))
         except IntegrityError:
             raise ValidationError({'name': 'This channel already exists'})
         return Response(ChannelSerializer(channel).data, status=status.HTTP_201_CREATED)
+
+
+class PrivateChannelMembersView(APIView):
+    def get(self, request, channel_id):
+        channel = require_channel_access(request, channel_id)
+        if not channel.is_private:
+            raise ValidationError({'detail': 'Only private channels have separate members'})
+        rows = channel_team_members(channel).select_related('user')
+        return Response([{'id': str(row.user_id), 'full_name': row.user.full_name,
+                          'email': row.user.email} for row in rows])
+
+    @transaction.atomic
+    def post(self, request, channel_id):
+        channel = require_channel_access(request, channel_id, write=True)
+        team = locked_team(request, channel.team_id)
+        channel_joined_at(channel, request.user.pk)
+        if not channel.is_private:
+            raise ValidationError({'detail': 'Only private channels have separate members'})
+        email = request.data.get('email')
+        if not isinstance(email, str) or len(email) > 254:
+            raise ValidationError({'email': 'Choose a team member'})
+        member = get_object_or_404(
+            TeamMember, team=team, user__email__iexact=email.strip(), user__is_active=True,
+            user__organization_memberships__organization_id=team.organization_id,
+        )
+        _, created = PrivateChannelMember.objects.get_or_create(channel=channel, team_member=member)
+        if created:
+            transaction.on_commit(lambda: publish_team_membership_change(team.pk))
+            transaction.on_commit(lambda: publish_notification_refresh(team.organization_id, [member.user_id]))
+        return Response({'id': str(member.user_id)}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+class PrivateChannelMemberDetailView(APIView):
+    @transaction.atomic
+    def delete(self, request, channel_id, user_id):
+        channel = require_channel_access(request, channel_id, write=True)
+        team = locked_team(request, channel.team_id)
+        channel_joined_at(channel, request.user.pk)
+        if not channel.is_private:
+            raise ValidationError({'detail': 'Only private channels have separate members'})
+        if user_id == request.user.pk:
+            raise ValidationError({'detail': 'You cannot remove yourself here'})
+        target = get_object_or_404(PrivateChannelMember, channel=channel, team_member__user_id=user_id)
+        target.delete()
+        ChannelReadCursor.objects.filter(channel=channel, user_id=user_id).delete()
+        transaction.on_commit(lambda: publish_team_membership_change(team.pk))
+        transaction.on_commit(lambda: publish_notification_refresh(team.organization_id, [user_id]))
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class TeamMembersView(APIView):
@@ -297,7 +352,7 @@ def broadcast_message(channel_id, payload, action='message'):
 class ChannelMessagesView(APIView):
     def get(self, request, channel_id):
         channel = require_channel_access(request, channel_id)
-        joined = TeamMember.objects.get(team=channel.team, user=request.user).joined_at
+        joined = channel_joined_at(channel, request.user.pk)
         records = Message.objects.filter(channel=channel, created_at__gte=joined).select_related('sender')
         before = request.query_params.get('before')
         before_id = request.query_params.get('before_id')
@@ -347,11 +402,10 @@ class ChannelMessagesView(APIView):
         if not body or len(body) > 4000:
             raise ValidationError({'body': 'Message must contain 1–4000 characters'})
         with transaction.atomic():
-            joined = TeamMember.objects.get(team=channel.team, user=request.user).joined_at
+            joined = channel_joined_at(channel, request.user.pk)
             reply_id = resolve_reply_target(request, Message.objects.filter(channel=channel, created_at__gte=joined))
             message = Message.objects.create(channel=channel, sender=request.user, body=body, reply_to_id=reply_id)
-            eligible_members = list(TeamMember.objects.filter(
-                team=channel.team,
+            eligible_members = list(channel_team_members(channel).filter(
                 user__organization_memberships__organization_id=channel.team.organization_id,
                 user__is_active=True,
             ).select_related('user').distinct())
@@ -374,7 +428,7 @@ class ChannelMessageDetailView(APIView):
 
     def patch(self, request, channel_id, message_id):
         channel = require_channel_access(request, channel_id, write=True)
-        joined = TeamMember.objects.get(team=channel.team, user=request.user).joined_at
+        joined = channel_joined_at(channel, request.user.pk)
         body = request.data.get('body')
         if not isinstance(body, str) or not 1 <= len(body.strip()) <= 4000:
             raise ValidationError({'body': 'Message must contain 1–4000 characters'})
@@ -398,7 +452,7 @@ class ChannelMessageDetailView(APIView):
 
     def delete(self, request, channel_id, message_id):
         channel = require_channel_access(request, channel_id, write=True)
-        joined = TeamMember.objects.get(team=channel.team, user=request.user).joined_at
+        joined = channel_joined_at(channel, request.user.pk)
         with transaction.atomic():
             message = get_object_or_404(
                 Message.objects.select_for_update().select_related('sender').filter(created_at__gte=joined),
@@ -419,8 +473,7 @@ class ChannelMessageDetailView(APIView):
                 transaction.on_commit(
                     lambda: broadcast_message(channel.pk, payload, action='message.deleted')
                 )
-                members = list(TeamMember.objects.filter(
-                    team=channel.team,
+                members = list(channel_team_members(channel).filter(
                     user__organization_memberships__organization_id=channel.team.organization_id,
                     user__is_active=True,
                 ).values_list('user_id', flat=True))

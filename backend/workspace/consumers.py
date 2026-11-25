@@ -4,6 +4,8 @@ from django.utils.dateparse import parse_datetime
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from .models import Channel, TeamMember, OrganizationMember, ChatConversation, ChatParticipant
 from .device_sessions import GENERATION_KEY, live_websocket_session
+from .permissions import channel_access_filter, channel_joined_at
+from rest_framework.exceptions import PermissionDenied
 
 
 class ChannelConsumer(AsyncJsonWebsocketConsumer):
@@ -71,10 +73,13 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         timestamp = parse_datetime(created_at)
         if timestamp is None:
             return False
-        return TeamMember.objects.filter(
-            team__channels__id=channel_id, user_id=user_id,
-            joined_at__lte=timestamp,
-        ).exists()
+        channel = Channel.objects.filter(pk=channel_id).first()
+        if channel is None:
+            return False
+        try:
+            return channel_joined_at(channel, user_id) <= timestamp
+        except PermissionDenied:
+            return False
 
     @database_sync_to_async
     def allowed(self, user_id, channel_id, organization_id):
@@ -87,7 +92,7 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
             id=channel_id, team__organization_id=organization_id,
             team__members__user_id=user_id,
             team__organization__members__user_id=user_id,
-        ).exists())
+        ).filter(channel_access_filter(user_id)).exists())
 
 
 

@@ -15,7 +15,8 @@ from rest_framework.views import APIView
 from .models import (
     ChatParticipant, MentionNotification, OrganizationMember, TeamMember,
 )
-from .permissions import get_active_membership
+from .permissions import get_active_membership, channel_joined_at
+from rest_framework.exceptions import PermissionDenied
 
 
 def mentioned_user_ids(body, eligible_users, sender_id):
@@ -85,8 +86,11 @@ def visible(notification, membership, chat_joins, team_joins):
         message = notification.channel_message
         if message.deleted_at or message.channel.team.organization_id != membership.organization_id:
             return False
-        joined = team_joins.get(message.channel.team_id)
-        return joined is not None and message.created_at >= joined
+        try:
+            joined = channel_joined_at(message.channel, membership.user_id)
+        except PermissionDenied:
+            return False
+        return message.created_at >= joined
     return False
 
 

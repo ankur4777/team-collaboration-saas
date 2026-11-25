@@ -122,6 +122,8 @@ class MeetingInput(serializers.Serializer):
         channel = None
         if data['channel_id']:
             channel = require_channel_access(request, data['channel_id'])
+            if channel.is_private:
+                raise serializers.ValidationError({'channel_id': 'Private channel-linked meetings are not supported yet.'})
             team_ids = set(TeamMember.objects.filter(team=channel.team, user_id__in=active_users(org)).values_list('user_id', flat=True))
             if not ids.issubset(team_ids):
                 raise serializers.ValidationError({'attendee_ids': 'Channel meetings can invite current members of that team only.'})

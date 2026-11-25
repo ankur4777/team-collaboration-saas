@@ -7,13 +7,13 @@ are applied in SQL before any text is returned.
 from datetime import date, datetime, time, timedelta, timezone
 from uuid import UUID
 from django.core import signing
-from django.db.models import F, Q
+from django.db.models import F, Q, OuterRef, Exists
 from django.utils.dateparse import parse_datetime
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import ChatMessage, Message
+from .models import ChatMessage, Message, PrivateChannelMember
 from .permissions import get_active_membership
 
 MAX_RESULTS = 50
@@ -118,6 +118,10 @@ class MessageSearchView(APIView):
                     body__icontains=query,
                     deleted_at__isnull=True,
                 )
+                .filter(Q(channel__is_private=False) | Exists(PrivateChannelMember.objects.filter(
+                    channel_id=OuterRef('channel_id'), team_member__user=request.user,
+                    joined_at__lte=OuterRef('created_at'),
+                )))
                 .select_related('sender', 'channel__team')
             )
             for message in constrain(channels, 'channel'):

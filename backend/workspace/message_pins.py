@@ -8,15 +8,14 @@ from rest_framework.views import APIView
 
 from .chat_views import accessible_chat, visible_chat_messages, publish_chat_message
 from .models import Message, TeamMember
-from .permissions import require_channel_access
+from .permissions import require_channel_access, channel_joined_at
 from .serializers import MessageSerializer, ChatMessageSerializer
 from .views import broadcast_message
 
 
 def channel_history(request, channel_id, *, write=False):
     channel = require_channel_access(request, channel_id, write=write)
-    membership = get_object_or_404(TeamMember, team=channel.team, user=request.user)
-    return Message.objects.filter(channel=channel, created_at__gte=membership.joined_at)
+    return Message.objects.filter(channel=channel, created_at__gte=channel_joined_at(channel, request.user.pk))
 
 
 def chat_history(request, chat_id):

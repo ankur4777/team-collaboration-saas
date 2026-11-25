@@ -17,7 +17,7 @@ from rest_framework.views import APIView
 
 from .chat_views import accessible_chat
 from .models import ChatConversation, ChatParticipant, PrivateAttachment, TeamMember
-from .permissions import get_active_membership, require_channel_access
+from .permissions import get_active_membership, require_channel_access, channel_joined_at
 
 MAX_BYTES = 5 * 1024 * 1024
 ALLOWED = {
@@ -89,7 +89,7 @@ def visible_chat_attachments(request, chat):
 
 
 def visible_channel_attachments(request, channel):
-    joined = TeamMember.objects.get(team=channel.team, user=request.user).joined_at
+    joined = channel_joined_at(channel, request.user.pk)
     return PrivateAttachment.objects.filter(
         organization_id=channel.team.organization_id, channel=channel,
         created_at__gte=joined,

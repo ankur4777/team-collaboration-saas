@@ -141,10 +141,20 @@ class Channel(models.Model):
     description = models.CharField(max_length=500, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    is_private = models.BooleanField(default=False)
     archived_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=['team', 'name'], name='uq_channel_name_per_team')]
+
+
+class PrivateChannelMember(models.Model):
+    channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name='private_members')
+    team_member = models.ForeignKey(TeamMember, on_delete=models.CASCADE, related_name='private_channel_memberships')
+    joined_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['channel', 'team_member'], name='uq_private_channel_member')]
 
 
 class Message(models.Model):

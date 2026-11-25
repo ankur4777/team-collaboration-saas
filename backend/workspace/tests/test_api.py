@@ -195,3 +195,36 @@ class WorkspaceAPITests(TestCase):
         rows = self.post(f'/api/organizations/{other.pk}/presence/',{}).json()['members']
         self.assertEqual([row['user_id'] for row in rows],[str(owner.user_id)])
         self.assertEqual(self.client.post(path,data='{}',content_type='application/json').status_code,403)
+
+    def test_private_channels_isolate_search_history_and_access(self):
+        session = self.register()
+        org = Organization.objects.get(pk=session['active_organization_id'])
+        staff = get_user_model().objects.create_user('private@company-a.test','SecurePass123!',full_name='Private Staff')
+        OrganizationMember.objects.create(organization=org,user=staff)
+        team = self.post('/api/teams/',{'name':'Restricted'}).json()
+        base = f"/api/teams/{team['id']}/"
+        self.assertEqual(self.post(base+'members/',{'email':staff.email}).status_code,201)
+        channel = self.post(base+'channels/',{'name':'Confidential','is_private':True}).json()
+        url = f"/api/channels/{channel['id']}/"
+        first = self.post(url+'messages/',{'body':'Confidential alpha'}).json()
+        def login(email):
+            self.post('/api/auth/logout/',{})
+            self.assertEqual(self.post('/api/auth/login/',{'email':email,'password':'SecurePass123!'}).status_code,200)
+        login(staff.email)
+        self.assertNotIn(channel['id'],[r['id'] for r in self.client.get(base+'channels/').json()])
+        for route in ('messages/','attachments/','pins/','members/'):
+            self.assertEqual(self.client.get(url+route).status_code,403)
+        self.assertEqual(self.client.get('/api/search/messages/',{'q':'Confidential'}).json()['results'],[])
+        self.assertNotIn(channel['id'],[r['channel_id'] for r in self.client.get('/api/channel-notifications/').json()])
+        self.assertNotIn(channel['id'],[r['id'] for r in self.client.get('/api/messages/forward/destinations/').json()])
+        login('owner@company-a.test')
+        self.assertEqual(self.post(url+'members/',{'email':staff.email}).status_code,201)
+        second = self.post(url+'messages/',{'body':'Confidential beta'}).json()
+        login(staff.email)
+        self.assertEqual([r['id'] for r in self.client.get(url+'messages/').json()],[second['id']])
+        self.assertEqual(self.client.get(url+'messages/'+first['id']+'/context/').status_code,404)
+        self.assertEqual([r['id'] for r in self.client.get('/api/search/messages/',{'q':'Confidential'}).json()['results']],[second['id']])
+        login('owner@company-a.test')
+        self.assertEqual(self.client.delete(url+'members/'+str(staff.pk)+'/',HTTP_X_CSRFTOKEN=self.csrf).status_code,204)
+        login(staff.email)
+        self.assertEqual(self.client.get(url+'messages/').status_code,403)

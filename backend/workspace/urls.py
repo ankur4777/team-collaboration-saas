@@ -78,6 +78,8 @@ urlpatterns = [
     path('teams/<uuid:team_id>/channels/<uuid:channel_id>/', views.ChannelDetailView.as_view()),
     path('teams/<uuid:team_id>/channels/', views.TeamChannelsView.as_view()),
     path('teams/<uuid:team_id>/members/', views.TeamMembersView.as_view()),
+    path('channels/<uuid:channel_id>/members/', views.PrivateChannelMembersView.as_view()),
+    path('channels/<uuid:channel_id>/members/<uuid:user_id>/', views.PrivateChannelMemberDetailView.as_view()),
     path('channels/<uuid:channel_id>/preferences/', conversation_tools.ChannelPreferencesView.as_view()),
     path('channels/<uuid:channel_id>/messages/<uuid:message_id>/context/', conversation_tools.ChannelContextView.as_view()),
     path('channels/<uuid:channel_id>/pins/', message_pins.ChannelPinsView.as_view()),
