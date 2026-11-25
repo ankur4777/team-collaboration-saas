@@ -55,7 +55,8 @@ export interface MessageSearchResult {
   created_at:string;
   excerpt:string;
 }
-export interface MessageSearchResponse {results:MessageSearchResult[];limit:number}
+export interface MessageSearchResponse {results:MessageSearchResult[];limit:number;has_more?:boolean;next_cursor?:string|null}
+export interface MessageSearchFilters {sender?:string;start?:string;end?:string;cursor?:string}
 
 
 export interface Member { id: string; role: string; joined_at: string; user: Person }
@@ -175,8 +176,11 @@ export const api = {
   invite: (id:string, email:string, role: string) => post<{detail:string; development_invite_url?:string}>(`organizations/${id}/invitations/`, {email,role}),
   previewInvite: (token:string) => request<InvitePreview>(`invitations/${encodeURIComponent(token)}/`),
   acceptInvite: (token:string, full_name:string, password:string) => secureLogin(`invitations/${encodeURIComponent(token)}/accept/`, {full_name, password}),
-  searchMessages: (query:string,scope:SearchScope='all') =>
-    request<MessageSearchResponse>(`search/messages/?q=${encodeURIComponent(query)}&scope=${scope}`),
+  searchMessages: (query:string,scope:SearchScope='all',filters?:MessageSearchFilters) => {
+    const params=new URLSearchParams({q:query,scope});
+    if(filters){params.set('page','1');for(const [key,value] of Object.entries(filters))if(value)params.set(key,value);}
+    return request<MessageSearchResponse>(`search/messages/?${params.toString()}`);
+  },
   chats: () => request<ChatThread[]>('chats/'),
   startDirectChat: (email:string) => post<ChatThread>('chats/', {kind:'direct',email}),
   startGroupChat: (title:string,emails:string[]) => post<ChatThread>('chats/', {kind:'group',title,emails}),

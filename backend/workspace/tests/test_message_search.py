@@ -159,3 +159,28 @@ class WorkspaceMessageSearchTests(TestCase):
         self.assertEqual(len(results), 50)
         self.assertIn('event 51', results[0]['excerpt'])
         self.assertEqual(self.search('searchable', 'channels').json()['results'], [])
+
+    def test_search_pagination_and_sender_date_filters(self):
+        from django.utils import timezone
+        from workspace.models import ChatMessage
+        org = self.register()
+        colleague = self.employee(org, 'colleague@a.test')
+        chat_id = self.post('/api/chats/', {'kind':'direct','email':colleague.email}).json()['id']
+        now = timezone.now()
+        ChatMessage.objects.bulk_create([
+            ChatMessage(conversation_id=chat_id, sender=org.created_by, body='Paged keyword')
+            for _ in range(60)
+        ])
+        ChatMessage.objects.filter(conversation_id=chat_id).update(created_at=now)
+        params = {'q':'paged', 'page':'1', 'sender':'owner@a.test', 'start':now.date().isoformat(), 'end':now.date().isoformat()}
+        url = '/api/search/messages/'
+        first = self.client.get(url, params).json()
+        self.assertEqual(len(first['results']), 50)
+        self.assertTrue(first['has_more'])
+        second = self.client.get(url, {**params, 'cursor':first['next_cursor']}).json()
+        self.assertEqual(len(second['results']), 10)
+        self.assertFalse(second['has_more'])
+        self.assertEqual(len({r['id'] for r in first['results'] + second['results']}), 60)
+        self.assertEqual(self.client.get(url, {**params,'sender':'colleague','cursor':first['next_cursor']}).status_code, 400)
+        self.assertEqual(self.client.get(url, {**params,'sender':'colleague'}).json()['results'], [])
+        self.assertEqual(self.client.get(url, {**params,'start':'invalid'}).status_code, 400)

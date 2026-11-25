@@ -1,10 +1,14 @@
 """Tenant-safe keyword search across accessible direct chats, groups and channels.
 
-Search is intentionally bounded to the most recent 50 matches. It uses the
+Each page is bounded to 50 matches, with signed continuation cursors. It uses the
 existing MySQL database and no new search infrastructure. Membership filters
 are applied in SQL before any text is returned.
 """
-from django.db.models import F
+from datetime import date, datetime, time, timedelta, timezone
+from uuid import UUID
+from django.core import signing
+from django.db.models import F, Q
+from django.utils.dateparse import parse_datetime
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -29,6 +33,53 @@ class MessageSearchView(APIView):
         if scope not in ('all', 'chats', 'channels'):
             raise ValidationError({'scope': 'Choose all, chats or channels'})
 
+        sender = request.query_params.get('sender', '').strip()
+        start = request.query_params.get('start', '')
+        end = request.query_params.get('end', '')
+        cursor = request.query_params.get('cursor', '')
+        paged = request.query_params.get('page')
+        if paged not in (None, '1') or (cursor and paged != '1'):
+            raise ValidationError({'page': 'Use page=1 for paginated search'})
+        if len(sender) > 100 or len(cursor) > 4096:
+            raise ValidationError({'detail': 'Invalid sender or search cursor'})
+        try:
+            start_date = date.fromisoformat(start) if start else None
+            end_date = date.fromisoformat(end) if end else None
+            lower = datetime.combine(start_date, time.min, tzinfo=timezone.utc) if start_date else None
+            upper = datetime.combine(end_date + timedelta(days=1), time.min, tzinfo=timezone.utc) if end_date else None
+        except (ValueError, OverflowError):
+            raise ValidationError({'date': 'Use valid YYYY-MM-DD dates'})
+        if lower and upper and lower >= upper:
+            raise ValidationError({'date': 'Start date must not be after end date'})
+        filters = [str(member.organization_id), str(request.user.pk), query, scope, sender, start, end]
+        anchor = None
+        if cursor:
+            try:
+                data = signing.loads(cursor, salt='workspace-message-search', max_age=3600)
+                if data['filters'] != filters or data['source'] not in ('chat', 'channel'):
+                    raise ValueError()
+                timestamp = parse_datetime(data['created_at'])
+                if timestamp is None or timestamp.tzinfo is None:
+                    raise ValueError()
+                anchor = (timestamp, UUID(data['id']), data['source'])
+            except (signing.BadSignature, ValueError, KeyError, TypeError):
+                raise ValidationError({'cursor': 'Search page expired or filters changed. Search again.'})
+
+        def constrain(rows, source):
+            if sender:
+                rows = rows.filter(Q(sender__full_name__icontains=sender) | Q(sender__email__icontains=sender))
+            if lower:
+                rows = rows.filter(created_at__gte=lower)
+            if upper:
+                rows = rows.filter(created_at__lt=upper)
+            if anchor:
+                timestamp, identity, previous_source = anchor
+                condition = Q(created_at__lt=timestamp) | Q(created_at=timestamp, id__lt=identity)
+                if source < previous_source:
+                    condition |= Q(created_at=timestamp, id=identity)
+                rows = rows.filter(condition)
+            return rows.order_by('-created_at', '-id')[:MAX_RESULTS + (1 if paged else 0)]
+
         results = []
         if scope in ('all', 'chats'):
             # Filtering the participant join and created_at in the same query
@@ -42,9 +93,8 @@ class MessageSearchView(APIView):
                     body__icontains=query,
                 )
                 .select_related('sender', 'conversation')
-                .order_by('-created_at', '-id')[:MAX_RESULTS]
             )
-            for message in chats:
+            for message in constrain(chats, 'chat'):
                 results.append({
                     'id': str(message.pk),
                     'source': 'chat',
@@ -69,9 +119,8 @@ class MessageSearchView(APIView):
                     deleted_at__isnull=True,
                 )
                 .select_related('sender', 'channel__team')
-                .order_by('-created_at', '-id')[:MAX_RESULTS]
             )
-            for message in channels:
+            for message in constrain(channels, 'channel'):
                 results.append({
                     'id': str(message.pk),
                     'source': 'channel',
@@ -85,5 +134,13 @@ class MessageSearchView(APIView):
                     'excerpt': message.body[:300],
                 })
 
-        results.sort(key=lambda result: (result['created_at'], result['id']), reverse=True)
-        return Response({'results': results[:MAX_RESULTS], 'limit': MAX_RESULTS})
+        results.sort(key=lambda result: (parse_datetime(result['created_at']), result['id'], result['source']), reverse=True)
+        response = {'results': results[:MAX_RESULTS], 'limit': MAX_RESULTS}
+        if paged:
+            has_more = len(results) > MAX_RESULTS
+            last = response['results'][-1] if has_more else None
+            response['has_more'] = has_more
+            response['next_cursor'] = signing.dumps({
+                'filters': filters, 'id': last['id'], 'source': last['source'], 'created_at': last['created_at'],
+            }, salt='workspace-message-search') if last else None
+        return Response(response)
