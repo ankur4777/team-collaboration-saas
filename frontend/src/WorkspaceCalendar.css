@@ -20,7 +20,7 @@
   bottom: 0;
   width: min(440px, 100%);
   z-index: 25;
-  box-shadow: -10px 0 30px #193f321a;
+  box-shadow: -10px 0 30px #3f191c1a;
   padding: 22px;
 }
 .calendar-shell .calendar-layout .meeting-back {
@@ -36,7 +36,7 @@
   overflow: hidden;
   background: #fff;
   font-family: inherit;
-  color: #213c3c;
+  color: #3c2123;
   font-size: 12px;
 }
 .workspace-calendar button,
@@ -44,9 +44,9 @@
   font: inherit;
 }
 .workspace-calendar button {
-  border: 1px solid #dbe7e1;
+  border: 1px solid #e7dbdc;
   background: #fff;
-  color: #42635d;
+  color: #634244;
   border-radius: 6px;
   cursor: pointer;
   display: inline-flex;
@@ -61,21 +61,21 @@
   cursor: not-allowed;
 }
 .workspace-calendar button:hover:not(:disabled) {
-  background: #eaf5ef;
-  border-color: #b6d8ca;
-  color: #11775f;
+  background: #f5eaeb;
+  border-color: #d8b6b8;
+  color: #652328;
 }
 .workspace-calendar button:focus-visible,
 .workspace-calendar input:focus-visible {
-  outline: 3px solid #9adfce;
+  outline: 3px solid #dc9da1;
   outline-offset: 1px;
 }
 .wc-brandbar {
   display: flex;
   align-items: center;
   gap: 16px;
-  background: #176f5b;
-  border-bottom: 1px solid #176f5b;
+  background: #632327;
+  border-bottom: 1px solid #632327;
   padding: 7px 16px;
   color: #fff;
   flex-shrink: 0;
@@ -118,7 +118,7 @@
   height: 30px;
   flex: 1;
   font-size: 12px;
-  color: #213c3c;
+  color: #3c2123;
   background: transparent;
 }
 .wc-search button {
@@ -127,7 +127,7 @@
 }
 .wc-zone {
   margin-left: auto;
-  color: #d3eee3;
+  color: #eed3d5;
   font-size: 10px;
   white-space: nowrap;
 }
@@ -137,7 +137,7 @@
   align-items: center;
   padding: 9px 14px;
   background: #fff;
-  border-bottom: 1px solid #dfe9e4;
+  border-bottom: 1px solid #e9dfe0;
   flex-shrink: 0;
   flex-wrap: wrap;
   position: relative;
@@ -146,7 +146,7 @@
 .wc-toolbar nav {
   display: flex;
   gap: 3px;
-  border-left: 1px solid #e2ebe6;
+  border-left: 1px solid #ebe2e3;
   padding-left: 9px;
 }
 .wc-toolbar nav button {
@@ -154,9 +154,9 @@
   white-space: nowrap;
 }
 .wc-toolbar nav button[aria-pressed='true'] {
-  background: #e1f3ea;
-  color: #177a61;
-  border-color: #c0dfd0;
+  background: #f3e1e2;
+  color: #6b262a;
+  border-color: #dfc0c2;
   font-weight: 700;
 }
 .wc-toolbar-extras {
@@ -179,7 +179,7 @@
 .wc-filter-dot {
   width: 6px;
   height: 6px;
-  background: #208d74;
+  background: #802d33;
   border-radius: 50%;
 }
 .wc-filters {
@@ -189,8 +189,8 @@
   width: 220px;
   padding: 14px;
   background: #fff;
-  box-shadow: 0 8px 26px #173f3520;
-  border: 1px solid #dbe7e1;
+  box-shadow: 0 8px 26px #3f171a20;
+  border: 1px solid #e7dbdc;
   border-radius: 9px;
   display: flex;
   flex-direction: column;
@@ -199,7 +199,7 @@
 }
 .wc-filters strong {
   font-size: 12px;
-  color: #294f45;
+  color: #4f292c;
 }
 .wc-filters label {
   display: flex;
@@ -208,7 +208,7 @@
   font-size: 12px;
 }
 .workspace-calendar input[type='checkbox'] {
-  accent-color: #208d74;
+  accent-color: #802d33;
 }
 .wc-body {
   display: flex;
@@ -220,8 +220,8 @@
 .wc-sidebar {
   width: 202px;
   flex-shrink: 0;
-  background: #f7faf8;
-  border-right: 1px solid #dfe9e4;
+  background: #faf7f7;
+  border-right: 1px solid #e9dfe0;
   padding: 18px 12px;
   overflow-y: auto;
   display: flex;
@@ -236,7 +236,7 @@
 .wc-mini-heading strong {
   font-size: 12px;
   flex: 1;
-  color: #365a4a;
+  color: #5a3638;
   white-space: nowrap;
 }
 .wc-mini-heading button {
@@ -262,25 +262,25 @@
   border-radius: 50%;
   padding: 0;
   aspect-ratio: 1;
-  color: #42635d;
+  color: #634244;
   background: transparent;
 }
 .wc-mini-days button.outside {
   color: #a6b9b0;
 }
 .wc-mini-days button.today {
-  box-shadow: inset 0 0 0 1px #208d74;
-  color: #177a61;
+  box-shadow: inset 0 0 0 1px #802d33;
+  color: #6b262a;
 }
 .wc-mini-days button.chosen {
-  background: #208d74;
+  background: #802d33;
   color: white;
   box-shadow: none;
   font-weight: 700;
 }
 .wc-calendars {
   padding-top: 18px;
-  border-top: 1px solid #dfe9e4;
+  border-top: 1px solid #e9dfe0;
 }
 .wc-calendars h2,
 .wc-agenda h2 {
@@ -289,14 +289,14 @@
   font-weight: 700;
   letter-spacing: 0;
   margin: 0 0 13px;
-  color: #365a4a;
+  color: #5a3638;
 }
 .wc-calendars > label {
   display: flex;
   align-items: center;
   gap: 7px;
   font-size: 11px;
-  color: #42635d;
+  color: #634244;
 }
 .wc-calendars > label input {
   margin: 0;
@@ -305,7 +305,7 @@
   width: 8px;
   height: 8px;
   border-radius: 2px;
-  background: #208d74;
+  background: #802d33;
 }
 .wc-legend {
   display: flex;
@@ -324,13 +324,13 @@
   width: 7px;
   height: 7px;
   border-radius: 2px;
-  background: #208d74;
+  background: #802d33;
 }
 .wc-legend i.invited {
-  background: #8ccdb7;
+  background: #cd8c90;
 }
 .wc-agenda {
-  border-top: 1px solid #dfe9e4;
+  border-top: 1px solid #e9dfe0;
   padding-top: 18px;
 }
 .wc-eyebrow {
@@ -354,7 +354,7 @@
   background: #fff;
   padding: 9px;
   margin-top: 8px;
-  border-left: 3px solid #208d74;
+  border-left: 3px solid #802d33;
 }
 .wc-agenda button span {
   font-size: 10px;
@@ -362,7 +362,7 @@
 }
 .wc-agenda button strong {
   font-size: 11px;
-  color: #365a4a;
+  color: #5a3638;
   overflow-wrap: anywhere;
 }
 .wc-sidebar-note {
@@ -385,7 +385,7 @@
   align-items: center;
   gap: 14px;
   padding: 13px 16px;
-  border-bottom: 1px solid #dfe9e4;
+  border-bottom: 1px solid #e9dfe0;
   flex-shrink: 0;
   flex-wrap: wrap;
 }
@@ -407,24 +407,24 @@
   letter-spacing: -0.035em;
   font-weight: 600;
   line-height: 1.4;
-  color: #254e43;
+  color: #4e2528;
   margin: 0;
 }
 .wc-navigator > input {
   margin-left: auto;
   font-size: 11px;
-  color: #628278;
+  color: #826264;
   background: #fff;
-  border: 1px solid #dfe9e4;
+  border: 1px solid #e9dfe0;
   border-radius: 6px;
   padding: 6px;
   max-width: 135px;
 }
 .wc-loading {
   padding: 5px 16px;
-  color: #628278;
+  color: #826264;
   font-size: 10px;
-  border-bottom: 1px solid #e7efea;
+  border-bottom: 1px solid #efe7e8;
 }
 .wc-month-scroll {
   overflow: auto;
@@ -445,14 +445,14 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  border-bottom: 1px solid #dfe9e4;
+  border-bottom: 1px solid #e9dfe0;
   flex-shrink: 0;
 }
 .wc-weekdays span {
   padding: 8px 9px;
   font-size: 11px;
-  color: #628278;
-  border-right: 1px solid #e7efea;
+  color: #826264;
+  border-right: 1px solid #efe7e8;
 }
 .wc-month-days {
   display: grid;
@@ -464,8 +464,8 @@
 .wc-month-day {
   min-width: 0;
   min-height: 0;
-  border-right: 1px solid #e1eae5;
-  border-bottom: 1px solid #e1eae5;
+  border-right: 1px solid #eae1e2;
+  border-bottom: 1px solid #eae1e2;
   padding: 5px 4px;
   background: #fff;
   display: flex;
@@ -473,13 +473,13 @@
   gap: 4px;
 }
 .wc-month-day.outside {
-  background: #fafcfb;
+  background: #fcfafa;
 }
 .wc-month-day.today {
-  background: #f1faf5;
+  background: #faf1f2;
 }
 .wc-month-day.chosen {
-  box-shadow: inset 0 0 0 1px #9bcfbb;
+  box-shadow: inset 0 0 0 1px #cf9b9e;
 }
 .wc-day-heading {
   display: flex;
@@ -493,13 +493,13 @@
   min-width: 23px;
   border: 0;
   background: transparent;
-  color: #42635d;
+  color: #634244;
 }
 .wc-month-day.outside .wc-day-heading > button:first-child {
-  color: #9ab0a4;
+  color: #b09a9b;
 }
 .wc-month-day.today .wc-day-heading > button:first-child {
-  background: #208d74;
+  background: #802d33;
   color: white;
   border-radius: 50%;
   font-weight: 700;
@@ -509,7 +509,7 @@
   background: transparent !important;
   border: 0 !important;
   opacity: 0;
-  color: #628278;
+  color: #826264;
 }
 .wc-month-day:hover .wc-cell-add,
 .wc-cell-add:focus-visible {
@@ -525,10 +525,10 @@
 }
 .workspace-calendar .wc-event {
   border: 0;
-  border-left: 3px solid #208d74;
+  border-left: 3px solid #802d33;
   border-radius: 3px;
-  background: #e5f4ec;
-  color: #245a47;
+  background: #f4e5e6;
+  color: #5a2428;
   font-size: 10px;
   text-align: left;
   justify-content: flex-start;
@@ -548,16 +548,16 @@
   font-weight: 600;
 }
 .workspace-calendar .wc-event.invited {
-  background: #eff7f4;
-  border-left-color: #8ccdb7;
-  color: #426b5b;
+  background: #f7eff0;
+  border-left-color: #cd8c90;
+  color: #6b4245;
 }
 .wc-event-dot {
   display: none;
 }
 .workspace-calendar .wc-event.selected,
 .workspace-calendar .wc-timed-event.selected {
-  outline: 2px solid #208d74;
+  outline: 2px solid #802d33;
   outline-offset: -2px;
 }
 .wc-status {
@@ -567,8 +567,8 @@
   padding: 7px 14px;
   font-size: 10px;
   color: #80988f;
-  border-top: 1px solid #e1eae5;
-  background: #fafcfb;
+  border-top: 1px solid #eae1e2;
+  background: #fcfafa;
   flex-shrink: 0;
 }
 .wc-time-scroll {
@@ -585,11 +585,11 @@
   top: 0;
   z-index: 5;
   background: #fff;
-  box-shadow: 0 1px 0 #dfe9e4;
+  box-shadow: 0 1px 0 #e9dfe0;
 }
 .wc-time-head > button {
   border: 0;
-  border-right: 1px solid #e1eae5;
+  border-right: 1px solid #eae1e2;
   border-radius: 0;
   background: #fff;
   flex-direction: column;
@@ -603,12 +603,12 @@
 .wc-time-head button strong {
   font-size: 18px;
   font-weight: 500;
-  color: #42635d;
+  color: #634244;
   min-width: 29px;
   line-height: 29px;
 }
 .wc-time-head button.today strong {
-  background: #208d74;
+  background: #802d33;
   color: white;
   border-radius: 50%;
 }
@@ -616,7 +616,7 @@
   display: grid;
   place-items: center;
   color: #80988f;
-  border-right: 1px solid #e1eae5;
+  border-right: 1px solid #eae1e2;
 }
 .wc-time-grid {
   display: grid;
@@ -628,8 +628,8 @@
   flex-direction: column;
   color: #80988f;
   font-size: 10px;
-  border-right: 1px solid #dfe9e4;
-  background: #fafcfb;
+  border-right: 1px solid #e9dfe0;
+  background: #fcfafa;
 }
 .wc-hours span {
   height: 52px;
@@ -641,35 +641,35 @@
 .wc-time-column {
   position: relative;
   min-width: 0;
-  border-right: 1px solid #e1eae5;
+  border-right: 1px solid #eae1e2;
   height: 1248px;
 }
 .workspace-calendar .wc-time-slot {
   height: 52px;
   width: 100%;
   border: 0;
-  border-bottom: 1px solid #e1eae5;
+  border-bottom: 1px solid #eae1e2;
   border-radius: 0;
   background: linear-gradient(
     to bottom,
     transparent 25px,
-    #f1f5f2 25px,
-    #f1f5f2 26px,
+    #f5f1f1 25px,
+    #f5f1f1 26px,
     transparent 26px
   );
   display: block;
   padding: 0;
 }
 .workspace-calendar .wc-time-slot:hover {
-  background: #f0f9f4;
+  background: #f9f0f1;
 }
 .workspace-calendar .wc-timed-event {
   position: absolute;
   border: 0;
-  border-left: 3px solid #208d74;
+  border-left: 3px solid #802d33;
   border-radius: 4px;
-  background: #dff1e7;
-  color: #245a47;
+  background: #f1dfe0;
+  color: #5a2428;
   text-align: left;
   display: flex;
   flex-direction: column;
@@ -693,9 +693,9 @@
   line-height: 1.3;
 }
 .workspace-calendar .wc-timed-event.invited {
-  background: #edf6f1;
-  border-left-color: #8ccdb7;
-  color: #426b5b;
+  background: #f6edee;
+  border-left-color: #cd8c90;
+  color: #6b4245;
 }
 @media (max-width: 1100px) {
   .wc-sidebar {
@@ -740,7 +740,7 @@
     inset: 0 auto 0 0;
     z-index: 20;
     width: 215px;
-    box-shadow: 8px 0 25px #173f3520;
+    box-shadow: 8px 0 25px #3f171a20;
   }
   .wc-brandbar {
     padding: 7px 16px;
@@ -761,7 +761,7 @@
   }
   .calendar-shell .calendar-layout.meeting-selected .meeting-detail {
     width: min(440px, 100%);
-    box-shadow: -12px 0 30px #193f3226;
+    box-shadow: -12px 0 30px #3f191c26;
   }
 }
 @media (max-width: 600px) {
@@ -771,7 +771,7 @@
     border: 0;
     justify-content: space-between;
     padding: 5px 0 0;
-    border-top: 1px solid #edf2ef;
+    border-top: 1px solid #f2eded;
   }
   .wc-toolbar nav button {
     flex: 1;
