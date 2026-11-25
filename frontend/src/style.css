@@ -359,3 +359,11 @@ body,.page-loader{background:#fff;color:var(--shabdd-ink)}
 .modal input,.modal select,.member-role-select{background:#fff;border-color:#e3e7ec;color:#273542}
 .notification-popover{background:#fff;border-color:#edf0f4;box-shadow:0 18px 48px #f42a3220}.notification-head,.notification-foot{background:#fff}.notification-item{background:#fff}.notification-item:hover{background:#fff4f5}
 .future-icon{background:#fff0f1;color:var(--shabdd-red)}
+
+/* Advanced message search filters: wrap before the panel overflows. */
+.message-search-form{flex-wrap:wrap;align-items:flex-end}
+.message-search-form .message-search-field{align-self:stretch;flex:1 1 240px;min-height:42px}
+.message-search-form>label:not(.message-search-field):not(.message-search-filter){display:flex;flex:1 1 145px;flex-direction:column;gap:5px;font-size:12px;color:#593537;min-width:0}
+.message-search-form>label:not(.message-search-field):not(.message-search-filter)>input{box-sizing:border-box;width:100%;min-width:0;min-height:40px;border:1px solid #ebdedf;border-radius:9px;background:#fff;color:#593537;padding:0 10px;font:inherit}
+.message-search-form .primary-button{min-height:40px}
+@media(max-width:660px){.message-search-form .message-search-field{flex-basis:100%}.message-search-form .message-search-filter{flex:1 1 100%}.message-search-form .message-search-filter select{width:100%}.message-search-form>label:not(.message-search-field):not(.message-search-filter){flex-basis:130px}}
