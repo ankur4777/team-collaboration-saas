@@ -41,6 +41,7 @@ export interface ChatThread {
 }
 export interface ReactionSummary {emoji:string; count:number; user_ids:string[]}
 export type ChatMessage = Message & { edited_at: string|null; deleted_at: string|null; reactions:ReactionSummary[] };
+export interface ChatMessagePage { items:ChatMessage[]; has_more:boolean; next_cursor:ChannelMessageCursor|null }
 export type SearchScope = 'all'|'chats'|'channels';
 export interface MessageSearchResult {
   id:string;
@@ -180,6 +181,11 @@ export const api = {
   startDirectChat: (email:string) => post<ChatThread>('chats/', {kind:'direct',email}),
   startGroupChat: (title:string,emails:string[]) => post<ChatThread>('chats/', {kind:'group',title,emails}),
   chatMessages: (id:string) => request<ChatMessage[]>(`chats/${id}/messages/`),
+  chatMessagePage: (id:string, cursor?:ChannelMessageCursor) => {
+    const query = new URLSearchParams({page:'1'});
+    if(cursor) { query.set('before',cursor.before); query.set('before_id',cursor.before_id); }
+    return request<ChatMessagePage>(`chats/${id}/messages/?${query.toString()}`);
+  },
   sendChatMessage: (id:string, body:string) => post<ChatMessage>(`chats/${id}/messages/`,{body}),
   toggleChatReaction: (chatId:string,messageId:string,emoji:string) => post<ChatMessage>(`chats/${chatId}/messages/${messageId}/reactions/`,{emoji}),
   markChatRead: (id:string, messageId:string) => post<{last_read_at:string}>(`chats/${id}/read/`,{message_id:messageId}),

@@ -22,7 +22,8 @@ This is a runnable **React + TypeScript frontend** and **Python Django + Django 
 - Post/read channel messages with membership checks; real-time WebSocket notification of new messages.
 - Start one-to-one chats or private group chats with employees in the active workspace; receive messages live through membership-scoped WebSockets.
 - Edit or delete your own private chat messages (deletions replace content with a tombstone); real-time updates reach authorized participants.
-- Group creators can add and remove employees; newly added participants only see messages sent after they joined the group.
+- Group owners can add/remove employees and transfer ownership before leaving; other members can leave voluntarily. Newly added participants only see messages sent after they joined the group.
+- Private and group chat history can load older messages in 50-message pages with stable timestamp/UUID cursors; legacy API responses remain supported.
 - Private/group chats show unread message counts and participant read receipts; read position advances only when the browser submits an explicitly viewed message.
 - Live typing indicators use authenticated, rate-limited WebSocket signals; the workspace bell shows unread-chat notifications, refreshed periodically (approximately 20 seconds).
 - Team channels now have independent per-member unread badges and explicit read cursors, scoped to current team and organization membership.

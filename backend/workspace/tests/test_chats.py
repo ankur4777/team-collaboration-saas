@@ -1,8 +1,10 @@
 """Private-chat API regression tests, including cross-organization isolation."""
 import json
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase, override_settings
+from django.utils import timezone
 
 from workspace.models import (
     ChatConversation, ChatMessage, ChatParticipant, Organization, OrganizationMember,
@@ -118,3 +120,58 @@ class PrivateChatTests(TestCase):
         self.assertEqual(new_chat.status_code, 201, new_chat.content)
         self.assertNotEqual(new_chat.json()['id'], direct['id'])
         self.assertEqual(self.client.get(f"/api/chats/{new_chat.json()['id']}/messages/").json(), [])
+
+    def test_chat_history_pages_preserve_tied_timestamps_and_legacy_response(self):
+        org = self.register()
+        colleague, _ = self.staff(org, 'friend@company-a.test')
+        chat = self.post('/api/chats/', {'kind': 'direct', 'email': colleague.email}).json()
+        chat_id = chat['id']
+        ChatMessage.objects.bulk_create([
+            ChatMessage(conversation_id=chat_id, sender=org.created_by, body=f'History {i}')
+            for i in range(121)
+        ])
+        ChatMessage.objects.filter(conversation_id=chat_id).update(created_at=timezone.now())
+        url = f'/api/chats/{chat_id}/messages/'
+        self.assertEqual(len(self.client.get(url).json()), 50)
+        seen = set()
+        cursor = {}
+        for size in (50, 50, 21):
+            response = self.client.get(url, {'page': '1', **cursor})
+            self.assertEqual(response.status_code, 200, response.content)
+            page = response.json()
+            self.assertEqual(len(page['items']), size)
+            ids = [row['id'] for row in page['items']]
+            self.assertEqual(ids, sorted(ids))
+            self.assertFalse(seen.intersection(ids))
+            seen.update(ids)
+            cursor = page['next_cursor']
+            self.assertEqual(bool(cursor), page['has_more'])
+        self.assertEqual(len(seen), 121)
+        self.assertIsNone(cursor)
+        for query in ({'page': '2'}, {'page': '1', 'before_id': 'invalid'},
+                      {'page': '1', 'before': '2026-02-31T12:00:00Z'},
+                      {'page': '1', 'before': '2026-01-01T12:00:00Z', 'before_id': 'bad'}):
+            self.assertEqual(self.client.get(url, query).status_code, 400)
+
+    def test_group_history_pages_and_mutations_respect_rejoin_boundary(self):
+        org = self.register()
+        a, _ = self.staff(org, 'alice@company-a.test')
+        b, _ = self.staff(org, 'bob@company-a.test')
+        chat_id = self.post('/api/chats/', {
+            'kind': 'group', 'title': 'History', 'emails': [a.email, b.email],
+        }).json()['id']
+        hidden = ChatMessage.objects.create(conversation_id=chat_id, sender=org.created_by, body='Before rejoin')
+        ChatMessage.objects.filter(pk=hidden.pk).update(created_at=timezone.now()-timedelta(days=1))
+        url = f'/api/chats/{chat_id}/messages/'
+        visible = self.post(url, {'body': 'Visible'}).json()
+        page = self.client.get(url, {'page': '1'}).json()
+        self.assertEqual([row['id'] for row in page['items']], [visible['id']])
+        self.assertIsNone(page['next_cursor'])
+        detail = url + f'{hidden.pk}/'
+        edited = self.client.patch(detail, data=json.dumps({'body': 'Not permitted'}),
+                                   content_type='application/json', HTTP_X_CSRFTOKEN=self.csrf)
+        self.assertEqual(edited.status_code, 404)
+        self.assertEqual(self.delete(detail).status_code, 404)
+        self.post('/api/auth/logout/')
+        self.register('owner@company-b.test', 'Company B')
+        self.assertEqual(self.client.get(url, {'page': '1'}).status_code, 404)

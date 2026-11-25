@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, MessageCircle, Plus, RefreshCw, Send, Users, X } from 'lucide-react';
-import { api, type ChatMessage, type ChatThread, type Member, type Person } from './api';
+import { api, type ChatMessage, type ChannelMessageCursor, type ChatThread, type Member, type Person } from './api';
 import ChatReactionBar from './ChatReactionBar';
 import AttachmentPanel from './AttachmentPanel';
 import MentionInput from './MentionInput';
@@ -25,6 +25,13 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [selected, setSelected] = useState<string|null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [historyCursor, setHistoryCursor] = useState<ChannelMessageCursor|null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const historyRef = useRef<HTMLDivElement>(null);
+  const historyRequestRef = useRef(0);
+  const scrollRestoreRef = useRef<{height:number;top:number}|null>(null);
+  const scopeRef = useRef({selected,workspaceId});
+  scopeRef.current = {selected,workspaceId};
   const [draft, setDraft] = useState('');
   const [mode, setMode] = useState<'direct'|'group'|null>(null);
   const [directEmail, setDirectEmail] = useState('');
@@ -87,6 +94,10 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
   },[currentUser.id]);
 
   useEffect(() => {
+    historyRequestRef.current++;
+    setHistoryCursor(null);
+    setLoadingOlder(false);
+    scrollRestoreRef.current = null;
     if (!selected) { setMessages([]); setLoadedChatId(null); setConnected(false); return; }
     let valid = true;
     setMessages([]);
@@ -94,8 +105,10 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
     setTypingUsers({});
     setEditingId(null);
     setConnected(false);
-    api.chatMessages(selected).then(rows => {
+    api.chatMessagePage(selected).then(page => {
       if (valid) {
+        const rows = page.items;
+        setHistoryCursor(page.next_cursor);
         setLoadedChatId(selected);
         setMessages(current => {
         const all = new Map([...rows, ...current].map(item => [item.id, item]));
@@ -108,7 +121,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
     const socket = new WebSocket(`${protocol}//${location.host}/ws/chats/${selected}/`);
     socketRef.current = socket;
     socket.onopen = () => { if (valid) setConnected(true); };
-    socket.onclose = event => { if (valid) { setConnected(false); if(event.code===4403) { setMessages([]); void loadThreads(); } } };
+    socket.onclose = event => { if (valid) { setConnected(false); if(event.code===4403) { valid = false; historyRequestRef.current++; setHistoryCursor(null); setLoadingOlder(false); setLoadedChatId(null); setMessages([]); setThreads(old=>old.filter(t=>t.id!==selected)); void loadThreads(); } } };
     socket.onmessage = event => {
       try {
         const payload = JSON.parse(event.data) as {
@@ -153,12 +166,18 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
       typingTimersRef.current.clear();
       socket.close();
     };
-  }, [selected, loadThreads]);
-
-  useEffect(() => { bottomRef.current?.scrollIntoView({behavior:'smooth'}); }, [messages.length]);
+  }, [selected, workspaceId, loadThreads]);
 
   const latest = messages[messages.length-1];
   const latestId = latest?.id;
+  useEffect(() => { if(latestId) bottomRef.current?.scrollIntoView({behavior:'smooth'}); }, [selected,latestId]);
+  useLayoutEffect(() => {
+    const old = scrollRestoreRef.current;
+    if(old && historyRef.current) {
+      historyRef.current.scrollTop = old.top + historyRef.current.scrollHeight - old.height;
+      scrollRestoreRef.current = null;
+    }
+  },[messages,loadingOlder]);
   useEffect(()=>{
     if(!selected || loadedChatId!==selected || !latestId || document.visibilityState!=='visible')return;
     const key=`${selected}:${latestId}`;
@@ -198,6 +217,23 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
   const visibleThreads = threads.filter(thread =>
     titleFor(thread, currentUser.id).toLowerCase().includes(filter.toLowerCase()),
   );
+
+  async function loadOlder() {
+    if (!selected || !historyCursor || loadingOlder || loadedChatId!==selected) return;
+    const chatId = selected, orgId = workspaceId;
+    const token = ++historyRequestRef.current;
+    const isCurrent = () => token===historyRequestRef.current && scopeRef.current.selected===chatId && scopeRef.current.workspaceId===orgId;
+    setLoadingOlder(true); setError('');
+    try {
+      const page = await api.chatMessagePage(chatId, historyCursor);
+      if (!isCurrent()) return;
+      if (historyRef.current) scrollRestoreRef.current = {height:historyRef.current.scrollHeight,top:historyRef.current.scrollTop};
+      setMessages(current => [...new Map([...page.items,...current].map(item=>[item.id,item])).values()].sort(messageOrder));
+      setHistoryCursor(page.next_cursor);
+    } catch(e) {
+      if(isCurrent()) setError(e instanceof Error ? e.message : 'Could not load older messages');
+    } finally { if(isCurrent()) setLoadingOlder(false); }
+  }
 
   async function create(e: FormEvent) {
     e.preventDefault();
@@ -259,8 +295,10 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
     setError('');
     try {
       await api.deleteChatMessage(selected, message.id);
-      const rows = await api.chatMessages(selected);
-      setMessages(rows);
+      if(scopeRef.current.selected===selected && scopeRef.current.workspaceId===workspaceId) {
+        setMessages(current => current.map(row => row.id===message.id && !row.deleted_at
+          ? {...row, body:'', deleted_at:new Date().toISOString(), reactions:[]} : row));
+      }
       if (editingId === message.id) setEditingId(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not delete message');
@@ -344,7 +382,8 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
             {active.kind==='group' && active.created_by.id!==currentUser.id && <button type="button" className="group-manage-button" disabled={working} onClick={() => void leaveGroup()}>Leave group</button>}
             <span className={`chat-connected ${connected ? 'yes' : ''}`} title={connected ? 'Live updates connected' : 'Messages saved; live updates unavailable'}/>
           </header>
-          <div className="private-chat-history">
+          <div className="private-chat-history" ref={historyRef}>
+            {historyCursor && <div style={{textAlign:"center",padding:"8px"}}><button type="button" className="outline-button" disabled={loadingOlder} onClick={()=>void loadOlder()}>{loadingOlder?"Loading…":"Load older messages"}</button></div>}
             {messages.length === 0 && <div className="private-chat-welcome"><MessageCircle size={30}/><h3>Start the conversation</h3><p>Only participants in this workspace can read these messages.</p></div>}
             {messages.map(message => <div key={message.id} className={`private-message ${message.sender.id===currentUser.id ? 'mine' : ''}`}>
               <div className="private-message-meta"><strong>{message.sender.full_name}</strong><time>{timeFor(message.created_at)}</time></div>

@@ -5,10 +5,12 @@ participants. All writes use authenticated session/CSRF via DRF.
 """
 import hashlib
 import logging
+from uuid import UUID
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -125,7 +127,6 @@ class ChatOwnershipView(APIView):
     @transaction.atomic
     def post(self, request, chat_id):
         chat = manage_group(request, chat_id)
-        from uuid import UUID
         try:
             target_id = UUID(str(request.data.get('user_id', '')))
         except (ValueError, TypeError):
@@ -255,14 +256,46 @@ class ChatMessagesView(APIView):
             participant = ChatParticipant.objects.get(conversation=chat, user=request.user)
             records = records.filter(created_at__gte=participant.joined_at)
         before = request.query_params.get('before')
-        if before:
-            value = parse_datetime(before)
+        before_id = request.query_params.get('before_id')
+        paged = request.query_params.get('page')
+        if paged is not None and paged != '1':
+            raise ValidationError({'page': 'Use page=1 to request a paginated response'})
+        if before_id is not None and not before:
+            raise ValidationError({'before_id': 'Provide before with before_id'})
+        if before is not None:
+            try:
+                value = parse_datetime(before)
+            except ValueError:
+                value = None
             if value is None or timezone.is_naive(value):
                 raise ValidationError({'before': 'Use an ISO 8601 timestamp with timezone'})
-            records = records.filter(created_at__lt=value)
-        records = list(records.order_by('-created_at', '-id')[:50])
-        records.reverse()
-        return Response(ChatMessageSerializer(records, many=True).data)
+            if before_id is not None:
+                try:
+                    cursor_id = UUID(before_id)
+                except (TypeError, ValueError, AttributeError):
+                    raise ValidationError({'before_id': 'Provide a valid message UUID'})
+                records = records.filter(
+                    Q(created_at__lt=value) | Q(created_at=value, id__lt=cursor_id)
+                )
+            else:
+                records = records.filter(created_at__lt=value)
+        rows = list(records.order_by('-created_at', '-id')[:51 if paged else 50])
+        if paged:
+            has_more = len(rows) > 50
+            rows = rows[:50]
+            oldest = rows[-1] if rows else None
+            cursor = ({
+                'before': oldest.created_at.isoformat(),
+                'before_id': str(oldest.pk),
+            } if has_more and oldest else None)
+            rows.reverse()
+            return Response({
+                'items': ChatMessageSerializer(rows, many=True).data,
+                'has_more': has_more,
+                'next_cursor': cursor,
+            })
+        rows.reverse()
+        return Response(ChatMessageSerializer(rows, many=True).data)
 
     def post(self, request, chat_id):
         chat = accessible_chat(request, chat_id)
@@ -291,6 +324,14 @@ class ChatMessagesView(APIView):
         return Response(payload, status=status.HTTP_201_CREATED)
 
 
+def visible_chat_messages(request, chat):
+    records = ChatMessage.objects.filter(conversation=chat)
+    if chat.kind == ChatConversation.Kind.GROUP:
+        participant = get_object_or_404(ChatParticipant, conversation=chat, user=request.user)
+        records = records.filter(created_at__gte=participant.joined_at)
+    return records
+
+
 class ChatMessageDetailView(APIView):
     """Only the author may edit or soft-delete a message in a chat they can access."""
 
@@ -301,8 +342,8 @@ class ChatMessageDetailView(APIView):
             raise ValidationError({'body': 'Message must contain 1–4000 characters'})
         with transaction.atomic():
             message = get_object_or_404(
-                ChatMessage.objects.select_for_update().select_related('sender'),
-                pk=message_id, conversation=chat,
+                visible_chat_messages(request, chat).select_for_update().select_related('sender'),
+                pk=message_id,
             )
             if message.sender_id != request.user.id:
                 raise PermissionDenied('Only the author can edit this message')
@@ -321,8 +362,8 @@ class ChatMessageDetailView(APIView):
         chat = accessible_chat(request, chat_id)
         with transaction.atomic():
             message = get_object_or_404(
-                ChatMessage.objects.select_for_update().select_related('sender'),
-                pk=message_id, conversation=chat,
+                visible_chat_messages(request, chat).select_for_update().select_related('sender'),
+                pk=message_id,
             )
             if message.sender_id != request.user.id:
                 raise PermissionDenied('Only the author can delete this message')
