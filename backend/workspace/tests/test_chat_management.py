@@ -129,3 +129,31 @@ class ChatManagementTests(TestCase):
         direct = self.write('POST', '/api/chats/', {'kind':'direct', 'email':colleague.email}).json()
         self.assertEqual(self.write('POST', f'/api/chats/{direct["id"]}/participants/',
                                     {'email': colleague.email}).status_code, 400)
+
+    def test_group_ownership_transfer_and_leave(self):
+        org = self.register()
+        first = self.user(org, 'first@company-a.test')
+        second = self.user(org, 'second@company-a.test')
+        outsider = self.user(org, 'outsider@company-a.test')
+        chat = self.write('POST', '/api/chats/', {
+            'kind': 'group', 'title': 'Transfer', 'emails': [first.email, second.email],
+        }).json()
+        chat_id = chat['id']
+        base = f'/api/chats/{chat_id}/'
+        self.assertEqual(self.write('POST', base + 'leave/').status_code, 400)
+        self.assertEqual(self.write('POST', base + 'ownership/', {'user_id': str(outsider.pk)}).status_code, 400)
+        self.assertEqual(self.write('POST', base + 'messages/', {'body': 'Keep this'}).status_code, 201)
+        self.login(first.email)
+        self.assertEqual(self.write('POST', base + 'ownership/', {'user_id': str(second.pk)}).status_code, 403)
+        self.login('owner@company-a.test')
+        self.assertEqual(self.write('POST', base + 'ownership/', {'user_id': str(first.pk)}).status_code, 204)
+        self.assertEqual(ChatConversation.objects.get(pk=chat_id).created_by_id, first.pk)
+        self.assertEqual(self.write('POST', base + 'leave/').status_code, 204)
+        self.assertEqual(self.client.get(base + 'messages/').status_code, 404)
+        self.assertTrue(ChatMessage.objects.filter(conversation_id=chat_id, body='Keep this').exists())
+        self.login(first.email)
+        self.assertEqual(self.write('POST', base + 'leave/').status_code, 400)
+        self.assertEqual(self.write('POST', base + 'participants/', {'email': outsider.email}).status_code, 201)
+        self.login(second.email)
+        self.assertEqual(self.write('POST', base + 'leave/').status_code, 204)
+        self.assertEqual(self.client.get(base + 'messages/').status_code, 404)

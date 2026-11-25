@@ -108,7 +108,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
     const socket = new WebSocket(`${protocol}//${location.host}/ws/chats/${selected}/`);
     socketRef.current = socket;
     socket.onopen = () => { if (valid) setConnected(true); };
-    socket.onclose = () => { if (valid) setConnected(false); };
+    socket.onclose = event => { if (valid) { setConnected(false); if(event.code===4403) { setMessages([]); void loadThreads(); } } };
     socket.onmessage = event => {
       try {
         const payload = JSON.parse(event.data) as {
@@ -293,6 +293,30 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
     } finally { setWorking(false); }
   }
 
+  async function transferOwnership(user: Person) {
+    if (!selected || working || !window.confirm(`Transfer group ownership to ${user.full_name}?`)) return;
+    setWorking(true); setError('');
+    try {
+      await api.transferGroupOwnership(selected, user.id);
+      setManagingGroup(false);
+      await loadThreads();
+    } catch(e) { setError(e instanceof Error ? e.message : 'Could not transfer ownership'); }
+    finally { setWorking(false); }
+  }
+
+  async function leaveGroup() {
+    if (!selected || working || !window.confirm('Leave this group? You will lose access to its messages and attachments.')) return;
+    setWorking(true); setError('');
+    try {
+      await api.leaveGroup(selected);
+      setThreads(old => old.filter(thread => thread.id !== selected));
+      setMessages([]); setSelected(null); setManagingGroup(false); setDraft('');
+      await loadThreads();
+      onReadRef.current?.();
+    } catch(e) { setError(e instanceof Error ? e.message : 'Could not leave group'); }
+    finally { setWorking(false); }
+  }
+
   return <section className="private-chat-page">
     <div className="private-chat-heading">
       <div><div className="eyebrow">YOUR WORKSPACE / MESSAGES</div><h1>Chats</h1><p>Private conversations with teammates in this company.</p></div>
@@ -317,6 +341,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
             <span className="chat-thread-avatar large">{active.kind === 'group' ? <Users size={19}/> : initials(titleFor(active,currentUser.id))}</span>
             <div><h2>{titleFor(active,currentUser.id)}</h2><p>{active.participants.map(p => p.user.full_name).join(', ')}</p></div>
             {active.kind==='group' && active.created_by.id===currentUser.id && <button type="button" className="group-manage-button" onClick={() => setManagingGroup(true)}><Users size={15}/> Manage group</button>}
+            {active.kind==='group' && active.created_by.id!==currentUser.id && <button type="button" className="group-manage-button" disabled={working} onClick={() => void leaveGroup()}>Leave group</button>}
             <span className={`chat-connected ${connected ? 'yes' : ''}`} title={connected ? 'Live updates connected' : 'Messages saved; live updates unavailable'}/>
           </header>
           <div className="private-chat-history">
@@ -348,8 +373,8 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
       <div className="modal" role="dialog" aria-modal="true" aria-label="Manage group participants">
         <div className="modal-head"><div><div className="eyebrow">GROUP CHAT</div><h2>Manage participants</h2></div><button className="icon-button" onClick={() => setManagingGroup(false)} aria-label="Close"><X size={19}/></button></div>
         <div className="modal-body">
-          <p className="muted">New participants see messages from the time they join, not earlier chat history.</p>
-          <div className="member-list">{active.participants.map(p => <div className="member-row" key={p.user.id}><div className="avatar small-avatar">{initials(p.user.full_name)}</div><div><strong>{p.user.full_name}</strong><small>{p.user.email}</small></div>{p.user.id===active.created_by.id ? <span className="role-pill">Creator</span> : <button className="member-remove" disabled={working} onClick={() => void removeParticipant(p.user)}>Remove</button>}</div>)}</div>
+          <p className="muted">New participants see messages from the time they join, not earlier chat history. Transfer ownership before leaving this group.</p>
+          <div className="member-list">{active.participants.map(p => <div className="member-row" key={p.user.id}><div className="avatar small-avatar">{initials(p.user.full_name)}</div><div><strong>{p.user.full_name}</strong><small>{p.user.email}</small></div>{p.user.id===active.created_by.id ? <span className="role-pill">Owner</span> : <div><button type="button" className="member-remove" disabled={working} onClick={() => void transferOwnership(p.user)}>Transfer ownership</button><button type="button" className="member-remove" disabled={working} onClick={() => void removeParticipant(p.user)}>Remove</button></div>}</div>)}</div>
           <form className="group-manage-add" onSubmit={addParticipant}>
             <label>Add teammate<select aria-label="Select teammate to add" value={addEmail} onChange={e => setAddEmail(e.target.value)} required><option value="">Choose a member</option>{groupCandidates.map(m => <option key={m.id} value={m.user.email}>{m.user.full_name} ({m.user.email})</option>)}</select></label>
             <button type="submit" className="primary-button" disabled={!addEmail || working || active.participants.length>=25}><Plus size={15}/> Add to group</button>

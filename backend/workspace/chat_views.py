@@ -75,6 +75,9 @@ def publish_chat_participants(chat_id):
 
 def manage_group(request, chat_id):
     chat = accessible_chat(request, chat_id)
+    chat = ChatConversation.objects.select_for_update().get(pk=chat.pk)
+    if not ChatParticipant.objects.filter(conversation=chat, user=request.user).exists():
+        raise PermissionDenied('Group membership required')
     if chat.kind != ChatConversation.Kind.GROUP:
         raise ValidationError({'detail': 'Only group chats support participant management'})
     if chat.created_by_id != request.user.id:
@@ -83,6 +86,7 @@ def manage_group(request, chat_id):
 
 
 class ChatParticipantsView(APIView):
+    @transaction.atomic
     def post(self, request, chat_id):
         chat = manage_group(request, chat_id)
         email = str(request.data.get('email', '')).strip().lower()
@@ -104,6 +108,7 @@ class ChatParticipantsView(APIView):
 
 
 class ChatParticipantDetailView(APIView):
+    @transaction.atomic
     def delete(self, request, chat_id, user_id):
         chat = manage_group(request, chat_id)
         if chat.created_by_id == user_id:
@@ -113,6 +118,42 @@ class ChatParticipantDetailView(APIView):
             participant = get_object_or_404(ChatParticipant, conversation=chat, user_id=user_id)
             participant.delete()
             transaction.on_commit(lambda: publish_chat_participants(chat.pk))
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ChatOwnershipView(APIView):
+    @transaction.atomic
+    def post(self, request, chat_id):
+        chat = manage_group(request, chat_id)
+        from uuid import UUID
+        try:
+            target_id = UUID(str(request.data.get('user_id', '')))
+        except (ValueError, TypeError):
+            raise ValidationError({'user_id': 'Choose a valid participant'})
+        if target_id == request.user.pk or not ChatParticipant.objects.filter(
+            conversation=chat, user_id=target_id, user__is_active=True,
+            user__organization_memberships__organization_id=chat.organization_id,
+        ).exists():
+            raise ValidationError({'user_id': 'Choose another active group participant'})
+        chat.created_by_id = target_id
+        chat.save(update_fields=['created_by'])
+        transaction.on_commit(lambda: publish_chat_participants(chat.pk))
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ChatLeaveView(APIView):
+    @transaction.atomic
+    def post(self, request, chat_id):
+        chat = accessible_chat(request, chat_id)
+        chat = ChatConversation.objects.select_for_update().get(pk=chat.pk)
+        if chat.kind != ChatConversation.Kind.GROUP:
+            raise ValidationError({'detail': 'Only group chats can be left'})
+        participant = get_object_or_404(ChatParticipant, conversation=chat, user=request.user)
+        if chat.created_by_id == request.user.pk:
+            raise ValidationError({'detail': 'Transfer group ownership before leaving'})
+        participant.delete()
+        transaction.on_commit(lambda: publish_chat_participants(chat.pk))
+        transaction.on_commit(lambda: publish_notification_refresh(chat.organization_id, [request.user.pk]))
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

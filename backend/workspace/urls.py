@@ -48,6 +48,8 @@ urlpatterns = [
     path('chats/<uuid:chat_id>/read/', chat_views.ChatReadView.as_view()),
     path('chats/<uuid:chat_id>/messages/<uuid:message_id>/', chat_views.ChatMessageDetailView.as_view()),
     path('chats/<uuid:chat_id>/messages/<uuid:message_id>/reactions/', chat_views.ChatReactionView.as_view()),
+    path('chats/<uuid:chat_id>/ownership/', chat_views.ChatOwnershipView.as_view()),
+    path('chats/<uuid:chat_id>/leave/', chat_views.ChatLeaveView.as_view()),
     path('chats/<uuid:chat_id>/participants/', chat_views.ChatParticipantsView.as_view()),
     path('chats/<uuid:chat_id>/participants/<uuid:user_id>/', chat_views.ChatParticipantDetailView.as_view()),
     path('search/messages/', message_search.MessageSearchView.as_view()),
