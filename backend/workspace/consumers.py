@@ -29,6 +29,12 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         # Messages are only created through authenticated, CSRF-protected REST POSTs.
         # The WebSocket only receives server-published chat events.
         if content.get('type') == 'ping':
+            user = self.scope.get('user')
+            channel_id = self.scope['url_route']['kwargs']['channel_id']
+            org_id = self.scope['session'].get('active_organization_id')
+            if not user or not await self.allowed(user.pk, channel_id, org_id):
+                await self.close(code=4403)
+                return
             await self.send_json({'type': 'pong'})
 
     async def team_membership_changed(self, event):
@@ -108,6 +114,12 @@ class PrivateChatConsumer(AsyncJsonWebsocketConsumer):
 
     async def receive_json(self, content, **kwargs):
         if content.get('type') == 'ping':
+            user = self.scope.get('user')
+            chat_id = self.scope['url_route']['kwargs']['chat_id']
+            org_id = self.scope['session'].get('active_organization_id')
+            if not user or not await self.allowed(user.pk, chat_id, org_id):
+                await self.close(code=4403)
+                return
             await self.send_json({'type': 'pong'})
             return
         if content.get('type') != 'typing' or type(content.get('active')) is not bool:

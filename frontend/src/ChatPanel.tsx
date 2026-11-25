@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEve
 import { ArrowRight, MessageCircle, Plus, RefreshCw, Send, Users, X } from 'lucide-react';
 import { api, type ChatMessage, type ChannelMessageCursor, type ChatThread, type Member, type Person, type PresenceMap } from './api';
 import ChatReactionBar from './ChatReactionBar';
+import {connectConversationSocket,mergeFreshHistory} from './conversationSocket';
+import {ApiError} from './api';
 import AttachmentPanel from './AttachmentPanel';
 import MentionInput from './MentionInput';
 import ReplyPreview from './ReplyPreview';
@@ -116,30 +118,41 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
     setTypingUsers({});
     setEditingId(null);
     setConnected(false);
-    api.chatMessagePage(selected).then(page => {
-      if (valid) {
-        const rows = page.items;
-        setHistoryCursor(page.next_cursor);
-        setLoadedChatId(selected);
-        setMessages(current => {
-        const all = new Map([...rows, ...current].map(item => [item.id, item]));
-        return [...all.values()].sort(messageOrder);
-        });
-      }
-    }).catch(e => { if (valid) setError(e instanceof Error ? e.message : 'Could not load messages'); });
-
-    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const socket = new WebSocket(`${protocol}//${location.host}/ws/chats/${selected}/`);
-    socketRef.current = socket;
-    socket.onopen = () => { if (valid) setConnected(true); };
-    socket.onclose = event => { if (valid) { setConnected(false); if(event.code===4403) { valid = false; historyRequestRef.current++; setHistoryCursor(null); setLoadingOlder(false); setLoadedChatId(null); setMessages([]); setThreads(old=>old.filter(t=>t.id!==selected)); void loadThreads(); } } };
-    socket.onmessage = event => {
+    let revision=0,syncing=false,stopSocket=()=>{};
+    const live=new Map<string,ChatMessage>();
+    function denied(){
+      if(!valid)return;valid=false;revision++;historyRequestRef.current++;
+      stopSocket();socketRef.current=null;setConnected(false);setHistoryCursor(null);setLoadingOlder(false);
+      setLoadedChatId(null);setMessages([]);setReplyTo(null);setForwardId(null);setDraft('');
+      setThreads(old=>old.filter(t=>t.id!==selected));setSelected(null);void loadThreads();
+    }
+    async function refresh(){
+      const run=++revision;syncing=true;live.clear();
+      historyRequestRef.current++;setLoadingOlder(false);setHistoryCursor(null);scrollRestoreRef.current=null;
+      try{
+        const page=await api.chatMessagePage(selected!);
+        if(!valid||run!==revision)return;
+        setHistoryCursor(page.next_cursor);setLoadedChatId(selected);
+        setMessages(mergeFreshHistory(page.items,live));setPinVersion(v=>v+1);
+      }catch(e){
+        if(!valid||run!==revision)return;
+        if(e instanceof ApiError&&[401,403,404].includes(e.status)){denied();return;}
+        setError(e instanceof Error?e.message:'Could not load messages');
+      }finally{if(valid&&run===revision){syncing=false;live.clear();}}
+    }
+    stopSocket=connectConversationSocket(`/ws/chats/${selected}/`,{
+      onAttempt:()=>{void refresh();},
+      onOpen:socket=>{if(valid){socketRef.current=socket;setConnected(true);void refresh();void loadThreads();}},
+      onDisconnected:()=>{if(valid){socketRef.current=null;setConnected(false);setTypingUsers({});}},
+      onDenied:denied,
+      onMessage:event=>{
       try {
         const payload = JSON.parse(event.data) as {
           type:string; message:ChatMessage; user_id?:string;
           full_name?:string; active?:boolean; last_read_at?:string;
         };
         if (!valid) return;
+        if(syncing&&payload.message&&['message','message.updated','message.deleted'].includes(payload.type))live.set(payload.message.id,payload.message);
         if (payload.type === 'typing' && payload.user_id && payload.full_name) {
           const id=payload.user_id;
           const oldTimer=typingTimersRef.current.get(id);
@@ -168,14 +181,16 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
           void loadThreads();
         }
       } catch { /* Ignore unexpected socket events. */ }
-    };
+      },
+    });
+    if(!navigator.onLine)void refresh();
     return () => {
-      valid = false;
-      if(socketRef.current===socket) socketRef.current=null;
+      valid = false;revision++;historyRequestRef.current++;
+      socketRef.current=null;
       if(stopTypingRef.current) clearTimeout(stopTypingRef.current);
       typingTimersRef.current.forEach(timer=>clearTimeout(timer));
       typingTimersRef.current.clear();
-      socket.close();
+      stopSocket();
     };
   }, [selected, workspaceId, loadThreads]);
 

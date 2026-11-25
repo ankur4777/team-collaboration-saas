@@ -4,6 +4,8 @@ import { ArrowLeft, ArrowRight, Check, ChevronDown, Hash, Inbox, MessageCircle,
   Settings2, Sparkles, Users, Video, X, CalendarDays, FolderOpen, Search } from 'lucide-react';
 import { api, csrf, type Channel, type ChannelMessageCursor, type ChannelNotice, type Member, type Message, type Person, type Session, type Team } from './api';
 import ChatPanel from './ChatPanel';
+import {connectConversationSocket,mergeFreshHistory} from './conversationSocket';
+import {ApiError} from './api';
 import {useWorkspacePresence,PresenceStatus} from './WorkspacePresence';
 import MeetingsPanel, {ChannelMeetingCards} from './MeetingsPanel';
 import ChannelMessageItem from './ChannelMessageItem';
@@ -111,6 +113,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   const [channelHasMore,setChannelHasMore] = useState(false);
   const [channelLoadingOlder,setChannelLoadingOlder] = useState(false);
   const olderRequestRef = useRef(false);
+  const channelHistoryGeneration=useRef(0);
   const channelScrollRef = useRef<HTMLDivElement>(null);
   const channelScrollAnchorRef = useRef<{height:number;top:number}|null>(null);
   const channelAutoScrollRef = useRef(true);
@@ -186,42 +189,53 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   },[selectedTeam,session.active_organization_id]);
   useEffect(()=>{if(!selectedTeam){setChannels([]);setSelectedChannel(null);return;}let valid=true;api.channels(selectedTeam).then(rows=>{if(!valid)return;setChannels(rows);setSelectedChannel(current=>current&&rows.some(c=>c.id===current)?current:rows[0]?.id||null);}).catch(e=>valid&&setError(errorText(e)));return()=>{valid=false;};},[selectedTeam]);
   useEffect(()=>{
-    channelAutoScrollRef.current=true;
-    channelScrollAnchorRef.current=null;
-    olderRequestRef.current=false;
-    setChannelCursor(null);
-    setChannelHasMore(false);
-    setChannelLoadingOlder(false);
-    if(!selectedChannel){setMessages([]);setLoadedChannelId(null);return;}
-    let valid=true;
-    setMessages([]);
-    setLoadedChannelId(null);
-    api.channelMessagePage(selectedChannel).then(page=>{
-      if(!valid)return;
-      setMessages(previous=>{
-        // Keep WebSocket messages that arrived while initial history was loading.
-        const all=new Map([...page.items,...previous].map(m=>[m.id,m]));
-        return [...all.values()].sort((a,b)=>
-          a.created_at.localeCompare(b.created_at)||a.id.localeCompare(b.id));
-      });
-      setChannelCursor(page.next_cursor);
-      setChannelHasMore(page.has_more);
-      setLoadedChannelId(selectedChannel);
-    }).catch(e=>valid&&setError(errorText(e)));
-    return()=>{valid=false;};
-  },[selectedChannel,session.active_organization_id]);
-  useEffect(()=>{if(!selectedChannel)return;let open=true;setConnected(false);const protocol=location.protocol==='https:'?'wss:':'ws:';
-    const socket=new WebSocket(`${protocol}//${location.host}/ws/channels/${selectedChannel}/`);
-    socket.onopen=()=>{if(open)setConnected(true);};socket.onclose=event=>{if(!open)return;setConnected(false);if(event.code===4403){setMessages([]);setLoadedChannelId(null);setSelectedChannel(null);setChannels([]);setReplyTo(null);setForwardId(null);setDraft('');void loadTeams();void loadChannelNotices();}};
-    socket.onmessage=event=>{try {
-      const payload=JSON.parse(event.data) as {type:string;message:Message};
-      if(!open)return;
-      if(payload.type==='team_membership_changed'){const teamId=selectedTeamRef.current;if(teamId)void api.teamMembers(teamId).then(rows=>{if(open&&selectedTeamRef.current===teamId){setTeamRoster(rows);setTeamMentionPeople(rows.map(row=>row.user));}}).catch(()=>{});return;}
-      if(!payload.message)return;
-      if(payload.type==='message')setMessages(old=>old.some(m=>m.id===payload.message.id)?old:[...old,payload.message]);
-      else if(payload.type==='message.updated'||payload.type==='message.deleted'){setMessages(old=>old.map(row=>row.id===payload.message.id?payload.message:row));setPinVersion(value=>value+1);}
-    }catch{/* Ignore malformed server messages */}};
-    return()=>{open=false;socket.close();};
+    channelAutoScrollRef.current=true;channelScrollAnchorRef.current=null;
+    channelHistoryGeneration.current++;olderRequestRef.current=false;
+    setChannelCursor(null);setChannelHasMore(false);setChannelLoadingOlder(false);
+    setMessages([]);setLoadedChannelId(null);setConnected(false);
+    if(!selectedChannel)return;
+    const channelId=selectedChannel;
+    let valid=true,revision=0,syncing=false,stopSocket=()=>{};
+    const live=new Map<string,Message>();
+    function denied(){
+      if(!valid)return;valid=false;revision++;channelHistoryGeneration.current++;
+      stopSocket();setConnected(false);setMessages([]);setLoadedChannelId(null);
+      setSelectedChannel(null);setChannels([]);setReplyTo(null);setForwardId(null);setDraft('');
+      void loadTeams();void loadChannelNotices();
+    }
+    async function refresh(){
+      const run=++revision;syncing=true;live.clear();
+      channelHistoryGeneration.current++;olderRequestRef.current=false;
+      setChannelLoadingOlder(false);channelScrollAnchorRef.current=null;setChannelHasMore(false);
+      try{
+        const page=await api.channelMessagePage(channelId);
+        if(!valid||run!==revision)return;
+        setMessages(mergeFreshHistory(page.items,live));setChannelCursor(page.next_cursor);
+        setChannelHasMore(page.has_more);setLoadedChannelId(channelId);setPinVersion(v=>v+1);
+      }catch(e){
+        if(!valid||run!==revision)return;
+        if(e instanceof ApiError&&[401,403,404].includes(e.status)){denied();return;}
+        setError(errorText(e));
+      }finally{if(valid&&run===revision){syncing=false;live.clear();}}
+    }
+    stopSocket=connectConversationSocket(`/ws/channels/${channelId}/`,{
+      onAttempt:()=>{void refresh();},
+      onOpen:()=>{if(valid){setConnected(true);void refresh();void loadChannelNotices();}},
+      onDisconnected:()=>{if(valid)setConnected(false);},
+      onDenied:denied,
+      onMessage:event=>{try{
+        if(!valid)return;
+        const payload=JSON.parse(event.data) as {type:string;message:Message};
+        if(payload.type==='team_membership_changed'){const teamId=selectedTeamRef.current;if(teamId)void api.teamMembers(teamId).then(rows=>{if(valid&&selectedTeamRef.current===teamId){setTeamRoster(rows);setTeamMentionPeople(rows.map(row=>row.user));}}).catch(()=>{});return;}
+        if(!payload.message)return;
+        if(syncing&&['message','message.updated','message.deleted'].includes(payload.type))live.set(payload.message.id,payload.message);
+        if(payload.type==='message')setMessages(old=>old.some(m=>m.id===payload.message.id)?old:mergeFreshHistory(old,new Map([[payload.message.id,payload.message]])));
+        else if(payload.type==='message.updated'||payload.type==='message.deleted'){setMessages(old=>old.map(row=>row.id===payload.message.id?payload.message:row));setPinVersion(value=>value+1);}
+      }catch{/* Ignore malformed events. */}},
+    });
+    // REST history remains available even when the network/socket is initially offline.
+    if(!navigator.onLine)void refresh();
+    return()=>{valid=false;revision++;channelHistoryGeneration.current++;stopSocket();};
   },[selectedChannel,session.active_organization_id,loadTeams,loadChannelNotices]);
   useLayoutEffect(()=>{
     const area=channelScrollRef.current;
@@ -327,6 +341,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
     const channelId=selectedChannel;
     const cursor=channelCursor;
     if(!channelId||!cursor||!channelHasMore||channelLoadingOlder||olderRequestRef.current)return;
+    const generation=channelHistoryGeneration.current;
     olderRequestRef.current=true;
     setChannelLoadingOlder(true);
     const area=channelScrollRef.current;
@@ -334,7 +349,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
     const organizationId=session.active_organization_id;
     try{
       const page=await api.channelMessagePage(channelId,cursor);
-      if(selectedChannelRef.current!==channelId||currentOrgRef.current!==organizationId)return;
+      if(generation!==channelHistoryGeneration.current||selectedChannelRef.current!==channelId||currentOrgRef.current!==organizationId)return;
       if(page.items.length){
         setMessages(current=>{
           const all=new Map([...page.items,...current].map(m=>[m.id,m]));
@@ -347,11 +362,12 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
       setChannelCursor(page.next_cursor);
       setChannelHasMore(page.has_more);
     }catch(e){
-      if(selectedChannelRef.current===channelId){
+      if(generation===channelHistoryGeneration.current&&selectedChannelRef.current===channelId){
         channelScrollAnchorRef.current=null;
         setError(errorText(e));
       }
     }finally{
+      if(generation!==channelHistoryGeneration.current)return;
       olderRequestRef.current=false;
       if(selectedChannelRef.current===channelId&&currentOrgRef.current===organizationId){
         setChannelLoadingOlder(false);
