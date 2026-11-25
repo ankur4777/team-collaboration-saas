@@ -43,7 +43,12 @@ class PlatformView(APIView):
 class LicenseInput(serializers.Serializer):
     contact_email = serializers.EmailField(required=False, allow_blank=True, max_length=254)
     country = serializers.CharField(required=False, allow_blank=True, max_length=80)
-    country_code = serializers.RegexField(r'^\+[1-9][0-9]{0,2}(required=False, allow_blank=True, max_length=80)
+    country_code = serializers.RegexField(r'^\+[1-9][0-9]{0,2}$', required=False, allow_blank=True, max_length=5)
+    phone = serializers.RegexField(r'^[0-9]{4,15}$', required=False, allow_blank=True, max_length=15)
+    website = serializers.URLField(required=False, allow_blank=True, max_length=250)
+    tax_number = serializers.CharField(required=False, allow_blank=True, max_length=60)
+    address = serializers.CharField(required=False, allow_blank=True, max_length=500)
+    plan = serializers.CharField(required=False, allow_blank=True, max_length=80)
     status = serializers.ChoiceField(choices=CompanyLicense.Status.choices, required=False)
     seat_limit = serializers.IntegerField(required=False, allow_null=True, min_value=1, max_value=1000000)
     starts_on = serializers.DateField(required=False, allow_null=True)

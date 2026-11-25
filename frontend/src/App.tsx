@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Check, ChevronDown, Hash, Inbox, MessageCircle,
 import { api, csrf, type Channel, type ChannelMessageCursor, type ChannelNotice, type Member, type Message, type Person, type Session, type Team } from './api';
 import ChatPanel from './ChatPanel';
 import PlatformAdmin from './PlatformAdmin';
+import {showPlatformAdmin} from './adminRouting';
 import SubscriptionBlocked from './SubscriptionBlocked';
 import {SubscriptionSummary} from './SubscriptionSummary';
 import {connectConversationSocket,mergeFreshHistory} from './conversationSocket';
@@ -41,7 +42,7 @@ function Empty({ icon, title, description, action }: {icon:ReactNode;title:strin
 
 type AuthMode = 'login' | 'register';
 function AuthScreen({ onAuth }: {onAuth:(session:Session)=>void}) {
-  const [mode,setMode] = useState<AuthMode>('register');
+  const [mode,setMode] = useState<AuthMode>('login');
   const [email,setEmail] = useState(''); const [password,setPassword] = useState('');
   const [fullName,setFullName] = useState(''); const [orgName,setOrgName] = useState('');
   const [error,setError] = useState(''); const [busy,setBusy] = useState(false);
@@ -58,7 +59,7 @@ function AuthScreen({ onAuth }: {onAuth:(session:Session)=>void}) {
     <p>Bring your people, projects and ideas together in a workspace designed to help everyone do their best work.</p>
     <div className="testimonial"><span className="testimonial-icon">“</span><p>Less time switching between apps. More time making things happen.</p><span>YOUR TEAM, CONNECTED</span></div>
   </div><div className="aside-foot"><span className="status-dot"/> Secure workspaces for every organization</div></section>
-  <section className="auth-main"><div className="auth-top">Already have an account? <button className="text-link" onClick={()=>{setMode(mode==='login'?'register':'login');setError('');}}>{mode==='login'?'Create workspace':'Sign in'} <ArrowRight size={15}/></button></div>
+  <section className="auth-main"><div className="auth-top">{mode==='login'?'New to TeamWorkspace?':'Already have an account?'} <button className="text-link" onClick={()=>{setMode(mode==='login'?'register':'login');setError('');}}>{mode==='login'?'Create workspace':'Sign in'} <ArrowRight size={15}/></button></div>
     <form className="auth-card" onSubmit={submit}><div className="mini-mark"><LayoutGrid size={23}/></div>
       <div className="eyebrow">{mode==='register'?'GET STARTED — IT’S FREE':'WELCOME BACK'}</div>
       <h2>{mode==='register'?'Create your workspace':'Sign in to your workspace'}</h2>
@@ -71,7 +72,7 @@ function AuthScreen({ onAuth }: {onAuth:(session:Session)=>void}) {
       <button type="submit" className="primary-button wide" disabled={busy}>{busy?<Spinner/>:mode==='register'?'Create workspace':'Sign in'} <ArrowRight size={17}/></button>
       <div className="auth-note"><LockKeyhole size={14}/> Your workspace data stays separate and protected.</div>
       <p className="auth-switch">{mode==='register'?'Have an account already?':'New to TeamWorkspace?'} <button type="button" className="text-link" onClick={()=>{setMode(mode==='login'?'register':'login');setError('');}}>{mode==='register'?'Sign in':'Create a workspace'}</button></p>
-    </form><div className="auth-footer">© 2026 TeamWorkspace · Account security preview</div>
+    <p className="auth-switch"><a className="text-link" href="/platform-admin"><LockKeyhole size={14}/> Super Admin Login</a></p></form><div className="auth-footer">© 2026 TeamWorkspace · Account security preview</div>
   </section></main>;
 }
 
@@ -472,21 +473,27 @@ export default function App() {
     : location.pathname === '/reset-password' ? 'reset'
     : location.pathname === '/verify-email' ? 'verify' : null;
   useEffect(()=>{let active=true;csrf().then(()=>api.me()).then(s=>{if(active)setSession(s);}).catch(e=>{if(!active)return;if('status' in (e as object) && (e as {status:number}).status===401) setSession(null);else {setBootError(errorText(e));setSession(null);}});return()=>{active=false;};},[]);
+  const platformMode=showPlatformAdmin(location.pathname,session);
+  useEffect(()=>{
+    if(!inviteMode&&!recoveryMode&&session?.user.is_platform_admin===true&&location.pathname!=='/platform-admin'){
+      history.replaceState({},'','/platform-admin');
+    }
+  },[session?.user.is_platform_admin,inviteMode,recoveryMode]);
   const signedInUser=session?.user.id;
   const activeOrgId=session?.active_organization_id;
   useEffect(()=>{
-    if(!signedInUser||location.pathname==='/platform-admin')return;
+    if(!signedInUser||platformMode)return;
     let active=true,busy=false;
     const refresh=async()=>{if(!active||busy||document.hidden)return;busy=true;try{const next=await api.me();if(active)setSession(current=>current?.user.id===signedInUser&&current.active_organization_id===activeOrgId?next:current);}catch{/* REST endpoints still enforce subscription access. */}finally{busy=false;}};
     const trigger=()=>{void refresh();};
     const timer=window.setInterval(trigger,30000);
     window.addEventListener('focus',trigger);window.addEventListener('online',trigger);document.addEventListener('visibilitychange',trigger);
     return()=>{active=false;window.clearInterval(timer);window.removeEventListener('focus',trigger);window.removeEventListener('online',trigger);document.removeEventListener('visibilitychange',trigger);};
-  },[signedInUser,activeOrgId]);
+  },[signedInUser,activeOrgId,platformMode]);
   if(session===undefined)return <div className="page-loader"><Brand/><Spinner/><span>Preparing your workspace...</span></div>;
   if(recoveryMode)return <AccountRecoveryScreen mode={recoveryMode}/>;
   if(inviteMode)return <InviteScreen session={session} onDone={s=>{setSession(s);history.replaceState({},'','/');}} onBack={()=>{location.href='/';}}/>;
-  if(location.pathname==='/platform-admin'||session?.user.is_platform_admin&&!session.active_organization_id)return <PlatformAdmin session={session} onSession={setSession}/>;
+  if(platformMode)return <PlatformAdmin session={session} onSession={setSession}/>;
   if(!session)return <>{bootError&&<div className="boot-error"><ErrorBanner message={bootError}/></div>}<AuthScreen onAuth={setSession}/></>;
   const activeSubscription=session.organizations.find(org=>org.id===session.active_organization_id)?.subscription;
   if(activeSubscription&&!activeSubscription.allowed)return <SubscriptionBlocked session={session} onSession={setSession}/>;

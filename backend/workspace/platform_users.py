@@ -49,64 +49,7 @@ class UserDirectoryView(PlatformView):
 
 class MembershipUpdateInput(serializers.Serializer):
     role=serializers.ChoiceField(choices=('member','admin'),required=False)
-    contact_phone=serializers.RegexField(r'^\+[1-9][0-9]{3,14}
-    @transaction.atomic
-    def patch(self,request,member_id):
-        form=MembershipUpdateInput(data=request.data,partial=True)
-        form.is_valid(raise_exception=True)
-        if not form.validated_data:
-            raise ValidationError({'detail':'No membership changes supplied'})
-        initial=get_object_or_404(OrganizationMember,pk=member_id)
-        org=get_object_or_404(Organization.objects.select_for_update(),pk=initial.organization_id)
-        row=get_object_or_404(OrganizationMember.objects.select_for_update().select_related('organization','user'),pk=member_id,organization=org)
-        if row.role=='owner' or row.user.is_superuser or row.user.is_staff:
-            raise ValidationError({'role':'Protected owner or platform account'})
-        changes={}
-        for key,value in form.validated_data.items():
-            old=getattr(row,key)
-            if old!=value:
-                setattr(row,key,value)
-                changes[key]={'from':old,'to':value}
-        if changes:
-            row.save(update_fields=list(changes))
-            audit(org,request.user,'membership_updated',{'member_id':str(row.pk),**changes})
-        return Response(member_data(row))
-
-
-class InviteInput(serializers.Serializer):
-    email=serializers.EmailField(max_length=254)
-    role=serializers.ChoiceField(choices=('admin','member'),default='member')
-
-
-class InviteUserView(PlatformView):
-    def post(self,request,company_id):
-        form=InviteInput(data=request.data)
-        form.is_valid(raise_exception=True)
-        email=form.validated_data['email'].lower()
-        role=form.validated_data['role']
-        with transaction.atomic():
-            org=get_object_or_404(Organization.objects.select_for_update(),pk=company_id)
-            if not access_allowed(org.pk):
-                raise ValidationError({'detail':'Reactivate the company before inviting new employees'})
-            if not org.members.filter(role='owner').exists():
-                raise ValidationError({'detail':'The company owner must accept their invitation first'})
-            if org.members.filter(user__email__iexact=email).exists():
-                raise ValidationError({'email':'This person is already a member'})
-            if not seat_available(org.pk):
-                return Response({'detail':SEAT_LIMIT_MESSAGE},status=409)
-            prior=list(Invitation.objects.select_for_update().filter(organization=org,email__iexact=email,accepted_at__isnull=True).exclude(role='owner'))
-            Invitation.objects.filter(pk__in=[r.pk for r in prior]).update(expires_at=timezone.now())
-            token=Invitation.generate_token()
-            inv=Invitation.objects.create(organization=org,email=email,role=role,token_hash=hashlib.sha256(token.encode()).hexdigest(),invited_by=request.user)
-            audit(org,request.user,'employee_invited',{'email':email,'role':role})
-        try:
-            delivered=bool(send_mail(subject=f'Invitation to join {org.name}',message=f'You have been invited to {org.name}. Accept within 7 days:\n{settings.FRONTEND_ORIGIN}/invite?token={quote(token,safe="")}',
-                  from_email=settings.DEFAULT_FROM_EMAIL,recipient_list=[email],fail_silently=False))
-        except Exception:
-            logger.exception('Employee invitation delivery failed for company %s',org.pk)
-            delivered=False
-        return Response({'id':str(inv.pk),'invitation_sent':delivered},status=201)
-,required=False,allow_blank=True,max_length=16)
+    contact_phone=serializers.RegexField(r'^\+[1-9][0-9]{3,14}$',required=False,allow_blank=True,max_length=16)
 
 
 class UserMembershipView(PlatformView):

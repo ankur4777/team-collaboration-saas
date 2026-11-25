@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useRef,useState,type FormEvent} from 'react';
-import {Building2,Users,LayoutGrid,ShieldCheck,LogOut,Home,SlidersHorizontal,CalendarClock,Receipt,ChartNoAxesCombined,Headset,Wallet,Menu,X} from 'lucide-react';
+import {Building2,Users,ShieldCheck,LogOut,Home,SlidersHorizontal,CalendarClock,Receipt,ChartNoAxesCombined,Headset,Wallet,Menu,X} from 'lucide-react';
 import {api,type Session,type CompanyLicense,type PlatformCompany,type PlatformCompanies,type PlatformAudit,type LicenseStatus} from './api';
 import './PlatformAdmin.css';
 import {CompanyDirectory,UserDirectory,type DirectoryMode} from './ProviderDirectory';
@@ -19,8 +19,8 @@ export default function PlatformAdmin({session,onSession}:{session:Session|null;
   async function login(e:FormEvent){e.preventDefault();setBusy(true);setError('');try{const next=await api.login(email,password);setPassword('');onSession(next);}catch(e){setError(message(e));}finally{setBusy(false);}}
   async function logout(){setBusy(true);setError('');try{await api.logout();onSession(null);}catch(e){setError(message(e));}finally{setBusy(false);}}
   if(session?.user.is_platform_admin)return <Dashboard key={session.user.id} session={session} onLogout={()=>void logout()}/>;
-  return <main className="pa-login"><div className="pa-login-card"><div className="pa-mark"><ShieldCheck/></div><div className="pa-eyebrow">TEAMWORKSPACE / PLATFORM ADMINISTRATION</div><h1>Provider sign in</h1><p>Restricted to authorized platform administrators.</p>{error&&<p className="pa-error" role="alert">{error}</p>}
-  {session?<><p role="alert">This account does not have platform administrator access.</p><button className="primary-button" disabled={busy} onClick={()=>void logout()}>Sign out</button><a href="/">Return to workspace</a></>:<form onSubmit={login}><label>Administrator email<input type="email" value={email} autoComplete="username" onChange={e=>setEmail(e.target.value)} required/></label><label>Password<input type="password" value={password} autoComplete="current-password" onChange={e=>setPassword(e.target.value)} required/></label><button className="primary-button" disabled={busy}>{busy?'Signing in…':'Sign in'}</button><a href="/forgot-password">Forgot password?</a></form>}</div></main>;
+  return <main className="pa-login"><div className="pa-login-card"><div className="pa-mark"><ShieldCheck/></div><div className="pa-eyebrow">TEAMWORKSPACE / PLATFORM ADMINISTRATION</div><h1>Super Admin sign in</h1><p>Restricted to authorized platform administrators.</p>{error&&<p className="pa-error" role="alert">{error}</p>}
+  {session?<><p role="alert">This is a company workspace account, not a Super Admin account. Sign out and use the account created with createsuperuser.</p><button className="primary-button" disabled={busy} onClick={()=>void logout()}>Sign out</button><a href="/">Return to workspace</a></>:<form onSubmit={login}><label>Administrator email<input type="email" value={email} autoComplete="username" onChange={e=>setEmail(e.target.value)} required/></label><label>Password<input type="password" value={password} autoComplete="current-password" onChange={e=>setPassword(e.target.value)} required/></label><button className="primary-button" disabled={busy}>{busy?'Signing in…':'Sign in'}</button><a href="/forgot-password">Forgot password?</a><a href="/">Company workspace sign in</a></form>}</div></main>;
 }
 type EditorTab='profile'|'modules'|'renewal'|'billing'|'usage'|'access'|'audit';
 type Section='overview'|DirectoryMode|'users'|'support'|'revenue';
