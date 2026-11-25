@@ -8,10 +8,13 @@ from . import message_forwarding
 from . import message_pins
 from . import presence
 from . import conversation_tools
-from . import platform_admin, platform_billing, platform_reports, support
+from . import platform_admin, platform_billing, platform_reports, support, platform_users
 from . import auth_views, views, member_views, chat_views, channel_notifications, account_recovery, settings_views, session_views, message_search, mentions
 
 urlpatterns = [
+    path('platform/users/', platform_users.UserDirectoryView.as_view()),
+    path('platform/users/<uuid:member_id>/', platform_users.UserMembershipView.as_view()),
+    path('platform/companies/<uuid:company_id>/invite-user/', platform_users.InviteUserView.as_view()),
     path('platform/revenue/', platform_reports.RevenueView.as_view()),
     path('platform/companies/<uuid:company_id>/usage/', platform_reports.CompanyUsageView.as_view()),
     path('platform/support/', support.PlatformTicketsView.as_view()),

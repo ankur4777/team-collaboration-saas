@@ -152,9 +152,11 @@ async function downloadWorkspaceFile(row:WorkspaceFile): Promise<void> {
 }
 
 export type LicenseStatus='unassigned'|'trial'|'active'|'suspended'|'cancelled';
-export interface CompanyLicense {contact_email:string;plan:string;status:LicenseStatus;seat_limit:number|null;starts_on:string|null;ends_on:string|null;modules:string[];enforce_modules?:boolean}
-export interface PlatformCompany extends CompanyLicense, SubscriptionTiming {id:string;name:string;slug:string;created_at:string;employee_count:number;seats_remaining?:number|null;team_count:number;owner_emails:string[];pending_owner_email:string|null;effective_status:string}
+export interface CompanyLicense {contact_email:string;country?:string;country_code?:string;phone?:string;website?:string;tax_number?:string;address?:string;plan:string;status:LicenseStatus;seat_limit:number|null;starts_on:string|null;ends_on:string|null;modules:string[];enforce_modules?:boolean}
+export interface PlatformCompany extends CompanyLicense, SubscriptionTiming {id:string;name:string;slug:string;created_at:string;employee_count:number;seats_remaining?:number|null;team_count:number;owner_emails:string[];owner_names?:string[];pending_owner_email:string|null;effective_status:string}
 export interface PlatformCompanies {items:PlatformCompany[];total:number;page:number;page_size:number;stats:{companies:number;active:number;trial:number;expired:number;suspended:number;memberships:number}}
+export interface ProviderMember {id:string;user_id:string;company_id:string;company:string;full_name:string;email:string;role:'owner'|'admin'|'member';contact_phone?:string;editable?:boolean;active:boolean;email_verified:boolean;joined_at:string;last_seen_at:string|null}
+export interface ProviderMemberPage {items:ProviderMember[];total:number;page:number;page_size:number}
 export interface CompanyUsage {company_id:string;as_of:string;window_days:number;members:number;recent_members:number;online_members:number;teams:number;channels:number;conversations:number;channel_messages:number;chat_messages:number;recent_messages:number;meetings:number;recent_meetings:number;shared_files:number;attachments:number;storage_bytes:number}
 export interface RevenueReport {start:string;end:string;as_of:string;totals:{currency:string;billed:string;received:string;outstanding:string;overdue:string}[];monthly:{month:string;currency:string;received:string}[];customers:{company_id:string;company:string;currency:string;received:string}[];customers_limit:number}
 export type TicketStatus='open'|'in_progress'|'resolved'|'closed';
@@ -182,10 +184,13 @@ export const api = {
   voidPlatformInvoice: (id:string,invoice:string) => post<BillingInvoice>(`platform/companies/${id}/invoices/${invoice}/void/`,{}),
   platformRenewals: (id:string,page=1) => request<RenewalPage>(`platform/companies/${id}/renewals/?page=${page}`),
   renewPlatformCompany: (id:string,data:RenewalInput) => post<{company:PlatformCompany;renewal:SubscriptionRenewal;replayed:boolean}>(`platform/companies/${id}/renewals/`,data),
-  platformCompanies: (q='',status='',page=1) => request<PlatformCompanies>(`platform/companies/?${new URLSearchParams({q,status,page:String(page)})}`),
+  platformCompanies: (q='',status='',page=1,pageSize=25,sort='newest') => request<PlatformCompanies>(`platform/companies/?${new URLSearchParams({q,status,page:String(page),page_size:String(pageSize),sort})}`),
+  platformUsers:(q='',role='',page=1,pageSize=10)=>request<ProviderMemberPage>(`platform/users/?${new URLSearchParams({q,role,page:String(page),page_size:String(pageSize)})}`),
+  platformUserRole:(id:string,role:'admin'|'member',contact_phone:string)=>request<ProviderMember>(`platform/users/${id}/`,'PATCH',{role,contact_phone}),
+  invitePlatformUser:(id:string,email:string,role:'admin'|'member')=>post<{id:string;invitation_sent:boolean}>(`platform/companies/${id}/invite-user/`,{email,role}),
   platformCompany: (id:string) => request<{company:PlatformCompany;audit:PlatformAudit[]}>(`platform/companies/${id}/`),
   createPlatformCompany: (data:CompanyLicense&{name:string;owner_email:string}) => post<{company:PlatformCompany;invitation_sent:boolean}>('platform/companies/',data),
-  updatePlatformCompany: (id:string,data:CompanyLicense) => request<PlatformCompany>(`platform/companies/${id}/`,'PATCH',data),
+  updatePlatformCompany: (id:string,data:Partial<CompanyLicense>&{name?:string}) => request<PlatformCompany>(`platform/companies/${id}/`,'PATCH',data),
   invitePlatformOwner: (id:string,email:string) => post<{invitation_sent:boolean}>(`platform/companies/${id}/invite-owner/`,{email}),
   chatPreferences: (id:string,values:Partial<ConversationPreferences>) => post<ConversationPreferences>(`chats/${id}/preferences/`,values),
   channelPreferences: (id:string,values:Partial<ConversationPreferences>) => post<ConversationPreferences>(`channels/${id}/preferences/`,values),

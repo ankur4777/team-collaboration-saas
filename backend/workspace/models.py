@@ -78,6 +78,12 @@ class CompanyLicense(models.Model):
 
     organization = models.OneToOneField(Organization, on_delete=models.CASCADE, related_name='license')
     contact_email = models.EmailField(blank=True)
+    country = models.CharField(max_length=80, blank=True)
+    country_code = models.CharField(max_length=5, blank=True)
+    phone = models.CharField(max_length=15, blank=True)
+    website = models.URLField(max_length=250, blank=True)
+    tax_number = models.CharField(max_length=60, blank=True)
+    address = models.CharField(max_length=500, blank=True)
     plan = models.CharField(max_length=80, blank=True)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.UNASSIGNED)
     seat_limit = models.PositiveIntegerField(null=True, blank=True)
@@ -194,6 +200,7 @@ class OrganizationMember(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='members')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='organization_memberships')
     role = models.CharField(max_length=16, choices=Role.choices, default=Role.MEMBER)
+    contact_phone = models.CharField(max_length=16, blank=True)
     joined_at = models.DateTimeField(auto_now_add=True)
     last_seen_at = models.DateTimeField(null=True, blank=True)
 
