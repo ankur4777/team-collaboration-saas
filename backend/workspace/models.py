@@ -108,6 +108,46 @@ class SubscriptionRenewal(models.Model):
         constraints = [models.UniqueConstraint(fields=['organization', 'request_id'], name='uq_company_renewal_request')]
 
 
+class BillingInvoice(models.Model):
+    class Status(models.TextChoices):
+        UNPAID = 'unpaid', 'Unpaid'
+        PAID = 'paid', 'Paid'
+        VOID = 'void', 'Void'
+
+    id = models.UUIDField(primary_key=True, default=make_id, editable=False)
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name='billing_invoices')
+    actor = models.ForeignKey(User, on_delete=models.PROTECT, related_name='issued_invoices')
+    request_id = models.UUIDField()
+    company_name = models.CharField(max_length=140)
+    contact_email = models.EmailField(blank=True)
+    issuer_name = models.CharField(max_length=140)
+    description = models.CharField(max_length=300)
+    currency = models.CharField(max_length=3)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    issued_on = models.DateField()
+    due_on = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.UNPAID)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+        constraints = [models.UniqueConstraint(fields=['organization','request_id'], name='uq_invoice_request')]
+
+    @property
+    def number(self):
+        return 'TW-' + self.pk.hex.upper()
+
+
+class BillingPayment(models.Model):
+    invoice = models.OneToOneField(BillingInvoice, on_delete=models.PROTECT, related_name='payment')
+    actor = models.ForeignKey(User, on_delete=models.PROTECT, related_name='recorded_payments')
+    paid_on = models.DateField()
+    method = models.CharField(max_length=20)
+    reference = models.CharField(max_length=120)
+    note = models.CharField(max_length=300, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
 class PlatformAuditEntry(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name='platform_audit_entries')
     actor = models.ForeignKey(User, on_delete=models.PROTECT, related_name='platform_audit_entries')

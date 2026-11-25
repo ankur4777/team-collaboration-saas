@@ -141,3 +141,6 @@ CALL_ICE_TRANSPORT_POLICY = os.getenv('CALL_ICE_TRANSPORT_POLICY','all')
 # Optional LibreTranslate-compatible service. Set an administrator-owned endpoint.
 CALL_TRANSLATE_URL = os.getenv('CALL_TRANSLATE_URL', '')
 CALL_TRANSLATE_API_KEY = os.getenv('CALL_TRANSLATE_API_KEY', '')
+
+# Commercial billing document issuer; configure the real legal business name before use.
+BILLING_ISSUER_NAME = os.getenv('BILLING_ISSUER_NAME', 'TeamWorkspace')[:140]
