@@ -31,6 +31,15 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         if content.get('type') == 'ping':
             await self.send_json({'type': 'pong'})
 
+    async def team_membership_changed(self, event):
+        user = self.scope.get('user')
+        channel_id = self.scope['url_route']['kwargs']['channel_id']
+        org_id = self.scope['session'].get('active_organization_id')
+        if not user or not await self.allowed(user.pk, channel_id, org_id):
+            await self.close(code=4403)
+            return
+        await self.send_json({'type': 'team_membership_changed'})
+
     async def chat_message(self, event):
         # Membership can change while a socket is open; recheck before sending.
         channel_id = self.scope['url_route']['kwargs']['channel_id']

@@ -191,6 +191,7 @@ export const api = {
   forwardDestinations: () => request<ForwardDestination[]>('messages/forward/destinations/'),
   forwardMessage: (sourceKind:'chat'|'channel',sourceId:string,messageId:string,destination:ForwardDestination) => post<ForwardResult>('messages/forward/',{source_kind:sourceKind,source_id:sourceId,message_id:messageId,destination_kind:destination.kind,destination_id:destination.id}),
   archiveChat: (id:string,archived:boolean) => post<{archived_at:string|null}>(`chats/${id}/archive/`,{archived}),
+  leaveTeam: (id:string) => post<void>(`teams/${id}/leave/`,{}),
   archiveTeam: (id:string,archived:boolean) => post<Team>(`teams/${id}/archive/`,{archived}),
   archiveChannel: (teamId:string,id:string,archived:boolean) => post<Channel>(`teams/${teamId}/channels/${id}/archive/`,{archived}),
   chats: () => request<ChatThread[]>('chats/'),

@@ -16,7 +16,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .auth_views import auth_payload
-from .models import Channel, Invitation, MentionNotification, Message, Organization, OrganizationMember, Team, TeamMember, User
+from .models import Channel, ChannelReadCursor, Invitation, MentionNotification, Message, Organization, OrganizationMember, Team, TeamMember, User
 from .permissions import get_active_membership, require_channel_access, require_team_access
 from .notification_events import publish_notification_refresh
 from .mentions import create_mentions
@@ -191,15 +191,47 @@ class TeamOwnershipView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+def publish_team_membership_change(team_id):
+    """Tell existing channel sockets to recheck access after membership changes."""
+    try:
+        layer = get_channel_layer()
+        for channel_id in Channel.objects.filter(team_id=team_id).values_list('pk', flat=True):
+            async_to_sync(layer.group_send)(
+                f'channel_{channel_id}', {'type': 'team.membership_changed'},
+            )
+    except Exception:
+        logger.exception('Could not broadcast team membership change %s', team_id)
+
+
+def remove_team_membership(team, member):
+    user_id = member.user_id
+    if member.role == TeamMember.Role.OWNER:
+        raise PermissionDenied('Transfer ownership before leaving or removing a team owner')
+    member.delete()
+    ChannelReadCursor.objects.filter(channel__team=team, user_id=user_id).delete()
+    transaction.on_commit(lambda: publish_team_membership_change(team.pk))
+    transaction.on_commit(lambda: publish_notification_refresh(team.organization_id, [user_id]))
+
+
+class TeamLeaveView(APIView):
+    @transaction.atomic
+    def post(self, request, team_id):
+        membership = get_active_membership(request)
+        team = get_object_or_404(
+            Team.objects.select_for_update(), pk=team_id,
+            organization_id=membership.organization_id,
+        )
+        member = require_team_access(request, team)
+        remove_team_membership(team, member)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class TeamMemberDetailView(APIView):
     @transaction.atomic
     def delete(self, request, team_id, user_id):
         team = locked_team(request, team_id)
         target = get_object_or_404(TeamMember, team=team, user_id=user_id)
-        if target.role == TeamMember.Role.OWNER:
-            raise PermissionDenied('Transfer ownership before removing a team owner')
-        target.delete()
-        transaction.on_commit(lambda: publish_notification_refresh(team.organization_id, [user_id]))
+        remove_team_membership(team, target)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

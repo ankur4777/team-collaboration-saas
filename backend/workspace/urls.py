@@ -64,6 +64,7 @@ urlpatterns = [
     path('channel-notifications/', channel_notifications.ChannelNotificationsView.as_view()),
     path('channels/<uuid:channel_id>/read/', channel_notifications.ChannelReadView.as_view()),
     path('teams/', views.TeamsView.as_view()),
+    path('teams/<uuid:team_id>/leave/', views.TeamLeaveView.as_view()),
     path('teams/<uuid:team_id>/archive/', views.TeamArchiveView.as_view()),
     path('teams/<uuid:team_id>/channels/<uuid:channel_id>/archive/', views.ChannelArchiveView.as_view()),
     path('teams/<uuid:team_id>/', views.TeamDetailView.as_view()),

@@ -127,3 +127,36 @@ class WorkspaceAPITests(TestCase):
         self.assertEqual(self.post(base+'archive/', {'archived':False}).status_code,200)
         self.assertEqual(self.post(messages, {'body':'Restored'}).status_code,201)
         self.assertEqual(Message.objects.filter(channel_id=channel['id']).count(),2)
+
+    def test_leave_team_revokes_access_preserves_workspace_and_history(self):
+        from workspace.models import ChannelReadCursor
+        session = self.register()
+        org = Organization.objects.get(pk=session['active_organization_id'])
+        staff = get_user_model().objects.create_user('staff@company-a.test', 'SecurePass123!', full_name='Staff')
+        OrganizationMember.objects.create(organization=org, user=staff)
+        team_id = self.post('/api/teams/', {'name':'Leave example'}).json()['id']
+        base = f'/api/teams/{team_id}/'
+        channel_id = self.client.get(base+'channels/').json()[0]['id']
+        channel_url = f'/api/channels/{channel_id}/'
+        self.assertEqual(self.post(base+'leave/', {}).status_code,403)
+        self.assertEqual(self.post(base+'members/', {'email':staff.email}).status_code,201)
+        self.post('/api/auth/logout/', {})
+        self.post('/api/auth/login/', {'email':staff.email,'password':'SecurePass123!'})
+        original = self.post(channel_url+'messages/', {'body':'Keep this unique history'}).json()
+        self.assertEqual(self.post(channel_url+'read/', {'message_id':original['id']}).status_code,200)
+        self.assertEqual(self.post(base+'leave/', {}).status_code,204)
+        self.assertTrue(OrganizationMember.objects.filter(organization=org,user=staff).exists())
+        self.assertFalse(TeamMember.objects.filter(team_id=team_id,user=staff).exists())
+        self.assertFalse(ChannelReadCursor.objects.filter(channel_id=channel_id,user=staff).exists())
+        self.assertEqual(self.client.get('/api/teams/').json(),[])
+        self.assertEqual(self.client.get(channel_url+'messages/').status_code,403)
+        self.assertEqual(self.client.get(channel_url+'attachments/').status_code,403)
+        self.assertEqual(self.client.get(channel_url+'pins/').status_code,403)
+        self.assertEqual(self.client.get('/api/search/messages/', {'q':'unique history'}).json()['results'],[])
+        self.assertTrue(Message.objects.filter(pk=original['id']).exists())
+        self.post('/api/auth/logout/', {})
+        self.post('/api/auth/login/', {'email':'owner@company-a.test','password':'SecurePass123!'})
+        self.assertEqual(self.post(base+'members/', {'email':staff.email}).status_code,201)
+        self.post('/api/auth/logout/', {})
+        self.post('/api/auth/login/', {'email':staff.email,'password':'SecurePass123!'})
+        self.assertEqual(self.client.get(channel_url+'messages/').json(),[])

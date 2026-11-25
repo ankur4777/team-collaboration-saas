@@ -132,6 +132,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   const [error,setError] = useState('');const [modal,setModal] = useState<null|'team'|'channel'|'invite'|'members'>(null);
   const [sidebarOpen,setSidebarOpen] = useState(false);const [connected,setConnected] = useState(false);
 
+  const selectedTeamRef=useRef(selectedTeam);selectedTeamRef.current=selectedTeam;
   const selectedChannelRef = useRef(selectedChannel);
   selectedChannelRef.current = selectedChannel;
   const activeOrg = session.organizations.find(o=>o.id===session.active_organization_id);
@@ -158,7 +159,19 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
     return()=>{window.clearInterval(timer);window.removeEventListener('focus',focus);};
   },[loadChannelNotices]);
 
-  const loadTeams = useCallback(async()=>{ try {const rows=await api.teams();setTeams(rows);setSelectedTeam(current=>current && rows.some(t=>t.id===current)?current:(rows[0]?.id||null));}catch(e){setError(errorText(e));}},[]);
+  const loadTeams = useCallback(async()=>{
+    const orgId=currentOrgRef.current;
+    try{
+      const rows=await api.teams();
+      if(currentOrgRef.current!==orgId)return;
+      const current=selectedTeamRef.current;
+      if(current&&!rows.some(t=>t.id===current)){
+        setChannels([]);setSelectedChannel(null);setMessages([]);setLoadedChannelId(null);
+        setReplyTo(null);setForwardId(null);setDraft('');setModal(null);
+      }
+      setTeams(rows);setSelectedTeam(old=>old&&rows.some(t=>t.id===old)?old:(rows[0]?.id||null));
+    }catch(e){if(currentOrgRef.current===orgId)setError(errorText(e));}
+  },[]);
   useEffect(()=>{setTeams([]);setChannels([]);setMembers([]);setSelectedTeam(null);setSelectedChannel(null);setMessages([]);loadTeams();if(session.active_organization_id)api.members(session.active_organization_id).then(setMembers).catch(()=>{});},[session.active_organization_id,loadTeams]);
   useEffect(()=>{
     setTeamMentionPeople([]);setTeamRoster([]);
@@ -197,15 +210,17 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   },[selectedChannel,session.active_organization_id]);
   useEffect(()=>{if(!selectedChannel)return;let open=true;setConnected(false);const protocol=location.protocol==='https:'?'wss:':'ws:';
     const socket=new WebSocket(`${protocol}//${location.host}/ws/channels/${selectedChannel}/`);
-    socket.onopen=()=>{if(open)setConnected(true);};socket.onclose=()=>{if(open)setConnected(false);};
+    socket.onopen=()=>{if(open)setConnected(true);};socket.onclose=event=>{if(!open)return;setConnected(false);if(event.code===4403){setMessages([]);setLoadedChannelId(null);setSelectedChannel(null);setChannels([]);setReplyTo(null);setForwardId(null);setDraft('');void loadTeams();void loadChannelNotices();}};
     socket.onmessage=event=>{try {
       const payload=JSON.parse(event.data) as {type:string;message:Message};
-      if(!open||!payload.message)return;
+      if(!open)return;
+      if(payload.type==='team_membership_changed'){const teamId=selectedTeamRef.current;if(teamId)void api.teamMembers(teamId).then(rows=>{if(open&&selectedTeamRef.current===teamId){setTeamRoster(rows);setTeamMentionPeople(rows.map(row=>row.user));}}).catch(()=>{});return;}
+      if(!payload.message)return;
       if(payload.type==='message')setMessages(old=>old.some(m=>m.id===payload.message.id)?old:[...old,payload.message]);
       else if(payload.type==='message.updated'||payload.type==='message.deleted'){setMessages(old=>old.map(row=>row.id===payload.message.id?payload.message:row));setPinVersion(value=>value+1);}
     }catch{/* Ignore malformed server messages */}};
     return()=>{open=false;socket.close();};
-  },[selectedChannel]);
+  },[selectedChannel,session.active_organization_id,loadTeams,loadChannelNotices]);
   useLayoutEffect(()=>{
     const area=channelScrollRef.current;
     if(!area)return;
@@ -259,6 +274,22 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   function changeTeamMember(user:Person,transfer:boolean){
     if(!selectedTeam||pending||!window.confirm(transfer?`Transfer team ownership to ${user.full_name}?`:`Remove ${user.full_name} from this team only?`))return;
     void action(async()=>{if(transfer)await api.transferTeamOwnership(selectedTeam,user.id);else await api.removeTeamMember(selectedTeam,user.id);await refreshTeamRoster(selectedTeam);void loadChannelNotices();},false);
+  }
+  function leaveActiveTeam(){
+    if(!activeTeam||pending||myTeamRole!=='member')return;
+    if(!window.confirm('Leave '+activeTeam.name+'? You will lose access to its channels and files, but remain in this workspace.'))return;
+    const teamId=activeTeam.id,orgId=currentOrgRef.current;
+    void action(async()=>{
+      await api.leaveTeam(teamId);
+      if(currentOrgRef.current!==orgId)return;
+      setTeams(old=>old.filter(row=>row.id!==teamId));
+      if(selectedTeamRef.current===teamId){
+        setSelectedTeam(null);setSelectedChannel(null);setChannels([]);setMessages([]);
+        setLoadedChannelId(null);setTeamRoster([]);setTeamMentionPeople([]);
+        setDraft('');setReplyTo(null);setForwardId(null);setModal(null);
+      }
+      await loadTeams();void loadChannelNotices();
+    },false);
   }
   function archiveTeamOrChannel(channel=false){
     if(!activeTeam||pending||(channel&&!activeChannel))return;
@@ -348,7 +379,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
           onOpenChannel={(teamId,channelId)=>{setSelectedTeam(teamId);setSelectedChannel(channelId);setView('teams');setSidebarOpen(false);}}/><div className="top-avatar">{initials(session.user.full_name)}</div></div></header>
   {error&&<div className="floating-error"><ErrorBanner message={error} onClose={()=>setError('')}/></div>}
   {view==='teams' ? <>{!activeTeam?<div className="hero-empty"><Empty icon={<Users size={32}/>} title="Bring your team together" description="Create your first team to begin organizing conversations and projects." action={<button className="primary-button" onClick={()=>setModal('team')}><Plus size={17}/>Create your first team</button>}/></div>:
-    <><div className="workspace-heading"><div><div className="eyebrow">YOUR WORKSPACE / TEAMS</div><h1>{activeTeam.name}{activeTeam.archived_at?' · Archived':''}</h1><p className="muted">Collaborate, share updates, and keep your team in sync.</p></div><div className="heading-actions">{(myTeamRole==='owner'||activeOrg?.role==='owner'||activeOrg?.role==='admin')&&<button className="outline-button" disabled={pending} onClick={()=>renameTeamOrChannel()} >Rename team</button>}{(myTeamRole==='owner'||activeOrg?.role==='owner'||activeOrg?.role==='admin')&&<button type="button" className="outline-button" disabled={pending} onClick={()=>archiveTeamOrChannel()}>{activeTeam.archived_at?'Restore team':'Archive team'}</button>}<button className="outline-button" onClick={()=>setModal('members')}><Users size={16}/> Manage members</button><button className="primary-button" disabled={Boolean(activeTeam.archived_at)} onClick={()=>setModal('channel')}><Plus size={17}/> New channel</button></div></div>
+    <><div className="workspace-heading"><div><div className="eyebrow">YOUR WORKSPACE / TEAMS</div><h1>{activeTeam.name}{activeTeam.archived_at?' · Archived':''}</h1><p className="muted">Collaborate, share updates, and keep your team in sync.</p></div><div className="heading-actions">{(myTeamRole==='owner'||activeOrg?.role==='owner'||activeOrg?.role==='admin')&&<button className="outline-button" disabled={pending} onClick={()=>renameTeamOrChannel()} >Rename team</button>}{(myTeamRole==='owner'||activeOrg?.role==='owner'||activeOrg?.role==='admin')&&<button type="button" className="outline-button" disabled={pending} onClick={()=>archiveTeamOrChannel()}>{activeTeam.archived_at?'Restore team':'Archive team'}</button>}<button className="outline-button" onClick={()=>setModal('members')}><Users size={16}/> Manage members</button>{myTeamRole==='member'&&<button type="button" className="outline-button" disabled={pending} onClick={leaveActiveTeam}>Leave team</button>}<button className="primary-button" disabled={Boolean(activeTeam.archived_at)} onClick={()=>setModal('channel')}><Plus size={17}/> New channel</button></div></div>
       <div className="chat-workspace"><section className="channels-panel"><div className="panel-title">CHANNELS <button className="icon-button" title="New channel" disabled={Boolean(activeTeam.archived_at)} onClick={()=>setModal('channel')}><Plus size={17}/></button></div>{channels.map(ch=><button className={`channel-card ${selectedChannel===ch.id?'active':''}`} key={ch.id} onClick={()=>setSelectedChannel(ch.id)}><span className="channel-symbol"><Hash size={17}/></span><span>{ch.name}{ch.archived_at?' (Archived)':''}</span>{channelUnread(ch.id)>0&&<span className="channel-unread-count" aria-label={`${channelUnread(ch.id)} unread messages`}>{channelUnread(ch.id)>99?'99+':channelUnread(ch.id)}</span>}{selectedChannel===ch.id&&<span className="selected-indicator"/>}</button>)}<div className="channel-help"><Sparkles size={18}/><strong>A place for every topic</strong><p>Create channels to keep discussions organized.</p></div></section>
         <section className="conversation-panel">{activeChannel?<><div className="conversation-top"><div className="channel-avatar"><Hash size={23}/></div><div><h3>{activeChannel.name}{channelReadOnly?' · Read-only':''}</h3><p>{activeTeam.name} · {connected?'Live updates connected':'Messages are saved securely'}</p></div>{(myTeamRole==='owner'||activeOrg?.role==='owner'||activeOrg?.role==='admin')&&<button className="outline-button" disabled={pending} onClick={()=>renameTeamOrChannel(true)} >Rename channel</button>}{(myTeamRole==='owner'||activeOrg?.role==='owner'||activeOrg?.role==='admin')&&<button type="button" className="outline-button" disabled={pending} onClick={()=>archiveTeamOrChannel(true)}>{activeChannel.archived_at?'Restore channel':'Archive channel'}</button>}<span className={`connection-light ${connected?'online':''}`} title={connected?'WebSocket connected':'WebSocket disconnected'}/></div>
           <PinnedMessages key={selectedChannel!} kind="channel" id={selectedChannel!} version={pinVersion} readOnly={channelReadOnly} onUnpin={updated=>{setMessages(old=>old.map(row=>row.id===updated.id?updated:row));setPinVersion(value=>value+1);}}/>
