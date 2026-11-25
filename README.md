@@ -311,3 +311,7 @@ requires HTTPS and a configured TURN relay; see the Meetings quickstart.
 
 Native calls currently use browser-to-browser mesh media. Actual participant capacity
 depends on devices and network bandwidth; large-group scaling requires an SFU media server.
+
+## Teams, chats and message search verification
+
+See [release verification checklist](docs/COLLABORATION_VALIDATION.md) for automated and two-browser acceptance checks, private-channel permissions, and current limitations.

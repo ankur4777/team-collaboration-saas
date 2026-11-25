@@ -452,7 +452,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
             <button className="group-manage-button" type="button" disabled={working} onClick={()=>void changeChatPreference('is_pinned')}>{active.is_pinned?'Unpin chat':'Pin chat'}</button><button className="group-manage-button" type="button" disabled={working} onClick={()=>void changeChatPreference('is_muted')}>{active.is_muted?'Unmute':'Mute'}</button>
             <span className={`chat-connected ${connected ? 'yes' : ''}`} title={connected ? 'Live updates connected' : 'Messages saved; live updates unavailable'}/>
           </header>
-          {requestedChat?.id===selected&&requestedChat.messageId&&jumpClosed!==requestedChat.nonce&&<MessageContext key={requestedChat.nonce} kind="chat" id={selected!} messageId={requestedChat.messageId} onClose={()=>setJumpClosed(requestedChat.nonce)}/>}
+          {requestedChat?.id===selected&&requestedChat.messageId&&jumpClosed!==requestedChat.nonce&&<MessageContext key={requestedChat.nonce} kind="chat" id={selected!} messageId={requestedChat.messageId} version={pinVersion} onClose={()=>setJumpClosed(requestedChat.nonce)}/>}
           <PinnedMessages key={selected!} kind="chat" id={selected!} version={pinVersion} onUnpin={updated=>{if("reactions" in updated){setMessages(old=>old.map(row=>row.id===updated.id?updated as ChatMessage:row));setPinVersion(value=>value+1);}}}/>
           <div className="private-chat-history" ref={historyRef}>
             {historyCursor && <div style={{textAlign:"center",padding:"8px"}}><button type="button" className="outline-button" disabled={loadingOlder} onClick={()=>void loadOlder()}>{loadingOlder?"Loading…":"Load older messages"}</button></div>}

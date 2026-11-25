@@ -228,3 +228,24 @@ class WorkspaceAPITests(TestCase):
         self.assertEqual(self.client.delete(url+'members/'+str(staff.pk)+'/',HTTP_X_CSRFTOKEN=self.csrf).status_code,204)
         login(staff.email)
         self.assertEqual(self.client.get(url+'messages/').status_code,403)
+
+    def test_channel_preferences_are_per_member_and_survive_refresh(self):
+        session = self.register()
+        org = Organization.objects.get(pk=session['active_organization_id'])
+        staff = get_user_model().objects.create_user('settings@company-a.test','SecurePass123!',full_name='Settings')
+        OrganizationMember.objects.create(organization=org,user=staff)
+        team = self.post('/api/teams/',{'name':'Preferences team'}).json()
+        base = f"/api/teams/{team['id']}/"
+        self.assertEqual(self.post(base+'members/',{'email':staff.email}).status_code,201)
+        channel_id = self.client.get(base+'channels/').json()[0]['id']
+        path = f'/api/channels/{channel_id}/preferences/'
+        self.assertEqual(self.post(path,{'is_muted':'true'}).status_code,400)
+        self.assertEqual(self.post(path,{'is_muted':True,'is_pinned':True}).status_code,200)
+        row = self.client.get('/api/channel-notifications/').json()[0]
+        self.assertTrue(row['is_muted'])
+        self.assertTrue(row['is_pinned'])
+        self.post('/api/auth/logout/',{})
+        self.assertEqual(self.post('/api/auth/login/',{'email':staff.email,'password':'SecurePass123!'}).status_code,200)
+        row = self.client.get('/api/channel-notifications/').json()[0]
+        self.assertFalse(row['is_muted'])
+        self.assertFalse(row['is_pinned'])
