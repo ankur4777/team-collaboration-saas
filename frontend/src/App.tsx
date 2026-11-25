@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check, ChevronDown, Hash, Inbox, MessageCircle,
   Settings2, Sparkles, Users, Video, X, CalendarDays, FolderOpen, Search } from 'lucide-react';
 import { api, csrf, type Channel, type ChannelMessageCursor, type ChannelNotice, type Member, type Message, type Person, type Session, type Team } from './api';
 import ChatPanel from './ChatPanel';
+import PlatformAdmin from './PlatformAdmin';
 import {connectConversationSocket,mergeFreshHistory} from './conversationSocket';
 import {ApiError} from './api';
 import {useWorkspacePresence,PresenceStatus} from './WorkspacePresence';
@@ -462,6 +463,7 @@ export default function App() {
   if(session===undefined)return <div className="page-loader"><Brand/><Spinner/><span>Preparing your workspace...</span></div>;
   if(recoveryMode)return <AccountRecoveryScreen mode={recoveryMode}/>;
   if(inviteMode)return <InviteScreen session={session} onDone={s=>{setSession(s);history.replaceState({},'','/');}} onBack={()=>{location.href='/';}}/>;
+  if(location.pathname==='/platform-admin'||session?.user.is_platform_admin&&!session.active_organization_id)return <PlatformAdmin session={session} onSession={setSession}/>;
   if(!session)return <>{bootError&&<div className="boot-error"><ErrorBanner message={bootError}/></div>}<AuthScreen onAuth={setSession}/></>;
   return <Workspace session={session} onSession={setSession} onLogout={()=>setSession(null)}/>;
 }

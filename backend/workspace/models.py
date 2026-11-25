@@ -68,6 +68,36 @@ class Organization(models.Model):
         return self.name
 
 
+class CompanyLicense(models.Model):
+    class Status(models.TextChoices):
+        UNASSIGNED = 'unassigned', 'Unassigned'
+        TRIAL = 'trial', 'Trial'
+        ACTIVE = 'active', 'Active'
+        SUSPENDED = 'suspended', 'Suspended'
+        CANCELLED = 'cancelled', 'Cancelled'
+
+    organization = models.OneToOneField(Organization, on_delete=models.CASCADE, related_name='license')
+    contact_email = models.EmailField(blank=True)
+    plan = models.CharField(max_length=80, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.UNASSIGNED)
+    seat_limit = models.PositiveIntegerField(null=True, blank=True)
+    starts_on = models.DateField(null=True, blank=True)
+    ends_on = models.DateField(null=True, blank=True)
+    modules = models.JSONField(default=list, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class PlatformAuditEntry(models.Model):
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name='platform_audit_entries')
+    actor = models.ForeignKey(User, on_delete=models.PROTECT, related_name='platform_audit_entries')
+    action = models.CharField(max_length=40)
+    changes = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+
+
 class OrganizationMember(models.Model):
     class Role(models.TextChoices):
         OWNER = 'owner', 'Owner'

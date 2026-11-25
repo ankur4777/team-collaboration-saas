@@ -1,6 +1,6 @@
 export interface Presence { user_id:string; online:boolean; last_seen_at:string|null }
 export type PresenceMap = Record<string,Presence>;
-export interface Person { id: string; email: string; full_name: string; email_verified: boolean }
+export interface Person { id: string; email: string; full_name: string; email_verified: boolean; is_platform_admin?: boolean }
 export interface NotificationPreferences { direct_chats: boolean; group_chats: boolean; team_channels: boolean }
 export interface AccountDeviceSession {
   id:string; user_agent:string; ip_address:string|null;
@@ -149,7 +149,17 @@ async function downloadWorkspaceFile(row:WorkspaceFile): Promise<void> {
   window.setTimeout(()=>URL.revokeObjectURL(url),30000);
 }
 
+export type LicenseStatus='unassigned'|'trial'|'active'|'suspended'|'cancelled';
+export interface CompanyLicense {contact_email:string;plan:string;status:LicenseStatus;seat_limit:number|null;starts_on:string|null;ends_on:string|null;modules:string[]}
+export interface PlatformCompany extends CompanyLicense {id:string;name:string;slug:string;created_at:string;employee_count:number;team_count:number;owner_emails:string[];pending_owner_email:string|null;effective_status:string}
+export interface PlatformCompanies {items:PlatformCompany[];total:number;page:number;page_size:number;stats:{companies:number;active:number;trial:number;expired:number;suspended:number;memberships:number}}
+export interface PlatformAudit {action:string;actor:string;created_at:string;changes:Record<string,unknown>}
 export const api = {
+  platformCompanies: (q='',status='',page=1) => request<PlatformCompanies>(`platform/companies/?${new URLSearchParams({q,status,page:String(page)})}`),
+  platformCompany: (id:string) => request<{company:PlatformCompany;audit:PlatformAudit[]}>(`platform/companies/${id}/`),
+  createPlatformCompany: (data:CompanyLicense&{name:string;owner_email:string}) => post<{company:PlatformCompany;invitation_sent:boolean}>('platform/companies/',data),
+  updatePlatformCompany: (id:string,data:CompanyLicense) => request<PlatformCompany>(`platform/companies/${id}/`,'PATCH',data),
+  invitePlatformOwner: (id:string,email:string) => post<{invitation_sent:boolean}>(`platform/companies/${id}/invite-owner/`,{email}),
   chatPreferences: (id:string,values:Partial<ConversationPreferences>) => post<ConversationPreferences>(`chats/${id}/preferences/`,values),
   channelPreferences: (id:string,values:Partial<ConversationPreferences>) => post<ConversationPreferences>(`channels/${id}/preferences/`,values),
   messageContext: (kind:'chat'|'channel',id:string,messageId:string) => request<{items:Message[]}>(`${kind==='chat'?'chats':'channels'}/${id}/messages/${messageId}/context/`),
