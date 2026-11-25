@@ -26,3 +26,7 @@ Frontend coverage: load/read, mark read, compose/save/send, idempotency keys, re
 5. Repeat core workflows with connected Gmail and Outlook, including a 3–5 MB Outlook file.
 6. Check lost-response handling in Sent/Drafts before resending.
 7. Validate production HTTPS, consent, token-key backup, rate limits and retention.
+
+## Inbox synchronization regression coverage
+
+The first visible page refreshes periodically and on focus/online events, without overlapping background requests or refreshing while composing. Gmail lists tolerate messages and drafts removed between provider list and detail requests. Added mocked regression tests; live Google/Microsoft delivery and webhook/background synchronization still require validation and further development.

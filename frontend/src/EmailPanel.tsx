@@ -100,17 +100,43 @@ export default function EmailPanel({workspaceId,user}:{workspaceId:string|null;u
     return()=>controller.abort();
   },[accountId,selectedId,folder]);
   useEffect(()=>{
-    if(!accountId||editor||busy)return;
+    // Only refresh the first page automatically; provider page cursors may
+    // shift when new messages arrive. Never interrupt composition or actions.
+    if(!accountId||editor||busy||loading||reading||page)return;
     const controller=new AbortController();
-    const timer=setInterval(()=>{
-      if(document.hidden)return;
-      void mailApi.messages(accountId,folder,search,page,controller.signal).then(result=>{
-        if(!controller.signal.aborted){setRows(result.results);setNext(result.next_cursor);}
-      }).catch(e=>{if(!controller.signal.aborted)setError(errorText(e));});
-      void mailApi.folders(accountId,controller.signal).then(value=>{if(!controller.signal.aborted)setFolders(value);}).catch(()=>{});
-    },60_000);
-    return()=>{clearInterval(timer);controller.abort();};
-  },[accountId,folder,search,page,Boolean(editor),busy]);
+    let inFlight=false;
+    let lastStarted=0;
+    async function sync(){
+      if(document.hidden||controller.signal.aborted||inFlight||Date.now()-lastStarted<5000)return;
+      inFlight=true;lastStarted=Date.now();
+      try{
+        const results=await Promise.allSettled([
+          mailApi.messages(accountId,folder,search,'',controller.signal),
+          mailApi.folders(accountId,controller.signal),
+        ]);
+        if(controller.signal.aborted)return;
+        const [messagesResult,foldersResult]=results;
+        if(messagesResult.status==='fulfilled'){
+          const result=messagesResult.value;
+          setRows(result.results);setNext(result.next_cursor);
+          const visible=new Set(result.results.map(row=>row.id));
+          setChecked(old=>new Set([...old].filter(id=>visible.has(id))));
+        }else setError(errorText(messagesResult.reason));
+        if(foldersResult.status==='fulfilled')setFolders(foldersResult.value);
+      }finally{inFlight=false;}
+    }
+    const trigger=()=>{void sync();};
+    const timer=setInterval(trigger,60_000);
+    window.addEventListener('focus',trigger);
+    window.addEventListener('online',trigger);
+    document.addEventListener('visibilitychange',trigger);
+    return()=>{
+      clearInterval(timer);controller.abort();
+      window.removeEventListener('focus',trigger);
+      window.removeEventListener('online',trigger);
+      document.removeEventListener('visibilitychange',trigger);
+    };
+  },[accountId,folder,search,page,version,Boolean(editor),busy,loading,reading]);
   useEffect(()=>{
     if(!editor&&!manager)return;
     const el=dialog.current;
@@ -291,7 +317,7 @@ export default function EmailPanel({workspaceId,user}:{workspaceId:string|null;u
             <f.icon size={18}/><span>{f.label}</span>{Boolean(count?.unread)&&<strong>{count?.unread}</strong>}
           </button>;})}</nav>
           <div className="email-mailbox-footer"><span className={'email-provider-dot '+account.provider}/><strong>{account.provider==='local'?'Local workspace mail':account.provider==='gmail'?'Gmail connected':'Outlook connected'}</strong>
-            <p>{account.provider==='local'?'Delivery stays inside this company workspace.':'Refreshes every minute while this tab is visible. Use Refresh to check now.'}</p></div>
+            <p>{account.provider==='local'?'Delivery stays inside this company workspace.':'The first page refreshes every minute and when you return to this tab. Use Refresh to check now.'}</p></div>
         </aside>
         <section className="email-list" aria-label="Email messages">
           <div className="email-list-heading"><button className="email-mobile-folders" aria-label="Choose mail folder" onClick={()=>setFolderMenu(v=>!v)}><Folder size={18}/><ChevronDown size={14}/></button>

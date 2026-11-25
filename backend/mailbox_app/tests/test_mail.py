@@ -210,6 +210,31 @@ class ProviderTests(TestCase):
         self.assertEqual(captured["data"]["message"]["threadId"], "thread1")
         self.assertEqual(result, opaque_id("draft-remote", "draft"))
 
+    def test_gmail_list_tolerates_concurrently_removed_messages_and_drafts(self):
+        from rest_framework.exceptions import NotFound
+        for folder, resource in (("inbox", "messages"), ("drafts", "drafts")):
+            def call(method, path, **kwargs):
+                if path == "/" + resource:
+                    return {resource: [{"id": "gone"}, {"id": "present"}], "nextPageToken": "next"}
+                if path.endswith("/gone"):
+                    raise NotFound("Removed by another client")
+                message = {"id": "m1", "labelIds": ["INBOX"], "internalDate": "1700000000000"}
+                return {"id": "present", "message": message} if resource == "drafts" else message
+            self.adapter.call = call
+            page = self.adapter.messages(folder)
+            expected = opaque_id("present", "draft") if resource == "drafts" else opaque_id("m1")
+            self.assertEqual([row["id"] for row in page["results"]], [expected])
+            self.assertEqual(self.adapter.uncursor(page["next_cursor"], folder, ""), "next")
+
+    def test_gmail_list_does_not_hide_provider_errors(self):
+        def call(method, path, **kwargs):
+            if path == "/messages":
+                return {"messages": [{"id": "m1"}]}
+            raise MailError("Provider unavailable")
+        self.adapter.call = call
+        with self.assertRaises(MailError):
+            self.adapter.messages("inbox")
+
     def test_provider_page_tokens_bound_to_account_and_query(self):
         cursor = self.adapter.cursor("page", "inbox", "hello")
         self.assertEqual(self.adapter.uncursor(cursor, "inbox", "hello"), "page")

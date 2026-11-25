@@ -162,12 +162,17 @@ class RemoteMailbox:
             response = self.call("GET", "/drafts" if drafts else "/messages", params=params)
             rows = response.get("drafts" if drafts else "messages", [])
             def get(row):
-                if drafts:
-                    v = self.call("GET", "/drafts/" + quote(row["id"], safe=""), params={"format": "full"})
-                    return self.gmail_normalize(v["message"], draft_id=v["id"])
-                return self.gmail_normalize(self.call("GET", "/messages/" + quote(row["id"], safe=""), params={"format": "full"}))
+                try:
+                    if drafts:
+                        v = self.call("GET", "/drafts/" + quote(row["id"], safe=""), params={"format": "full"})
+                        return self.gmail_normalize(v["message"], draft_id=v["id"])
+                    return self.gmail_normalize(self.call("GET", "/messages/" + quote(row["id"], safe=""), params={"format": "full"}))
+                except NotFound:
+                    # Another client may permanently delete or send an item
+                    # between listing its ID and retrieving its contents.
+                    return None
             with ThreadPoolExecutor(max_workers=5) as pool:
-                results = list(pool.map(get, rows))
+                results = [item for item in pool.map(get, rows) if item is not None]
             return {"results": results, "next_cursor": self.cursor(response.get("nextPageToken", ""), folder, query)}
         path = "/messages" if folder == "starred" else "/mailFolders/" + GRAPH_FOLDERS[folder] + "/messages"
         params = {"$top": 25, "$select": SELECT}

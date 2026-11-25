@@ -1,5 +1,5 @@
 import {afterEach,beforeEach,describe,it,expect,vi} from 'vitest';
-import {render,screen,waitFor,cleanup,within} from '@testing-library/react';
+import {render,screen,waitFor,cleanup,within,act} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EmailPanel from './EmailPanel';
 import {mailApi,type MailMessage} from './mailApi';
@@ -98,6 +98,22 @@ describe('Email inbox interactions',()=>{
     await waitFor(()=>expect(screen.queryByRole('heading',{name:'Project review'})).toBeNull());
     expect(await screen.findByText('Select a message to read')).toBeTruthy();
   });
+  it('refreshes on focus without overlapping requests or losing an open message',async()=>{
+    const user=userEvent.setup();mount();
+    await user.click(await screen.findByRole('button',{name:/Bob.*Project review/}));
+    await screen.findByRole('heading',{name:'Project review'});
+    await waitFor(()=>expect(mailApi.action).toHaveBeenCalled());
+    const before=vi.mocked(mailApi.messages).mock.calls.length;
+    const newMessage={...message,id:'message-2',subject:'New arrival'};
+    let resolve!: (value:{results:MailMessage[];next_cursor:string})=>void;
+    vi.mocked(mailApi.messages).mockImplementationOnce(()=>new Promise(done=>{resolve=done;}));
+    act(()=>{window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('online'));});
+    await waitFor(()=>expect(mailApi.messages).toHaveBeenCalledTimes(before+1));
+    await act(async()=>{resolve({results:[newMessage,message],next_cursor:''});});
+    expect(await screen.findByRole('button',{name:/Bob.*New arrival/})).toBeTruthy();
+    expect(screen.getByRole('heading',{name:'Project review'})).toBeTruthy();
+  });
+
   it('filters unread messages on the current page without fetching a different mailbox',async()=>{
     vi.mocked(mailApi.messages).mockResolvedValue({results:[message,{...message,id:'message-2',subject:'Already read',is_read:true}],next_cursor:''});
     const user=userEvent.setup();mount();
