@@ -54,3 +54,25 @@ class SubscriptionAccessTests(TestCase):
         row.save()
         self.assertTrue(access_allowed(self.org.pk))
         self.assertEqual(self.client.get('/api/teams/').status_code,200)
+
+    def test_module_restrictions_and_shared_scheduling(self):
+        row = CompanyLicense.objects.create(organization=self.org, status='active',
+            enforce_modules=True, modules=['teams','search','calendar'])
+        team = self.client.post('/api/teams/',{'name':'Entitled'},content_type='application/json')
+        self.assertEqual(team.status_code,201,team.content)
+        for path in ('/api/chats/','/api/mail/accounts/','/api/files/'):
+            self.assertEqual(self.client.get(path).status_code,403,path)
+        self.assertEqual(self.client.get('/api/search/messages/',{'q':'abc'}).status_code,200)
+        self.assertEqual(self.client.get('/api/meetings/').status_code,200)
+        import uuid
+        self.assertEqual(self.client.get(f'/api/meetings/{uuid.uuid4()}/call/').status_code,403)
+        self.assertEqual(self.client.get('/api/auth/me/').json()['organizations'][0]['subscription']['modules'],
+                         ['calendar','search','teams'])
+        row.modules=[]
+        row.save()
+        self.assertEqual(self.client.get('/api/teams/').status_code,403)
+        self.assertEqual(self.client.get('/api/organizations/'+str(self.org.pk)+'/members/').status_code,200)
+        row.enforce_modules=False
+        row.save()
+        self.assertEqual(self.client.get('/api/teams/').status_code,200)
+        self.assertTrue(Team.objects.filter(organization=self.org,name='Entitled').exists())

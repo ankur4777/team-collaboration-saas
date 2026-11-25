@@ -84,6 +84,7 @@ class CompanyLicense(models.Model):
     starts_on = models.DateField(null=True, blank=True)
     ends_on = models.DateField(null=True, blank=True)
     modules = models.JSONField(default=list, blank=True)
+    enforce_modules = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
 
 

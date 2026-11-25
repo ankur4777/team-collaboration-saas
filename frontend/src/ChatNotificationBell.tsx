@@ -4,6 +4,7 @@ import { api, meetingsApi, type MeetingNotice, type ChannelNotice, type ChatThre
 
 interface Props {
   workspaceId: string|null;
+  enabledModules?: string[];
   userId: string;
   emailVerified: boolean;
   onOpenMeeting?: (meetingId:string)=>void;
@@ -18,7 +19,10 @@ function chatTitle(thread:ChatThread,userId:string) {
   return thread.participants.find(p=>p.user.id!==userId)?.user.full_name || 'Direct chat';
 }
 
-export default function ChatNotificationBell({workspaceId,userId,emailVerified,onOpenMeeting,onOpenChat,onOpenChannel,onRealtimeNotification,refreshVersion=0}:Props) {
+export default function ChatNotificationBell({workspaceId,enabledModules,userId,emailVerified,onOpenMeeting,onOpenChat,onOpenChannel,onRealtimeNotification,refreshVersion=0}:Props) {
+  const chatsEnabled=!enabledModules||enabledModules.includes('chats');
+  const teamsEnabled=!enabledModules||enabledModules.includes('teams');
+  const schedulingEnabled=!enabledModules||enabledModules.includes('meetings')||enabledModules.includes('calendar');
   const [meetings,setMeetings] = useState<MeetingNotice[]>([]);
   const [threads,setThreads] = useState<ChatThread[]>([]);
   const [channels,setChannels] = useState<ChannelNotice[]>([]);
@@ -50,7 +54,7 @@ export default function ChatNotificationBell({workspaceId,userId,emailVerified,o
   const refresh = useCallback(async()=>{
     if(!workspaceId){setThreads([]);setChannels([]);setMentions([]);setMeetings([]);return;}
     try{
-      const [chatRows,channelRows,settings,mentionRows,meetingRows] = await Promise.all([api.chats(),api.channelNotifications(),api.notificationPreferences(),api.mentionNotifications(),meetingsApi.notifications()]);
+      const [chatRows,channelRows,settings,mentionRows,meetingRows] = await Promise.all([chatsEnabled?api.chats():Promise.resolve([]),teamsEnabled?api.channelNotifications():Promise.resolve([]),api.notificationPreferences(),api.mentionNotifications(),schedulingEnabled?meetingsApi.notifications():Promise.resolve({results:[]})]);
       if(latestId.current!==workspaceId)return;
       setThreads(chatRows);
       setChannels(channelRows);
@@ -61,7 +65,7 @@ export default function ChatNotificationBell({workspaceId,userId,emailVerified,o
     }catch(e){
       if(latestId.current===workspaceId)setError(e instanceof Error?e.message:'Could not load notifications');
     }
-  },[workspaceId]);
+  },[workspaceId,chatsEnabled,teamsEnabled,schedulingEnabled]);
 
   useEffect(()=>{
     setMeetings([]);

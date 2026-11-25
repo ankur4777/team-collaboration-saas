@@ -16,6 +16,7 @@ from .models import (
     ChatParticipant, MentionNotification, OrganizationMember, TeamMember,
 )
 from .permissions import get_active_membership, channel_joined_at
+from .license_access import enabled_modules, workspace_license
 from rest_framework.exceptions import PermissionDenied
 
 
@@ -76,13 +77,18 @@ def visible(notification, membership, chat_joins, team_joins):
             or notification.recipient_id != membership.user_id
             or notification.created_at < membership.joined_at):
         return False
+    modules = enabled_modules(workspace_license(membership.organization_id))
     if notification.chat_message_id:
+        if 'chats' not in modules:
+            return False
         message = notification.chat_message
         if message.deleted_at or message.conversation.organization_id != membership.organization_id:
             return False
         joined = chat_joins.get(message.conversation_id)
         return joined is not None and message.created_at >= joined
     if notification.channel_message_id:
+        if 'teams' not in modules:
+            return False
         message = notification.channel_message
         if message.deleted_at or message.channel.team.organization_id != membership.organization_id:
             return False

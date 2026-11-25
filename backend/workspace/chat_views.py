@@ -31,7 +31,9 @@ logger = logging.getLogger(__name__)
 
 
 def accessible_chat(request, chat_id):
+    from .license_access import require_module
     membership = get_active_membership(request)
+    require_module(membership.organization_id, 'chats')
     return get_object_or_404(
         ChatConversation.objects.filter(
             organization_id=membership.organization_id,

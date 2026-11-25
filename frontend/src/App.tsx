@@ -104,7 +104,12 @@ const navItems = [
 ];
 function Workspace({ session, onSession, onLogout }: {session:Session;onSession:(value:Session)=>void;onLogout:()=>void}) {
   const presence=useWorkspacePresence(session.active_organization_id);
-  const [view,setView] = useState(new URLSearchParams(location.search).has('meeting')?'meetings':new URLSearchParams(location.search).has('mail')?'inbox':'teams'); const [teams,setTeams] = useState<Team[]>([]);
+  const [requestedView,setView] = useState(new URLSearchParams(location.search).has('meeting')?'meetings':new URLSearchParams(location.search).has('mail')?'inbox':'teams'); const [teams,setTeams] = useState<Team[]>([]);
+  const allowedModules=session.organizations.find(o=>o.id===session.active_organization_id)?.subscription?.modules;
+  const moduleEnabled=(id:string)=>!allowedModules||allowedModules.includes(id==='inbox'?'email':id);
+  const teamsEnabled=moduleEnabled('teams'),meetingsEnabled=moduleEnabled('meetings'),calendarEnabled=moduleEnabled('calendar');
+  const visibleNav=navItems.filter(item=>moduleEnabled(item.id));
+  const view=requestedView==='settings'||moduleEnabled(requestedView)?requestedView:(visibleNav[0]?.id||'settings');
   const [openChatRequest,setOpenChatRequest] = useState<{id:string;nonce:number;messageId?:string}|null>(null);
   const [channelJump,setChannelJump]=useState<{id:string;messageId:string;nonce:number}|null>(null);
   const [notificationRefresh,setNotificationRefresh] = useState(0);
@@ -157,12 +162,12 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   const channelUnread = (id:string) => channelNotices.find(n=>n.channel_id===id)?.unread_count || 0;
   const loadChannelNotices = useCallback(async()=>{
     const organizationId = session.active_organization_id;
-    if(!organizationId){setChannelNotices([]);return;}
+    if(!organizationId||!teamsEnabled){setChannelNotices([]);return;}
     try{
       const rows=await api.channelNotifications();
       if(currentOrgRef.current===organizationId)setChannelNotices(rows);
     }catch{/* Retain the last safe count until the next refresh. */}
-  },[session.active_organization_id]);
+  },[session.active_organization_id,teamsEnabled]);
 
   useEffect(()=>{
     setChannelNotices([]);
@@ -174,6 +179,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   },[loadChannelNotices]);
 
   const loadTeams = useCallback(async()=>{
+    if(!teamsEnabled){setTeams([]);setSelectedTeam(null);return;}
     const orgId=currentOrgRef.current;
     try{
       const rows=await api.teams();
@@ -185,7 +191,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
       }
       setTeams(rows);setSelectedTeam(old=>old&&rows.some(t=>t.id===old)?old:(rows[0]?.id||null));
     }catch(e){if(currentOrgRef.current===orgId)setError(errorText(e));}
-  },[]);
+  },[teamsEnabled]);
   useEffect(()=>{setTeams([]);setChannels([]);setMembers([]);setSelectedTeam(null);setSelectedChannel(null);setMessages([]);loadTeams();if(session.active_organization_id)api.members(session.active_organization_id).then(setMembers).catch(()=>{});},[session.active_organization_id,loadTeams]);
   useEffect(()=>{
     setTeamMentionPeople([]);setTeamRoster([]);
@@ -390,18 +396,18 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
     <div className="org-picker"><div className="org-icon">{initials(activeOrg?.name||'TW')}</div><div className="org-label"><strong>{activeOrg?.name||'Choose workspace'}</strong><small>{activeOrg?.role||'No organization'}</small></div><ChevronDown size={16}/>
       <select aria-label="Switch organization" value={session.active_organization_id||''} onChange={e=>switchOrg(e.target.value)}>{session.organizations.map(org=><option key={org.id} value={org.id}>{org.name}</option>)}</select>
     </div>
-    <div className="sidebar-title">WORKSPACE</div><nav className="nav-list">{navItems.map(item=><button key={item.id} className={`nav-item ${view===item.id?'active':''}`} onClick={()=>{setView(item.id);setSidebarOpen(false);}}><item.icon size={18}/><span>{item.label}</span>{!item.ready&&<span className="soon-dot" title="Coming next"/>}</button>)}</nav>
+    <div className="sidebar-title">WORKSPACE</div><nav className="nav-list">{visibleNav.map(item=><button key={item.id} className={`nav-item ${view===item.id?'active':''}`} onClick={()=>{setView(item.id);setSidebarOpen(false);}}><item.icon size={18}/><span>{item.label}</span>{!item.ready&&<span className="soon-dot" title="Coming next"/>}</button>)}</nav>
     <button className="nav-item" onClick={()=>{setModal('members');setSidebarOpen(false);}}><Users size={18}/><span>Members</span><span className="count-chip">{members.length}</span></button>
     <button className={`nav-item ${view==='settings'?'active':''}`} onClick={()=>{setView('settings');setSidebarOpen(false);}}><Settings2 size={18}/>Settings</button>
-    <div className="sidebar-title teams-title">YOUR TEAMS <button className="icon-button" aria-label="Create team" onClick={()=>{setError('');setModal('team');setView('teams');}}><Plus size={17}/></button></div>
+    {teamsEnabled&&<><div className="sidebar-title teams-title">YOUR TEAMS <button className="icon-button" aria-label="Create team" onClick={()=>{setError('');setModal('team');setView('teams');}}><Plus size={17}/></button></div>
     <div className="team-tree">{teams.map(team=><div key={team.id}><button className={`tree-team ${selectedTeam===team.id&&view==='teams'?'selected':''}`} onClick={()=>{setSelectedTeam(team.id);setView('teams');setSidebarOpen(false);}}><span className="tree-team-icon">{initials(team.name)}</span><span>{team.name}{team.archived_at?' (Archived)':''}</span><ChevronDown size={13}/></button>
       {selectedTeam===team.id&&view==='teams'&&channels.map(channel=><button className={`tree-channel ${selectedChannel===channel.id?'selected':''}`} key={channel.id} onClick={()=>setSelectedChannel(channel.id)}><Hash size={14}/>{channel.is_private?'🔒 ':''}{channel.name}{channel.archived_at?' (Archived)':''}{channelUnread(channel.id)>0&&<span className="channel-unread-count" aria-label={`${channelUnread(channel.id)} unread messages`}>{channelUnread(channel.id)>99?'99+':channelUnread(channel.id)}</span>}</button>)}</div>)}
-    {teams.length===0&&<div className="sidebar-empty">Your teams will appear here.</div>}</div>
+    {teams.length===0&&<div className="sidebar-empty">Your teams will appear here.</div>}</div></>}
     </div>
     <div className="sidebar-bottom"><div className="profile"><div className="avatar">{initials(session.user.full_name)}</div><div className="profile-name"><strong>{session.user.full_name}</strong><small>{session.user.email}</small></div><button className="icon-button" aria-label="Log out" title="Log out" onClick={signOut}><LogOut size={18}/></button></div></div>
   </aside>
   {sidebarOpen&&<div className="mobile-shade" onClick={()=>setSidebarOpen(false)}/>}
-  <main className={"main-panel"+(view==='meetings'||view==='calendar'?' meetings-main':'')}><header className="top-bar"><div className="top-bar-left"><button className="mobile-menu icon-button" onClick={()=>setSidebarOpen(true)}><Menu/></button><span className="crumb">Workspace</span><span className="crumb-divider">/</span><strong>{view==='teams'?(activeTeam?.name||'Teams'):navItems.find(n=>n.id===view)?.label||'Settings'}</strong></div><div className="top-bar-right"><span className="preview-pill"><span/> PHASE 2 PREVIEW</span><ChatNotificationBell workspaceId={session.active_organization_id} userId={session.user.id} emailVerified={session.user.email_verified} onOpenMeeting={id=>{setOpenMeetingRequest({id,nonce:Date.now()});setView('meetings');setSidebarOpen(false);}} refreshVersion={notificationRefresh} onRealtimeNotification={()=>{void loadChannelNotices();}}
+  <main className={"main-panel"+(view==='meetings'||view==='calendar'?' meetings-main':'')}><header className="top-bar"><div className="top-bar-left"><button className="mobile-menu icon-button" onClick={()=>setSidebarOpen(true)}><Menu/></button><span className="crumb">Workspace</span><span className="crumb-divider">/</span><strong>{view==='teams'?(activeTeam?.name||'Teams'):navItems.find(n=>n.id===view)?.label||'Settings'}</strong></div><div className="top-bar-right"><span className="preview-pill"><span/> PHASE 2 PREVIEW</span><ChatNotificationBell enabledModules={allowedModules} workspaceId={session.active_organization_id} userId={session.user.id} emailVerified={session.user.email_verified} onOpenMeeting={id=>{setOpenMeetingRequest({id,nonce:Date.now()});setView(meetingsEnabled?'meetings':'calendar');setSidebarOpen(false);}} refreshVersion={notificationRefresh} onRealtimeNotification={()=>{void loadChannelNotices();}}
           onOpenChat={id=>{setOpenChatRequest({id,nonce:Date.now()});setView('chats');setSidebarOpen(false);}}
           onOpenChannel={(teamId,channelId)=>{setSelectedTeam(teamId);setSelectedChannel(channelId);setView('teams');setSidebarOpen(false);}}/><div className="top-avatar">{initials(session.user.full_name)}</div></div></header>
   {error&&<div className="floating-error"><ErrorBanner message={error} onClose={()=>setError('')}/></div>}
@@ -423,8 +429,8 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
               aria-label="Load older channel messages"
               onClick={()=>void loadOlderChannelMessages()}>{channelLoadingOlder?'Loading older messages…':'Load older messages'}</button>}
             {messages.map((message,index)=><ChannelMessageItem key={message.id} channelId={selectedChannel!} message={message} readOnly={channelReadOnly} onForward={()=>setForwardId(message.id)} replyTarget={messages.find(row=>row.id===message.reply_to_id)} onReply={()=>setReplyTo({channelId:selectedChannel!,messageId:message.id})} isMine={message.sender.id===session.user.id} samePerson={messages[index-1]?.sender.id===message.sender.id} onUpdated={updated=>{setMessages(current=>current.map(row=>row.id===updated.id?updated:row));setPinVersion(value=>value+1);}}/>)}</div></div>
-          {!activeChannel.is_private&&<ChannelMeetingCards key={'meetings-'+selectedChannel} channelId={selectedChannel!} onOpen={id=>{setOpenMeetingRequest({id,nonce:Date.now()});setView('meetings');setSidebarOpen(false);}}/>}
-          <div className="channel-meeting-shortcut"><button className="text-link" onClick={()=>{setView('meetings');setSidebarOpen(false);}}><Video size={15}/>Open workspace meetings</button></div>
+          {!activeChannel.is_private&&(meetingsEnabled||calendarEnabled)&&<ChannelMeetingCards key={'meetings-'+selectedChannel} channelId={selectedChannel!} onOpen={id=>{setOpenMeetingRequest({id,nonce:Date.now()});setView(meetingsEnabled?'meetings':'calendar');setSidebarOpen(false);}}/>}
+          {(meetingsEnabled||calendarEnabled)&&<div className="channel-meeting-shortcut"><button className="text-link" onClick={()=>{setView(meetingsEnabled?'meetings':'calendar');setSidebarOpen(false);}}><Video size={15}/>Open workspace meetings</button></div>}
           <AttachmentPanel key={selectedChannel!} kind="channel" parentId={selectedChannel!} readOnly={channelReadOnly}/>
            {channelReadOnly?<div className="compose-caption">Archived conversation — restore it to send messages or upload files.</div>:<form className="message-compose" onSubmit={send}>{replyTarget&&<ReplyPreview message={replyTarget} onCancel={()=>setReplyTo(null)}/>}<div className="compose-box"><MentionInput value={draft} onChange={setDraft} people={activeChannel.is_private?[]:teamMentionPeople.filter(person=>person.id!==session.user.id)} placeholder={`Message #${activeChannel.name}`} ariaLabel="New message"/><button type="submit" className="send-button" disabled={!draft.trim()} aria-label="Send message"><Send size={18}/></button></div><div className="compose-caption">Type @ to mention a teammate · Enter to send · Only team members can read this channel</div></form>}
         </>:<Empty icon={<Hash size={32}/>} title="Choose a channel" description="Select a channel to see its conversations."/>}</section></div>
@@ -432,7 +438,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   </>:view==='chats' ? <ChatPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id} currentUser={session.user} members={members} presence={presence} requestedChat={openChatRequest} onRead={()=>setNotificationRefresh(current=>current+1)}/>
    :view==='inbox' ? <EmailPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id} user={session.user}/>
    :view==='files' ? <SharedFilesPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id}/>
-   :view==='meetings'||view==='calendar' ? <MeetingsPanel key={(session.active_organization_id||'none')+view} workspaceId={session.active_organization_id} userId={session.user.id} members={members} teams={teams} calendar={view==='calendar'} requestedMeeting={openMeetingRequest} onChanged={()=>setNotificationRefresh(v=>v+1)}/>
+   :view==='meetings'||view==='calendar' ? <MeetingsPanel key={(session.active_organization_id||'none')+view} workspaceId={session.active_organization_id} userId={session.user.id} members={members} teams={teams} calendar={view==='calendar'} callsEnabled={meetingsEnabled} requestedMeeting={openMeetingRequest} onChanged={()=>setNotificationRefresh(v=>v+1)}/>
    :view==='settings' ? <SettingsPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id} workspaceName={activeOrg?.name||'your workspace'} user={session.user} onPreferencesSaved={()=>setNotificationRefresh(v=>v+1)}/>
    :view==='search' ? <MessageSearchPanel key={session.active_organization_id||'none'}
         onOpenChat={(id,messageId)=>{setOpenChatRequest({id,messageId,nonce:Date.now()});setView('chats');setSidebarOpen(false);}}
@@ -479,7 +485,7 @@ export default function App() {
   if(!session)return <>{bootError&&<div className="boot-error"><ErrorBanner message={bootError}/></div>}<AuthScreen onAuth={setSession}/></>;
   const activeSubscription=session.organizations.find(org=>org.id===session.active_organization_id)?.subscription;
   if(activeSubscription&&!activeSubscription.allowed)return <SubscriptionBlocked session={session} onSession={setSession}/>;
-  return <Workspace session={session} onSession={setSession} onLogout={()=>setSession(null)}/>;
+  return <Workspace key={(session.active_organization_id||'none')+':'+(activeSubscription?.modules?.join(',')|| (activeSubscription?.modules?'none':'all'))} session={session} onSession={setSession} onLogout={()=>setSession(null)}/>;
 }
 
 

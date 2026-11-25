@@ -9,17 +9,20 @@ from rest_framework.views import APIView
 from .models import Channel, ChatConversation, ChatMessage, ChatParticipant, Message, TeamMember
 from .permissions import get_active_membership, require_channel_writable, channel_access_filter, channel_joined_at, channel_team_members
 from .chat_views import publish_chat_message
+from .license_access import module_allowed, require_module
 from .views import broadcast_message
 from .notification_events import publish_notification_refresh
 from .serializers import ChatMessageSerializer, MessageSerializer
 
 
 def chat_rows(org, user):
-    return ChatConversation.objects.filter(organization_id=org, participants__user=user)
+    rows = ChatConversation.objects.filter(organization_id=org, participants__user=user)
+    return rows if module_allowed(org, 'chats') else rows.none()
 
 
 def channel_rows(org, user):
-    return Channel.objects.filter(team__organization_id=org, team__members__user=user).filter(channel_access_filter(user.pk))
+    rows = Channel.objects.filter(team__organization_id=org, team__members__user=user).filter(channel_access_filter(user.pk))
+    return rows if module_allowed(org, 'teams') else rows.none()
 
 
 def parse_location(data, prefix):
@@ -54,6 +57,8 @@ class ForwardMessageView(APIView):
         user = request.user
         source_kind, source_id = parse_location(request.data, 'source')
         dest_kind, dest_id = parse_location(request.data, 'destination')
+        require_module(org, 'chats' if source_kind == 'chat' else 'teams')
+        require_module(org, 'chats' if dest_kind == 'chat' else 'teams')
         try:
             message_id = UUID(str(request.data.get('message_id')))
         except (ValueError, TypeError):

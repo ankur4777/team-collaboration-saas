@@ -1,7 +1,7 @@
 from rest_framework.exceptions import PermissionDenied
 from django.db.models import Q
 from .models import OrganizationMember, TeamMember, Channel, PrivateChannelMember
-from .license_access import access_allowed
+from .license_access import effective_status, enabled_modules, workspace_license, BLOCKED, route_modules, require_module
 
 
 def get_active_membership(request):
@@ -10,13 +10,18 @@ def get_active_membership(request):
                   .filter(organization_id=active_id, user=request.user).first()) if active_id else None
     if membership is None:
         raise PermissionDenied('Choose an organization you belong to')
-    if not access_allowed(membership.organization_id):
+    license_row = workspace_license(membership.organization_id)
+    if effective_status(license_row) in BLOCKED:
         raise PermissionDenied('Workspace subscription is not active. Contact your company administrator.', code='subscription_inactive')
+    required = route_modules(request.path_info)
+    if required and not enabled_modules(license_row).intersection(required):
+        raise PermissionDenied('This module is not included in your company subscription.', code='module_disabled')
     return membership
 
 
 def require_team_access(request, team, *, manage=False):
     member = get_active_membership(request)
+    require_module(member.organization_id, 'teams')
     if team.organization_id != member.organization_id:
         raise PermissionDenied('No access to this team')
     team_member = TeamMember.objects.filter(team=team, user=request.user).first()

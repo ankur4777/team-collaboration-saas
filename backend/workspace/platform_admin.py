@@ -17,10 +17,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import CompanyLicense, Invitation, Organization, OrganizationMember, PlatformAuditEntry
 
-from .license_access import effective_status
+from .license_access import effective_status, MODULES
 
 logger = logging.getLogger(__name__)
-MODULES = ('teams', 'chats', 'search', 'email', 'meetings', 'calendar', 'files')
 PAGE_SIZE = 25
 
 
@@ -46,6 +45,7 @@ class LicenseInput(serializers.Serializer):
     seat_limit = serializers.IntegerField(required=False, allow_null=True, min_value=1, max_value=1000000)
     starts_on = serializers.DateField(required=False, allow_null=True)
     ends_on = serializers.DateField(required=False, allow_null=True)
+    enforce_modules = serializers.BooleanField(required=False)
     modules = serializers.ListField(child=serializers.ChoiceField(choices=MODULES), required=False, max_length=len(MODULES))
 
     def validate_modules(self, value):

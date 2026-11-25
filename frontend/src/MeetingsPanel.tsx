@@ -32,6 +32,7 @@ type Props = {
   members: Member[];
   teams: Team[];
   calendar?: boolean;
+  callsEnabled?: boolean;
   requestedMeeting?: { id: string; nonce: number } | null;
   onChanged: () => void;
 };
@@ -415,6 +416,7 @@ export default function MeetingsPanel({
   members,
   teams,
   calendar = false,
+  callsEnabled = true,
   requestedMeeting,
   onChanged,
 }: Props) {
@@ -826,7 +828,7 @@ export default function MeetingsPanel({
                 Organized by {selected.organizer.full_name}
               </p>
               <div className="meeting-detail-actions">
-                {active && !selected.call_ended && (
+                {callsEnabled && active && !selected.call_ended && (
                   <button
                     className="primary-button"
                     onClick={() => setCallMeeting(selected)}
@@ -1074,7 +1076,7 @@ export default function MeetingsPanel({
           }}
         />
       )}
-      {callMeeting && (
+      {callsEnabled && callMeeting && (
         <CallRoom
           meeting={callMeeting}
           userId={userId}

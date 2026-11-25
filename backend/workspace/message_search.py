@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 
 from .models import ChatMessage, Message, PrivateChannelMember
 from .permissions import get_active_membership
+from .license_access import enabled_modules, workspace_license
 
 MAX_RESULTS = 50
 MAX_QUERY_LENGTH = 100
@@ -80,8 +81,9 @@ class MessageSearchView(APIView):
                 rows = rows.filter(condition)
             return rows.order_by('-created_at', '-id')[:MAX_RESULTS + (1 if paged else 0)]
 
+        modules = enabled_modules(workspace_license(member.organization_id))
         results = []
-        if scope in ('all', 'chats'):
+        if scope in ('all', 'chats') and 'chats' in modules:
             # Filtering the participant join and created_at in the same query
             # enforces the calling user's join time, including group history.
             chats = (
@@ -107,7 +109,7 @@ class MessageSearchView(APIView):
                     'excerpt': message.body[:300],
                 })
 
-        if scope in ('all', 'channels'):
+        if scope in ('all', 'channels') and 'teams' in modules:
             # Unlike a channel's normal message-history API, search never
             # returns messages predating the employee's latest team admission.
             channels = (
