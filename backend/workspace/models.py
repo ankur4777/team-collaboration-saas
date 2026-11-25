@@ -148,6 +148,31 @@ class BillingPayment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class SupportTicket(models.Model):
+    id = models.UUIDField(primary_key=True, default=make_id, editable=False)
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name='support_tickets')
+    requester = models.ForeignKey(User, on_delete=models.PROTECT, related_name='support_requests')
+    subject = models.CharField(max_length=160)
+    priority = models.CharField(max_length=10, choices=[('normal','Normal'),('high','High')], default='normal')
+    status = models.CharField(max_length=20, choices=[('open','Open'),('in_progress','In progress'),('resolved','Resolved'),('closed','Closed')], default='open')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at', '-pk']
+
+
+class SupportReply(models.Model):
+    ticket = models.ForeignKey(SupportTicket, on_delete=models.CASCADE, related_name='replies')
+    author = models.ForeignKey(User, on_delete=models.PROTECT, related_name='support_replies')
+    from_provider = models.BooleanField(default=False)
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'pk']
+
+
 class PlatformAuditEntry(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.PROTECT, related_name='platform_audit_entries')
     actor = models.ForeignKey(User, on_delete=models.PROTECT, related_name='platform_audit_entries')

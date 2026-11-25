@@ -155,6 +155,12 @@ export type LicenseStatus='unassigned'|'trial'|'active'|'suspended'|'cancelled';
 export interface CompanyLicense {contact_email:string;plan:string;status:LicenseStatus;seat_limit:number|null;starts_on:string|null;ends_on:string|null;modules:string[];enforce_modules?:boolean}
 export interface PlatformCompany extends CompanyLicense, SubscriptionTiming {id:string;name:string;slug:string;created_at:string;employee_count:number;seats_remaining?:number|null;team_count:number;owner_emails:string[];pending_owner_email:string|null;effective_status:string}
 export interface PlatformCompanies {items:PlatformCompany[];total:number;page:number;page_size:number;stats:{companies:number;active:number;trial:number;expired:number;suspended:number;memberships:number}}
+export interface CompanyUsage {company_id:string;as_of:string;window_days:number;members:number;recent_members:number;online_members:number;teams:number;channels:number;conversations:number;channel_messages:number;chat_messages:number;recent_messages:number;meetings:number;recent_meetings:number;shared_files:number;attachments:number;storage_bytes:number}
+export interface RevenueReport {start:string;end:string;as_of:string;totals:{currency:string;billed:string;received:string;outstanding:string;overdue:string}[];monthly:{month:string;currency:string;received:string}[];customers:{company_id:string;company:string;currency:string;received:string}[];customers_limit:number}
+export type TicketStatus='open'|'in_progress'|'resolved'|'closed';
+export interface SupportTicket {id:string;company_id:string;company:string;subject:string;priority:'normal'|'high';status:TicketStatus;requester:string;created_at:string;updated_at:string}
+export interface SupportDetail extends SupportTicket {replies:{id:string;author:string;from_provider:boolean;body:string;created_at:string}[]}
+export interface SupportPage {items:SupportTicket[];total:number;page:number;page_size:number}
 export interface InvoiceInput {request_id:string;description:string;currency:string;amount:string;due_on:string|null}
 export interface PaymentInput {paid_on:string;method:string;reference:string;note:string}
 export interface BillingInvoice {id:string;number:string;company_name:string;issuer_name:string;contact_email:string;description:string;amount:string;currency:string;issued_on:string;due_on:string|null;status:'unpaid'|'paid'|'void';overdue:boolean;created_at:string;payment:PaymentInput|null}
@@ -164,6 +170,12 @@ export interface RenewalInput {request_id:string;days:number;reactivate:boolean;
 export interface RenewalPage {items:SubscriptionRenewal[];total:number;page:number;page_size:number}
 export interface PlatformAudit {action:string;actor:string;created_at:string;changes:Record<string,unknown>}
 export const api = {
+  companyUsage:(id:string)=>request<CompanyUsage>(`platform/companies/${id}/usage/`),
+  revenueReport:(start:string,end:string)=>request<RevenueReport>(`platform/revenue/?${new URLSearchParams({start,end})}`),
+  supportTickets:(provider:boolean,status:string,page:number)=>request<SupportPage>(`${provider?'platform/':''}support/?${new URLSearchParams({status,page:String(page)})}`),
+  supportDetail:(provider:boolean,id:string)=>request<SupportDetail>(`${provider?'platform/':''}support/${id}/`),
+  createSupportTicket:(data:{subject:string;priority:string;body:string})=>post<SupportDetail>('support/',data),
+  updateSupportTicket:(provider:boolean,id:string,data:{body?:string;status?:TicketStatus})=>post<SupportDetail>(`${provider?'platform/':''}support/${id}/`,data),
   platformInvoices: (id:string,page=1) => request<InvoicePage>(`platform/companies/${id}/invoices/?page=${page}`),
   createPlatformInvoice: (id:string,data:InvoiceInput) => post<BillingInvoice>(`platform/companies/${id}/invoices/`,data),
   recordPlatformPayment: (id:string,invoice:string,data:PaymentInput) => post<BillingInvoice>(`platform/companies/${id}/invoices/${invoice}/payment/`,data),

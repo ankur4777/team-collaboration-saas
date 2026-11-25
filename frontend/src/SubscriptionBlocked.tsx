@@ -2,6 +2,7 @@ import {useState} from 'react';
 import {ShieldCheck,RefreshCw,LogOut} from 'lucide-react';
 import {api,type Session} from './api';
 import './PlatformAdmin.css';
+import SupportPanel from './SupportPanel';
 
 export default function SubscriptionBlocked({session,onSession}:{session:Session;onSession:(s:Session|null)=>void}){
   const org=session.organizations.find(row=>row.id===session.active_organization_id);
@@ -14,5 +15,5 @@ export default function SubscriptionBlocked({session,onSession}:{session:Session
   {error&&<p role="alert" className="pa-error">{error}</p>}
   <button className="primary-button" disabled={busy} onClick={()=>void run(()=>api.me())}><RefreshCw size={16}/> Check subscription again</button>
   {session.organizations.length>1&&<label>Switch workspace<select disabled={busy} value={session.active_organization_id||''} onChange={e=>void run(()=>api.activate(e.target.value))}>{session.organizations.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></label>}
-  <button className="outline-button" disabled={busy} onClick={()=>void run(async()=>{await api.logout();return null;})}><LogOut size={16}/> Sign out</button></section></main>;
+  <button className="outline-button" disabled={busy} onClick={()=>void run(async()=>{await api.logout();return null;})}><LogOut size={16}/> Sign out</button>{org&&<SupportPanel key={org.id} provider={false}/>}</section></main>;
 }

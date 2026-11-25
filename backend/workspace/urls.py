@@ -8,10 +8,16 @@ from . import message_forwarding
 from . import message_pins
 from . import presence
 from . import conversation_tools
-from . import platform_admin, platform_billing
+from . import platform_admin, platform_billing, platform_reports, support
 from . import auth_views, views, member_views, chat_views, channel_notifications, account_recovery, settings_views, session_views, message_search, mentions
 
 urlpatterns = [
+    path('platform/revenue/', platform_reports.RevenueView.as_view()),
+    path('platform/companies/<uuid:company_id>/usage/', platform_reports.CompanyUsageView.as_view()),
+    path('platform/support/', support.PlatformTicketsView.as_view()),
+    path('platform/support/<uuid:ticket_id>/', support.PlatformTicketView.as_view()),
+    path('support/', support.CustomerTicketsView.as_view()),
+    path('support/<uuid:ticket_id>/', support.CustomerTicketView.as_view()),
     path('platform/companies/', platform_admin.CompanyListView.as_view()),
     path('platform/companies/<uuid:company_id>/', platform_admin.CompanyDetailView.as_view()),
     path('platform/companies/<uuid:company_id>/invoices/', platform_billing.InvoiceListView.as_view()),
