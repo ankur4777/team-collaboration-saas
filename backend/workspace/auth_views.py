@@ -40,13 +40,15 @@ def set_active_org(request, user):
 
 
 def auth_payload(request):
-    memberships = list(OrganizationMember.objects.filter(user=request.user).select_related('organization').order_by('joined_at'))
+    from .license_access import access_summary
+    memberships = list(OrganizationMember.objects.filter(user=request.user).select_related('organization', 'organization__license').order_by('joined_at'))
     return {
         'user': {'id': str(request.user.id), 'email': request.user.email, 'full_name': request.user.full_name,
                  'email_verified': request.user.email_verified_at is not None,
                  'is_platform_admin': bool(request.user.is_active and request.user.is_staff and request.user.is_superuser)},
         'organizations': [{'id': str(m.organization_id), 'name': m.organization.name,
-                           'slug': m.organization.slug, 'role': m.role} for m in memberships],
+                           'slug': m.organization.slug, 'role': m.role,
+                           'subscription': access_summary(getattr(m.organization, 'license', None))} for m in memberships],
         'active_organization_id': request.session.get('active_organization_id'),
     }
 

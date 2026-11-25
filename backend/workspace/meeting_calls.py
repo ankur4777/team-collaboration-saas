@@ -17,6 +17,7 @@ from rest_framework.views import APIView
 from .models import Meeting, MeetingCallPeer, OrganizationMember
 from .device_sessions import GENERATION_KEY, live_websocket_session
 from .meetings import get_meeting
+from .license_access import access_allowed
 
 PEER_TTL = 90
 
@@ -26,7 +27,7 @@ def socket_allowed(scope, meeting_id):
     if not user or not user.is_authenticated or not session:
         return False
     org_id = session.get('active_organization_id')
-    if not org_id or not live_websocket_session(user.pk, session.session_key, session.get(GENERATION_KEY)):
+    if not org_id or not access_allowed(org_id) or not live_websocket_session(user.pk, session.session_key, session.get(GENERATION_KEY)):
         return False
     stored = Session.objects.filter(session_key=session.session_key).first()
     if not stored or str(stored.get_decoded().get('active_organization_id')) != str(org_id):

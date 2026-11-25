@@ -1,6 +1,7 @@
 from rest_framework.exceptions import PermissionDenied
 from django.db.models import Q
 from .models import OrganizationMember, TeamMember, Channel, PrivateChannelMember
+from .license_access import access_allowed
 
 
 def get_active_membership(request):
@@ -9,6 +10,8 @@ def get_active_membership(request):
                   .filter(organization_id=active_id, user=request.user).first()) if active_id else None
     if membership is None:
         raise PermissionDenied('Choose an organization you belong to')
+    if not access_allowed(membership.organization_id):
+        raise PermissionDenied('Workspace subscription is not active. Contact your company administrator.', code='subscription_inactive')
     return membership
 
 

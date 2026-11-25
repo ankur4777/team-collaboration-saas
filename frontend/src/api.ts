@@ -6,7 +6,8 @@ export interface AccountDeviceSession {
   id:string; user_agent:string; ip_address:string|null;
   created_at:string; last_seen_at:string; current:boolean;
 }
-export interface Org { id: string; name: string; slug: string; role: 'owner' | 'admin' | 'member' }
+export interface SubscriptionAccess {status:string;allowed:boolean;plan:string;starts_on:string|null;ends_on:string|null}
+export interface Org { subscription?:SubscriptionAccess; id: string; name: string; slug: string; role: 'owner' | 'admin' | 'member' }
 export interface Session { user: Person; organizations: Org[]; active_organization_id: string | null }
 export interface Team { id: string; name: string; description: string; created_at: string; archived_at?: string|null }
 export interface Channel { id: string; name: string; description: string; created_at: string; archived_at?: string|null; is_private?:boolean }

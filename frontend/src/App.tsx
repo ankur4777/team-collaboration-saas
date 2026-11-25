@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Check, ChevronDown, Hash, Inbox, MessageCircle,
 import { api, csrf, type Channel, type ChannelMessageCursor, type ChannelNotice, type Member, type Message, type Person, type Session, type Team } from './api';
 import ChatPanel from './ChatPanel';
 import PlatformAdmin from './PlatformAdmin';
+import SubscriptionBlocked from './SubscriptionBlocked';
 import {connectConversationSocket,mergeFreshHistory} from './conversationSocket';
 import {ApiError} from './api';
 import {useWorkspacePresence,PresenceStatus} from './WorkspacePresence';
@@ -460,11 +461,24 @@ export default function App() {
     : location.pathname === '/reset-password' ? 'reset'
     : location.pathname === '/verify-email' ? 'verify' : null;
   useEffect(()=>{let active=true;csrf().then(()=>api.me()).then(s=>{if(active)setSession(s);}).catch(e=>{if(!active)return;if('status' in (e as object) && (e as {status:number}).status===401) setSession(null);else {setBootError(errorText(e));setSession(null);}});return()=>{active=false;};},[]);
+  const signedInUser=session?.user.id;
+  const activeOrgId=session?.active_organization_id;
+  useEffect(()=>{
+    if(!signedInUser||location.pathname==='/platform-admin')return;
+    let active=true,busy=false;
+    const refresh=async()=>{if(!active||busy||document.hidden)return;busy=true;try{const next=await api.me();if(active)setSession(current=>current?.user.id===signedInUser&&current.active_organization_id===activeOrgId?next:current);}catch{/* REST endpoints still enforce subscription access. */}finally{busy=false;}};
+    const trigger=()=>{void refresh();};
+    const timer=window.setInterval(trigger,30000);
+    window.addEventListener('focus',trigger);window.addEventListener('online',trigger);document.addEventListener('visibilitychange',trigger);
+    return()=>{active=false;window.clearInterval(timer);window.removeEventListener('focus',trigger);window.removeEventListener('online',trigger);document.removeEventListener('visibilitychange',trigger);};
+  },[signedInUser,activeOrgId]);
   if(session===undefined)return <div className="page-loader"><Brand/><Spinner/><span>Preparing your workspace...</span></div>;
   if(recoveryMode)return <AccountRecoveryScreen mode={recoveryMode}/>;
   if(inviteMode)return <InviteScreen session={session} onDone={s=>{setSession(s);history.replaceState({},'','/');}} onBack={()=>{location.href='/';}}/>;
   if(location.pathname==='/platform-admin'||session?.user.is_platform_admin&&!session.active_organization_id)return <PlatformAdmin session={session} onSession={setSession}/>;
   if(!session)return <>{bootError&&<div className="boot-error"><ErrorBanner message={bootError}/></div>}<AuthScreen onAuth={setSession}/></>;
+  const activeSubscription=session.organizations.find(org=>org.id===session.active_organization_id)?.subscription;
+  if(activeSubscription&&!activeSubscription.allowed)return <SubscriptionBlocked session={session} onSession={setSession}/>;
   return <Workspace session={session} onSession={setSession} onLogout={()=>setSession(null)}/>;
 }
 

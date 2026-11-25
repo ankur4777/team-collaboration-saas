@@ -5,6 +5,7 @@ from django.contrib.sessions.models import Session
 
 from .device_sessions import GENERATION_KEY, live_websocket_session
 from .models import OrganizationMember
+from .license_access import access_allowed
 from .notification_events import notification_group
 
 
@@ -51,6 +52,8 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def authorized(self, user_id, organization_id):
+        if not access_allowed(organization_id):
+            return False
         session = self.scope.get('session')
         if not session or not live_websocket_session(
             user_id, session.session_key, session.get(GENERATION_KEY),

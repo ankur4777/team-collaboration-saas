@@ -5,6 +5,7 @@ from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from .models import Channel, TeamMember, OrganizationMember, ChatConversation, ChatParticipant
 from .device_sessions import GENERATION_KEY, live_websocket_session
 from .permissions import channel_access_filter, channel_joined_at
+from .license_access import access_allowed
 from rest_framework.exceptions import PermissionDenied
 
 
@@ -84,6 +85,8 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
     @database_sync_to_async
     def allowed(self, user_id, channel_id, organization_id):
         session = self.scope.get('session')
+        if not access_allowed(organization_id):
+            return False
         if not session or not live_websocket_session(
             user_id, session.session_key, session.get(GENERATION_KEY),
         ):
@@ -216,6 +219,8 @@ class PrivateChatConsumer(AsyncJsonWebsocketConsumer):
     @database_sync_to_async
     def allowed(self, user_id, chat_id, organization_id):
         session = self.scope.get('session')
+        if not access_allowed(organization_id):
+            return False
         if not session or not live_websocket_session(
             user_id, session.session_key, session.get(GENERATION_KEY),
         ):

@@ -17,6 +17,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import CompanyLicense, Invitation, Organization, OrganizationMember, PlatformAuditEntry
 
+from .license_access import effective_status
+
 logger = logging.getLogger(__name__)
 MODULES = ('teams', 'chats', 'search', 'email', 'meetings', 'calendar', 'files')
 PAGE_SIZE = 25
@@ -81,13 +83,7 @@ def company_data(org):
     data = license_data(license_row)
     owners = list(org.members.filter(role=OrganizationMember.Role.OWNER).values_list('user__email', flat=True))
     pending = org.invitations.filter(role=OrganizationMember.Role.OWNER, accepted_at__isnull=True, expires_at__gt=timezone.now()).order_by('-created_at').first()
-    today = timezone.localdate()
-    effective = data['status']
-    if effective in ('active','trial'):
-        if license_row.ends_on and license_row.ends_on < today:
-            effective = 'expired'
-        elif license_row.starts_on and license_row.starts_on > today:
-            effective = 'scheduled'
+    effective = effective_status(license_row)
     return {
         'id': str(org.pk), 'name': org.name, 'slug': org.slug,
         'created_at': org.created_at.isoformat(), 'employee_count': org.employee_count,
