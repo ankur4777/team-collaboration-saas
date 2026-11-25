@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, MessageCircle, Plus, RefreshCw, Send, Users, X } from 'lucide-react';
-import { api, type ChatMessage, type ChannelMessageCursor, type ChatThread, type Member, type Person } from './api';
+import { api, type ChatMessage, type ChannelMessageCursor, type ChatThread, type Member, type Person, type PresenceMap } from './api';
 import ChatReactionBar from './ChatReactionBar';
 import AttachmentPanel from './AttachmentPanel';
 import MentionInput from './MentionInput';
 import ReplyPreview from './ReplyPreview';
+import {PresenceStatus,presenceLabel} from './WorkspacePresence';
 import PinnedMessages from './PinnedMessages';
 import ForwardMessageDialog from './ForwardMessageDialog';
 
@@ -22,9 +23,9 @@ function messageOrder(a: ChatMessage, b: ChatMessage) {
   return a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id);
 }
 
-interface Props { workspaceId: string|null; currentUser: Person; members: Member[]; requestedChat?: {id:string;nonce:number}|null; onRead?: ()=>void }
+interface Props { workspaceId: string|null; currentUser: Person; members: Member[]; presence?: PresenceMap; requestedChat?: {id:string;nonce:number}|null; onRead?: ()=>void }
 
-export default function ChatPanel({workspaceId, currentUser, members, requestedChat, onRead}: Props) {
+export default function ChatPanel({workspaceId, currentUser, members, presence={}, requestedChat, onRead}: Props) {
   const [showArchived,setShowArchived]=useState(false);
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [selected, setSelected] = useState<string|null>(null);
@@ -222,6 +223,8 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
   }
 
   const active = threads.find(thread => thread.id === selected);
+  const peerId=active?.participants.find(p=>p.user.id!==currentUser.id)?.user.id;
+  const onlineCount=active?.participants.filter(p=>presence[p.user.id]?.online).length||0;
   const colleagues = members.filter(member => member.user.id !== currentUser.id);
   const groupCandidates = colleagues.filter(m => !active?.participants.some(p => p.user.id === m.user.id));
   const visibleThreads = threads.filter(thread =>
@@ -409,7 +412,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
         <input className="chat-filter" aria-label="Search conversations" placeholder="Search conversations" value={filter} onChange={e => setFilter(e.target.value)}/>
         {visibleThreads.map(thread => <button type="button" key={thread.id} className={`chat-thread ${selected === thread.id ? 'selected' : ''}`} onClick={() => setSelected(thread.id)}>
           <span className="chat-thread-avatar">{thread.kind === 'group' ? <Users size={17}/> : initials(titleFor(thread,currentUser.id))}</span>
-          <span className="chat-thread-details"><strong>{titleFor(thread,currentUser.id)}</strong><small>{thread.kind === 'group' ? `${thread.participants.length} participants` : 'Direct message'}</small></span>
+          <span className="chat-thread-details"><strong>{titleFor(thread,currentUser.id)}</strong><small>{thread.kind === 'group' ? `${thread.participants.length} participants` : presenceLabel(presence[thread.participants.find(p=>p.user.id!==currentUser.id)?.user.id||''])}</small></span>
           {thread.unread_count>0&&<span className="chat-unread-badge" aria-label={`${thread.unread_count} unread messages`}>{thread.unread_count>99?'99+':thread.unread_count}</span>}
         </button>)}
         {visibleThreads.length === 0 && <div className="chat-list-empty">No conversations yet. Start a new chat with a colleague.</div>}
@@ -419,7 +422,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
         {active ? <>
           <header className="private-chat-toolbar">
             <span className="chat-thread-avatar large">{active.kind === 'group' ? <Users size={19}/> : initials(titleFor(active,currentUser.id))}</span>
-            <div><h2>{titleFor(active,currentUser.id)}</h2><p>{active.participants.map(p => p.user.full_name).join(', ')}</p></div>
+            <div><h2>{titleFor(active,currentUser.id)}</h2>{active.kind==='direct'?<PresenceStatus row={presence[peerId||'']}/>:<p>{active.participants.length} participants · {onlineCount} online</p>}</div>
             {active.kind==='group' && active.created_by.id===currentUser.id && <button type="button" className="group-manage-button" onClick={() => setManagingGroup(true)}><Users size={15}/> Manage group</button>}
             {active.kind==='group' && active.created_by.id!==currentUser.id && <button type="button" className="group-manage-button" disabled={working} onClick={() => void leaveGroup()}>Leave group</button>}
             <button type="button" className="group-manage-button" disabled={working} onClick={()=>void archiveActiveChat()}>{active.archived_at?'Restore chat':'Archive chat'}</button>
@@ -463,7 +466,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
         <div className="modal-body">
           <p className="muted">New participants see messages from the time they join, not earlier chat history. Transfer ownership before leaving this group.</p>
           <button type="button" className="outline-button" disabled={working} onClick={()=>void renameGroup()}>Rename group</button>
-          <div className="member-list">{active.participants.map(p => <div className="member-row" key={p.user.id}><div className="avatar small-avatar">{initials(p.user.full_name)}</div><div><strong>{p.user.full_name}</strong><small>{p.user.email}</small></div>{p.user.id===active.created_by.id ? <span className="role-pill">Owner</span> : <div><button type="button" className="member-remove" disabled={working} onClick={() => void transferOwnership(p.user)}>Transfer ownership</button><button type="button" className="member-remove" disabled={working} onClick={() => void removeParticipant(p.user)}>Remove</button></div>}</div>)}</div>
+          <div className="member-list">{active.participants.map(p => <div className="member-row" key={p.user.id}><div className="avatar small-avatar">{initials(p.user.full_name)}</div><div><strong>{p.user.full_name}</strong><small>{p.user.email}</small><PresenceStatus row={presence[p.user.id]}/></div>{p.user.id===active.created_by.id ? <span className="role-pill">Owner</span> : <div><button type="button" className="member-remove" disabled={working} onClick={() => void transferOwnership(p.user)}>Transfer ownership</button><button type="button" className="member-remove" disabled={working} onClick={() => void removeParticipant(p.user)}>Remove</button></div>}</div>)}</div>
           <form className="group-manage-add" onSubmit={addParticipant}>
             <label>Add teammate<select aria-label="Select teammate to add" value={addEmail} onChange={e => setAddEmail(e.target.value)} required><option value="">Choose a member</option>{groupCandidates.map(m => <option key={m.id} value={m.user.email}>{m.user.full_name} ({m.user.email})</option>)}</select></label>
             <button type="submit" className="primary-button" disabled={!addEmail || working || active.participants.length>=25}><Plus size={15}/> Add to group</button>

@@ -6,6 +6,7 @@ from . import private_attachments
 from . import shared_files
 from . import message_forwarding
 from . import message_pins
+from . import presence
 from . import auth_views, views, member_views, chat_views, channel_notifications, account_recovery, settings_views, session_views, message_search, mentions
 
 urlpatterns = [
@@ -39,6 +40,7 @@ urlpatterns = [
     path('auth/password-reset/confirm/', account_recovery.password_reset_confirm),
     path('organizations/', views.OrganizationListView.as_view()),
     path('organizations/<uuid:pk>/activate/', views.ActivateOrganizationView.as_view()),
+    path('organizations/<uuid:pk>/presence/', presence.WorkspacePresenceView.as_view()),
     path('organizations/<uuid:pk>/members/', views.OrganizationMembersView.as_view()),
     path('organizations/<uuid:pk>/members/<uuid:member_id>/', member_views.OrganizationMemberDetailView.as_view()),
     path('organizations/<uuid:pk>/invitations/', views.OrganizationInvitationsView.as_view()),

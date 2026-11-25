@@ -160,3 +160,38 @@ class WorkspaceAPITests(TestCase):
         self.post('/api/auth/logout/', {})
         self.post('/api/auth/login/', {'email':staff.email,'password':'SecurePass123!'})
         self.assertEqual(self.client.get(channel_url+'messages/').json(),[])
+
+    def test_presence_heartbeat_is_workspace_scoped_and_expires(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        session = self.register()
+        org = Organization.objects.get(pk=session['active_organization_id'])
+        owner = OrganizationMember.objects.get(organization=org, role='owner')
+        staff = get_user_model().objects.create_user('presence@company-a.test', 'SecurePass123!', full_name='Staff')
+        employee = OrganizationMember.objects.create(organization=org, user=staff)
+        other = Organization.objects.create(name='Presence other', slug='presence-other', created_by=owner.user)
+        other_membership = OrganizationMember.objects.create(organization=other, user=owner.user, role='owner')
+        path = f'/api/organizations/{org.pk}/presence/'
+        response = self.post(path, {'user_id':str(staff.pk)})
+        self.assertEqual(response.status_code,200,response.content)
+        rows = {row['user_id']:row for row in response.json()['members']}
+        self.assertTrue(rows[str(owner.user_id)]['online'])
+        self.assertFalse(rows[str(staff.pk)]['online'])
+        self.assertIsNone(rows[str(staff.pk)]['last_seen_at'])
+        employee.refresh_from_db()
+        self.assertIsNone(employee.last_seen_at)
+        OrganizationMember.objects.filter(pk=employee.pk).update(last_seen_at=timezone.now()-timedelta(seconds=91))
+        rows = {row['user_id']:row for row in self.post(path,{}).json()['members']}
+        self.assertFalse(rows[str(staff.pk)]['online'])
+        self.assertIsNotNone(rows[str(staff.pk)]['last_seen_at'])
+        OrganizationMember.objects.filter(pk=employee.pk).update(last_seen_at=timezone.now()-timedelta(seconds=10))
+        rows = {row['user_id']:row for row in self.post(path,{}).json()['members']}
+        self.assertTrue(rows[str(staff.pk)]['online'])
+        self.assertEqual(self.post(f'/api/organizations/{other.pk}/presence/',{}).status_code,403)
+        other_membership.refresh_from_db()
+        self.assertIsNone(other_membership.last_seen_at)
+        self.assertEqual(self.post(f'/api/organizations/{other.pk}/activate/',{}).status_code,200)
+        self.assertEqual(self.post(path,{}).status_code,403)
+        rows = self.post(f'/api/organizations/{other.pk}/presence/',{}).json()['members']
+        self.assertEqual([row['user_id'] for row in rows],[str(owner.user_id)])
+        self.assertEqual(self.client.post(path,data='{}',content_type='application/json').status_code,403)

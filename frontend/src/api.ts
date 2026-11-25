@@ -1,3 +1,5 @@
+export interface Presence { user_id:string; online:boolean; last_seen_at:string|null }
+export type PresenceMap = Record<string,Presence>;
 export interface Person { id: string; email: string; full_name: string; email_verified: boolean }
 export interface NotificationPreferences { direct_chats: boolean; group_chats: boolean; team_channels: boolean }
 export interface AccountDeviceSession {
@@ -145,6 +147,7 @@ async function downloadWorkspaceFile(row:WorkspaceFile): Promise<void> {
 }
 
 export const api = {
+  workspacePresence: (id:string) => post<{workspace_id:string;members:Presence[]}>(`organizations/${id}/presence/`,{}),
   chatAttachments: (chatId:string) => request<PrivateAttachment[]>(`chats/${chatId}/attachments/`),
   channelAttachments: (channelId:string) => request<PrivateAttachment[]>(`channels/${channelId}/attachments/`),
   uploadChatAttachment: (chatId:string,file:File) => uploadPrivateFile(`chats/${chatId}/attachments/`,file),
