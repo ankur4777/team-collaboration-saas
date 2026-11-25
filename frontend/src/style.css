@@ -370,3 +370,5 @@ body,.page-loader{background:#fff;color:var(--shabdd-ink)}
 
 /* Reply previews display only messages already authorized in current history. */
 .message-reply-preview{display:flex;align-items:flex-start;gap:10px;border-left:3px solid #e64b50;background:#fdf1f2;border-radius:5px;padding:8px 10px;margin:5px 0;color:#58383b;font-size:12px;min-width:0;max-width:100%}.message-reply-text{display:flex;flex-direction:column;min-width:0;flex:1;gap:3px}.message-reply-text span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.message-reply-preview button{border:0;background:transparent;cursor:pointer;color:inherit;font-size:20px;line-height:1}.chat-reply-compose{padding:0 12px;min-width:0}.message-compose>.message-reply-preview{width:100%;box-sizing:border-box}
+
+.forwarded-label{font-size:11px;color:#8b5155;font-style:italic;margin:3px 0}.forward-text{border-left:3px solid #e64b50;background:#fdf1f2;padding:10px;max-height:150px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}

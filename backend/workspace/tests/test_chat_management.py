@@ -193,3 +193,37 @@ class ChatManagementTests(TestCase):
         self.login('owner@company-a.test')
         self.assertEqual(self.write('DELETE',url+original['id']+'/').status_code,204)
         self.assertEqual(self.write('POST',url,{'body':'Wrong','reply_to_id':original['id']}).status_code,400)
+
+    def test_forward_text_between_accessible_conversations(self):
+        org = self.register()
+        a = self.user(org, 'alice@company-a.test')
+        b = self.user(org, 'bob@company-a.test')
+        chat = self.write('POST', '/api/chats/', {'kind':'direct','email':a.email}).json()
+        dest = self.write('POST', '/api/chats/', {'kind':'direct','email':b.email}).json()
+        original = self.write('POST', f"/api/chats/{chat['id']}/messages/", {'body':'Forward this'}).json()
+        url = '/api/messages/forward/'
+        payload = {'source_kind':'chat','source_id':chat['id'],'message_id':original['id'],
+                   'destination_kind':'chat','destination_id':dest['id']}
+        result = self.write('POST', url, payload)
+        self.assertEqual(result.status_code, 201, result.content)
+        self.assertEqual(result.json()['message']['body'], 'Forward this')
+        self.assertTrue(result.json()['message']['is_forwarded'])
+        self.assertIsNone(result.json()['message']['reply_to_id'])
+        self.assertNotEqual(result.json()['message']['id'], original['id'])
+        self.login(a.email)
+        self.assertEqual(self.write('POST', url, payload).status_code, 404)
+        self.login('owner@company-a.test')
+        team = self.write('POST','/api/teams/',{'name':'Forward team'}).json()
+        channel = self.client.get(f"/api/teams/{team['id']}/channels/").json()[0]
+        to_channel = {**payload,'destination_kind':'channel','destination_id':channel['id']}
+        forwarded = self.write('POST',url,to_channel)
+        self.assertEqual(forwarded.status_code,201,forwarded.content)
+        self.assertTrue(forwarded.json()['message']['is_forwarded'])
+        reverse = {**payload,'source_kind':'channel','source_id':channel['id'],'message_id':forwarded.json()['message']['id']}
+        self.assertEqual(self.write('POST',url,reverse).status_code,201)
+        self.assertEqual(self.write('DELETE',f"/api/chats/{chat['id']}/messages/{original['id']}/").status_code,204)
+        self.assertEqual(self.write('POST',url,payload).status_code,404)
+        self.write('POST','/api/auth/logout/')
+        self.register('other@company-b.test','Company B')
+        self.assertEqual(self.client.get('/api/messages/forward/destinations/').json(),[])
+        self.assertEqual(self.write('POST',url,payload).status_code,404)

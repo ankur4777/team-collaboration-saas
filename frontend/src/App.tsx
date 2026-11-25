@@ -7,6 +7,7 @@ import ChatPanel from './ChatPanel';
 import MeetingsPanel, {ChannelMeetingCards} from './MeetingsPanel';
 import ChannelMessageItem from './ChannelMessageItem';
 import ReplyPreview from './ReplyPreview';
+import ForwardMessageDialog from './ForwardMessageDialog';
 import AttachmentPanel from './AttachmentPanel';
 import MentionInput from './MentionInput';
 import EmailPanel from './EmailPanel';
@@ -118,6 +119,8 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   const [teamMemberEmail,setTeamMemberEmail] = useState('');
   const [inviteResult,setInviteResult] = useState('');
   const [memberBusyId,setMemberBusyId] = useState<string|null>(null);
+  const [forwardId,setForwardId]=useState<string|null>(null);
+  const forwardTarget=messages.find(row=>row.id===forwardId);
   const [replyTo,setReplyTo] = useState<{channelId:string;messageId:string}|null>(null);
   const replyTarget=replyTo?.channelId===selectedChannel?messages.find(row=>row.id===replyTo.messageId&&!row.deleted_at):undefined;
   const [draft,setDraft] = useState(''); const [pending,setPending] = useState(false);
@@ -264,7 +267,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   }
   async function changeMemberRole(member:Member, role:'admin'|'member') {if(!activeOrg || member.role===role)return;setError('');setMemberBusyId(member.id);try {await api.updateMemberRole(activeOrg.id,member.id,role);setMembers(await api.members(activeOrg.id));}catch(e){setError(errorText(e));}finally{setMemberBusyId(null);}}
   async function removeEmployee(member:Member) {if(!activeOrg)return;if(!window.confirm(`Remove ${member.user.full_name} from ${activeOrg.name}? They will lose access to its teams and channels.`))return;setError('');setMemberBusyId(member.id);try{await api.removeMember(activeOrg.id,member.id);setMembers(await api.members(activeOrg.id));}catch(e){setError(errorText(e));}finally{setMemberBusyId(null);}}
-  useEffect(()=>{setReplyTo(null);},[selectedChannel,session.active_organization_id]);
+  useEffect(()=>{setReplyTo(null);setForwardId(null);},[selectedChannel,session.active_organization_id,view]);
   async function send(e:FormEvent){e.preventDefault();if(!selectedChannel||!draft.trim())return;
     const channelId=selectedChannel,orgId=session.active_organization_id,body=draft,original=replyTarget?.id;
     setDraft('');setReplyTo(null);
@@ -345,7 +348,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
             <button className="channel-load-older" type="button" disabled={channelLoadingOlder}
               aria-label="Load older channel messages"
               onClick={()=>void loadOlderChannelMessages()}>{channelLoadingOlder?'Loading older messages…':'Load older messages'}</button>}
-            {messages.map((message,index)=><ChannelMessageItem key={message.id} channelId={selectedChannel!} message={message} replyTarget={messages.find(row=>row.id===message.reply_to_id)} onReply={()=>setReplyTo({channelId:selectedChannel!,messageId:message.id})} isMine={message.sender.id===session.user.id} samePerson={messages[index-1]?.sender.id===message.sender.id} onUpdated={updated=>setMessages(current=>current.map(row=>row.id===updated.id?updated:row))}/>)}</div></div>
+            {messages.map((message,index)=><ChannelMessageItem key={message.id} channelId={selectedChannel!} message={message} onForward={()=>setForwardId(message.id)} replyTarget={messages.find(row=>row.id===message.reply_to_id)} onReply={()=>setReplyTo({channelId:selectedChannel!,messageId:message.id})} isMine={message.sender.id===session.user.id} samePerson={messages[index-1]?.sender.id===message.sender.id} onUpdated={updated=>setMessages(current=>current.map(row=>row.id===updated.id?updated:row))}/>)}</div></div>
           <ChannelMeetingCards key={'meetings-'+selectedChannel} channelId={selectedChannel!} onOpen={id=>{setOpenMeetingRequest({id,nonce:Date.now()});setView('meetings');setSidebarOpen(false);}}/>
           <div className="channel-meeting-shortcut"><button className="text-link" onClick={()=>{setView('meetings');setSidebarOpen(false);}}><Video size={15}/>Open workspace meetings</button></div>
           <AttachmentPanel key={selectedChannel!} kind="channel" parentId={selectedChannel!}/>
@@ -362,6 +365,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
         onOpenChannel={(teamId,channelId)=>{setSelectedTeam(teamId);setSelectedChannel(channelId);setView('teams');setSidebarOpen(false);}}/>
    : <div className="future-page"><div className="future-icon">{view==='inbox'?<Inbox size={32}/>:view==='meetings'?<Video size={32}/>:view==='calendar'?<CalendarDays size={32}/>:view==='files'?<FolderOpen size={32}/>:<Settings2 size={32}/>}</div><div className="eyebrow">COMING IN A FUTURE PHASE</div><h1>{navItems.find(n=>n.id===view)?.label||'Workspace settings'}</h1><p>{view==='inbox'?'Connect Gmail and Outlook accounts, read inbox threads and send, reply or forward emails from your own mailbox.':view==='meetings'?'Schedule secure team meetings with audio, video and screen sharing.':'This module is planned after the authentication and real-time team chat foundation.'}</p><button className="outline-button" onClick={()=>setView('teams')}><ArrowLeft size={16}/>Back to Teams</button></div>}
   </main>
+  {view==='teams'&&selectedChannel&&forwardTarget&&<ForwardMessageDialog key={selectedChannel+forwardTarget.id} kind="channel" sourceId={selectedChannel} message={forwardTarget} onClose={()=>setForwardId(null)} onSent={result=>{if(result.kind==='channel'&&result.destination_id===selectedChannel)setMessages(old=>old.some(row=>row.id===result.message.id)?old:[...old,result.message]);}}/>}
   {modal&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setModal(null);}}><div className="modal" role="dialog" aria-modal="true"><div className="modal-head"><div><div className="eyebrow">TEAMWORKSPACE</div><h2>{modal==='team'?'Create a team':modal==='channel'?'Create a channel':modal==='invite'?'Invite an employee':'Workspace members'}</h2></div><button className="icon-button" onClick={()=>setModal(null)} aria-label="Close"><X size={21}/></button></div>
     {error&&<ErrorBanner message={error}/>}
     {modal==='team'&&<form onSubmit={createTeam} className="modal-body"><p className="muted">Teams bring people, channels and conversations together.</p><label>Team name<input autoFocus required maxLength={120} value={newTeam} onChange={e=>setNewTeam(e.target.value)} placeholder="e.g. Product & Design"/></label><div className="modal-actions"><button type="button" className="outline-button" onClick={()=>setModal(null)}>Cancel</button><button className="primary-button" disabled={pending||!newTeam.trim()}>Create team <ArrowRight size={16}/></button></div></form>}

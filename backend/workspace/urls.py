@@ -4,6 +4,7 @@ from . import meeting_calls
 from . import meetings
 from . import private_attachments
 from . import shared_files
+from . import message_forwarding
 from . import auth_views, views, member_views, chat_views, channel_notifications, account_recovery, settings_views, session_views, message_search, mentions
 
 urlpatterns = [
@@ -42,6 +43,8 @@ urlpatterns = [
     path('organizations/<uuid:pk>/invitations/', views.OrganizationInvitationsView.as_view()),
     path('invitations/<str:token>/', auth_views.invitation_preview),
     path('invitations/<str:token>/accept/', auth_views.invitation_accept),
+    path('messages/forward/', message_forwarding.ForwardMessageView.as_view()),
+    path('messages/forward/destinations/', message_forwarding.ForwardDestinationsView.as_view()),
     path('chats/', chat_views.ChatsView.as_view()),
     path('chats/<uuid:chat_id>/', chat_views.ChatGroupDetailView.as_view()),
     path('chats/<uuid:chat_id>/messages/', chat_views.ChatMessagesView.as_view()),

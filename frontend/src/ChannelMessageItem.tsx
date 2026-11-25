@@ -10,6 +10,7 @@ interface Props {
   onUpdated: (message: Message) => void;
   replyTarget?: Message;
   onReply?: () => void;
+  onForward?: () => void;
 }
 
 function initials(name: string) {
@@ -17,7 +18,7 @@ function initials(name: string) {
     .map(value => value[0].toUpperCase()).join('') || '?';
 }
 
-export default function ChannelMessageItem({channelId,message,isMine,samePerson,onUpdated,replyTarget,onReply}:Props) {
+export default function ChannelMessageItem({channelId,message,isMine,samePerson,onUpdated,replyTarget,onReply,onForward}:Props) {
   const [editing,setEditing] = useState(false);
   const [draft,setDraft] = useState(message.body);
   const [busy,setBusy] = useState(false);
@@ -50,6 +51,7 @@ export default function ChannelMessageItem({channelId,message,isMine,samePerson,
     {!samePerson?<div className="msg-avatar">{initials(message.sender.full_name)}</div>:<div className="msg-avatar-placeholder"/>}
     <div className="msg-content">
       {!samePerson&&<div className="msg-meta"><strong>{message.sender.full_name}</strong><span>{new Date(message.created_at).toLocaleString([], {hour:'2-digit',minute:'2-digit'})}</span></div>}
+      {!message.deleted_at&&message.is_forwarded&&<div className="forwarded-label">Forwarded</div>}
       {!message.deleted_at&&message.reply_to_id&&<ReplyPreview message={replyTarget}/>}
       {editing && !message.deleted_at
         ? <form className="channel-message-edit" onSubmit={event=>void save(event)}>
@@ -62,6 +64,7 @@ export default function ChannelMessageItem({channelId,message,isMine,samePerson,
           {!message.deleted_at&&message.edited_at&&<small className="channel-edited-note"> (edited)</small>}
         </div>}
       {!message.deleted_at && !editing && onReply&&<div className="channel-message-actions"><button type="button" onClick={onReply}>Reply</button></div>}
+      {!message.deleted_at&&!editing&&onForward&&<div className="channel-message-actions"><button type="button" onClick={onForward}>Forward</button></div>}
       {isMine && !message.deleted_at && !editing &&
         <div className="channel-message-actions">
           <button type="button" disabled={busy} onClick={()=>{setDraft(message.body);setError('');setEditing(true);}}>Edit</button>

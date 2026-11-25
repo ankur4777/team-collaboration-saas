@@ -5,6 +5,7 @@ import ChatReactionBar from './ChatReactionBar';
 import AttachmentPanel from './AttachmentPanel';
 import MentionInput from './MentionInput';
 import ReplyPreview from './ReplyPreview';
+import ForwardMessageDialog from './ForwardMessageDialog';
 
 function titleFor(chat: ChatThread, userId: string) {
   if (chat.kind === 'group') return chat.title;
@@ -34,6 +35,8 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
   const scopeRef = useRef({selected,workspaceId});
   scopeRef.current = {selected,workspaceId};
   const [draft, setDraft] = useState('');
+  const [forwardId,setForwardId]=useState<string|null>(null);
+  const forwardTarget=messages.find(row=>row.id===forwardId);
   const [replyTo,setReplyTo] = useState<{chatId:string;messageId:string}|null>(null);
   const replyTarget=replyTo?.chatId===selected?messages.find(row=>row.id===replyTo.messageId&&!row.deleted_at):undefined;
   const [mode, setMode] = useState<'direct'|'group'|null>(null);
@@ -97,7 +100,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
   },[currentUser.id]);
 
   useEffect(() => {
-    setReplyTo(null);
+    setReplyTo(null);setForwardId(null);
     historyRequestRef.current++;
     setHistoryCursor(null);
     setLoadingOlder(false);
@@ -371,6 +374,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
   }
 
   return <section className="private-chat-page">
+    {selected&&forwardTarget&&<ForwardMessageDialog key={selected+forwardTarget.id} kind="chat" sourceId={selected} message={forwardTarget} onClose={()=>setForwardId(null)} onSent={result=>{if(result.kind==='chat'&&result.destination_id===selected&&'reactions' in result.message){const sent=result.message;setMessages(old=>old.some(row=>row.id===sent.id)?old:[...old,sent].sort(messageOrder));}void loadThreads();}}/>}
     <div className="private-chat-heading">
       <div><div className="eyebrow">YOUR WORKSPACE / MESSAGES</div><h1>Chats</h1><p>Private conversations with teammates in this company.</p></div>
       <button className="primary-button" type="button" onClick={() => setMode('direct')}><Plus size={17}/> New chat</button>
@@ -402,6 +406,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
             {messages.length === 0 && <div className="private-chat-welcome"><MessageCircle size={30}/><h3>Start the conversation</h3><p>Only participants in this workspace can read these messages.</p></div>}
             {messages.map(message => <div key={message.id} className={`private-message ${message.sender.id===currentUser.id ? 'mine' : ''}`}>
               <div className="private-message-meta"><strong>{message.sender.full_name}</strong><time>{timeFor(message.created_at)}</time></div>
+              {!message.deleted_at&&message.is_forwarded&&<div className="forwarded-label">Forwarded</div>}
               {!message.deleted_at&&message.reply_to_id&&<ReplyPreview message={messages.find(row=>row.id===message.reply_to_id)}/>}
               {editingId===message.id ? <form className="message-edit-form" onSubmit={e => void editMessage(e,message.id)}>
                 <input autoFocus aria-label="Edit message" maxLength={4000} value={editDraft} onChange={e => setEditDraft(e.target.value)}/>
@@ -414,7 +419,7 @@ export default function ChatPanel({workspaceId, currentUser, members, requestedC
               }</div>}
               <ChatReactionBar chatId={selected!} message={message} currentUserId={currentUser.id}
                 onUpdated={updated=>setMessages(current=>current.map(item=>item.id===updated.id?updated:item))}/>
-              {!message.deleted_at&&editingId!==message.id&&<div className="private-message-actions"><button type="button" disabled={working} onClick={()=>setReplyTo({chatId:selected!,messageId:message.id})}>Reply</button></div>}
+              {!message.deleted_at&&editingId!==message.id&&<div className="private-message-actions"><button type="button" disabled={working} onClick={()=>setReplyTo({chatId:selected!,messageId:message.id})} >Reply</button><button type="button" disabled={working} onClick={()=>setForwardId(message.id)}>Forward</button></div>}
               {message.sender.id===currentUser.id && !message.deleted_at && editingId!==message.id && <div className="private-message-actions"><button type="button" disabled={working} onClick={() => {setEditingId(message.id);setEditDraft(message.body);}}>Edit</button><button type="button" disabled={working} onClick={() => void deleteMessage(message)}>Delete</button></div>}
             </div>)}
             <div ref={bottomRef}/>
