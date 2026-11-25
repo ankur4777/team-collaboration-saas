@@ -16,6 +16,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .auth_views import auth_payload
+from .seat_limits import seat_available, SEAT_LIMIT_MESSAGE
 from .models import Channel, ChannelReadCursor, PrivateChannelMember, Invitation, MentionNotification, Message, Organization, OrganizationMember, Team, TeamMember, User
 from .permissions import get_active_membership, require_channel_access, require_team_access, channel_access_filter, channel_joined_at, channel_team_members
 from .notification_events import publish_notification_refresh
@@ -65,11 +66,23 @@ class OrganizationInvitationsView(APIView):
             raise PermissionDenied('Only the workspace owner can invite administrators')
         if OrganizationMember.objects.filter(organization_id=pk, user__email__iexact=email).exists():
             raise ValidationError({'email': 'This person is already a member'})
-        token = Invitation.generate_token()
-        inv = Invitation.objects.create(
-            organization_id=pk, email=email, role=role,
-            token_hash=hashlib.sha256(token.encode()).hexdigest(), invited_by=request.user,
-        )
+        with transaction.atomic():
+            Organization.objects.select_for_update().get(pk=pk)
+            # Reauthorize after the company lock, before issuing an invitation.
+            membership = get_active_membership(request)
+            if membership.organization_id != pk or membership.role not in (OrganizationMember.Role.OWNER, OrganizationMember.Role.ADMIN):
+                raise PermissionDenied('Administrator access required')
+            if role == OrganizationMember.Role.ADMIN and membership.role != OrganizationMember.Role.OWNER:
+                raise PermissionDenied('Only the workspace owner can invite administrators')
+            if OrganizationMember.objects.filter(organization_id=pk, user__email__iexact=email).exists():
+                raise ValidationError({'email': 'This person is already a member'})
+            if not seat_available(pk):
+                return Response({'detail': SEAT_LIMIT_MESSAGE}, status=status.HTTP_409_CONFLICT)
+            token = Invitation.generate_token()
+            inv = Invitation.objects.create(
+                organization_id=pk, email=email, role=role,
+                token_hash=hashlib.sha256(token.encode()).hexdigest(), invited_by=request.user,
+            )
         invite_url = f'{settings.FRONTEND_ORIGIN}/invite?token={quote(token)}'
         send_mail(
             subject=f'Invitation to join {membership.organization.name}',

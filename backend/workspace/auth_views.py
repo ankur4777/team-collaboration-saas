@@ -17,6 +17,7 @@ from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
 from .models import Invitation, Organization, OrganizationMember, User
 from .ratelimit import login_throttled, record_login_failure
+from .seat_limits import seat_available, seat_usage, SEAT_LIMIT_MESSAGE
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,8 @@ def auth_payload(request):
                  'is_platform_admin': bool(request.user.is_active and request.user.is_staff and request.user.is_superuser)},
         'organizations': [{'id': str(m.organization_id), 'name': m.organization.name,
                            'slug': m.organization.slug, 'role': m.role,
-                           'subscription': access_summary(getattr(m.organization, 'license', None))} for m in memberships],
+                           'subscription': {**access_summary(getattr(m.organization, 'license', None)),
+                                            **seat_usage(m.organization_id, getattr(m.organization, 'license', None))}} for m in memberships],
         'active_organization_id': request.session.get('active_organization_id'),
     }
 
@@ -155,13 +157,19 @@ def invitation_accept(request, token):
             invite = find_invitation(token)
             if not invite:
                 return bad('Invitation is invalid', 404)
+            # Match the provider and invitation-creation lock order.
+            Organization.objects.select_for_update().get(pk=invite.organization_id)
             invite = Invitation.objects.select_for_update().get(pk=invite.pk)
             if not invite.is_valid:
                 return bad('Invitation has expired or been used', 410)
+            if request.user.is_authenticated and request.user.email.lower() != invite.email.lower():
+                return bad('Sign in with the invited email account', 403)
+            already_member = request.user.is_authenticated and OrganizationMember.objects.filter(
+                organization_id=invite.organization_id, user=request.user).exists()
+            if not already_member and not seat_available(invite.organization_id):
+                return bad(SEAT_LIMIT_MESSAGE, 409)
             if request.user.is_authenticated:
                 user = request.user
-                if user.email.lower() != invite.email.lower():
-                    return bad('Sign in with the invited email account', 403)
             else:
                 if User.objects.filter(email__iexact=invite.email).exists():
                     return bad('This email has an account. Sign in first, then accept the invitation.', 409)

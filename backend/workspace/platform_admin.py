@@ -18,6 +18,7 @@ from rest_framework.views import APIView
 from .models import CompanyLicense, Invitation, Organization, OrganizationMember, PlatformAuditEntry
 
 from .license_access import effective_status, MODULES
+from .seat_limits import seat_available, seat_usage, SEAT_LIMIT_MESSAGE
 
 logger = logging.getLogger(__name__)
 PAGE_SIZE = 25
@@ -90,6 +91,7 @@ def company_data(org):
         'team_count': org.team_count, 'owner_emails': owners,
         'pending_owner_email': pending.email if pending else None,
         'effective_status': effective, **data,
+        'seats_remaining': None if license_row.seat_limit is None else max(0, license_row.seat_limit-org.employee_count),
     }
 
 
@@ -98,6 +100,8 @@ def audit(org, actor, action, changes):
 
 
 def invite_owner(org, actor, email):
+    if not seat_available(org.pk):
+        raise ValidationError({'owner_email': SEAT_LIMIT_MESSAGE})
     # Lock prior pending invites so a resend cannot race an acceptance.
     prior = list(Invitation.objects.select_for_update().filter(organization=org, role=OrganizationMember.Role.OWNER, accepted_at__isnull=True).order_by('pk'))
     if org.members.filter(role=OrganizationMember.Role.OWNER).exists():
@@ -195,6 +199,11 @@ class CompanyDetailView(PlatformView):
         serializer = LicenseInput(row,data=request.data,partial=True)
         serializer.is_valid(raise_exception=True)
         old = license_data(row)
+        new_limit = serializer.validated_data.get('seat_limit', row.seat_limit)
+        if new_limit is not None and new_limit != row.seat_limit:
+            used = seat_usage(org.pk, locked=True)['seats_used']
+            if new_limit < used:
+                raise ValidationError({'seat_limit': f'Cannot allocate fewer than {used} existing memberships. Remove members first.'})
         for key,value in serializer.validated_data.items():
             setattr(row,key,value)
         row.save()

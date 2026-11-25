@@ -6,7 +6,7 @@ export interface AccountDeviceSession {
   id:string; user_agent:string; ip_address:string|null;
   created_at:string; last_seen_at:string; current:boolean;
 }
-export interface SubscriptionAccess {status:string;allowed:boolean;plan:string;starts_on:string|null;ends_on:string|null;modules?:string[];enforce_modules?:boolean}
+export interface SubscriptionAccess {status:string;allowed:boolean;plan:string;starts_on:string|null;ends_on:string|null;modules?:string[];enforce_modules?:boolean;seat_limit?:number|null;seats_used?:number;seats_remaining?:number|null}
 export interface Org { subscription?:SubscriptionAccess; id: string; name: string; slug: string; role: 'owner' | 'admin' | 'member' }
 export interface Session { user: Person; organizations: Org[]; active_organization_id: string | null }
 export interface Team { id: string; name: string; description: string; created_at: string; archived_at?: string|null }
@@ -152,7 +152,7 @@ async function downloadWorkspaceFile(row:WorkspaceFile): Promise<void> {
 
 export type LicenseStatus='unassigned'|'trial'|'active'|'suspended'|'cancelled';
 export interface CompanyLicense {contact_email:string;plan:string;status:LicenseStatus;seat_limit:number|null;starts_on:string|null;ends_on:string|null;modules:string[];enforce_modules?:boolean}
-export interface PlatformCompany extends CompanyLicense {id:string;name:string;slug:string;created_at:string;employee_count:number;team_count:number;owner_emails:string[];pending_owner_email:string|null;effective_status:string}
+export interface PlatformCompany extends CompanyLicense {id:string;name:string;slug:string;created_at:string;employee_count:number;seats_remaining?:number|null;team_count:number;owner_emails:string[];pending_owner_email:string|null;effective_status:string}
 export interface PlatformCompanies {items:PlatformCompany[];total:number;page:number;page_size:number;stats:{companies:number;active:number;trial:number;expired:number;suspended:number;memberships:number}}
 export interface PlatformAudit {action:string;actor:string;created_at:string;changes:Record<string,unknown>}
 export const api = {

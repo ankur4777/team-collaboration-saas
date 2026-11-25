@@ -10,7 +10,7 @@ from rest_framework.exceptions import NotFound, PermissionDenied, ValidationErro
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import OrganizationMember, TeamMember, ChatConversation, ChatParticipant
+from .models import Organization, OrganizationMember, TeamMember, ChatConversation, ChatParticipant
 from .permissions import get_active_membership
 from .chat_views import publish_chat_participants
 from .notification_events import publish_notification_refresh
@@ -60,6 +60,8 @@ class OrganizationMemberDetailView(APIView):
 
     def delete(self, request, pk, member_id):
         with transaction.atomic():
+            self._authorize(request, pk, member_id)
+            Organization.objects.select_for_update().get(pk=pk)
             target = self._authorize(request, pk, member_id)
             target = (OrganizationMember.objects.select_for_update()
                       .get(pk=target.pk))
