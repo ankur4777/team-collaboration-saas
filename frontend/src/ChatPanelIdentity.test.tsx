@@ -2,7 +2,7 @@ import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {cleanup,render,screen,waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ChatPanel from './ChatPanel';
-import {api,type ChatThread,type Person} from './api';
+import {api,type ChatThread,type Person,type Member} from './api';
 
 vi.mock('./api',async importOriginal=>{
   const actual=await importOriginal<typeof import('./api')>();
@@ -49,5 +49,33 @@ describe('Chat conversation panel identity',()=>{
     check();
     await user.click(screen.getByRole('button',{name:'Return to latest messages'}));
     check();
+  });
+});
+
+describe('Group member selection',()=>{
+  it('selects teammates by clicking their rows and keeps create disabled until two are selected',async()=>{
+    const user=userEvent.setup();
+    const members:Member[]=[person('one','First colleague'),person('two','Second colleague')].map(p=>({id:p.id,user:p,role:'member',joined_at:now}));
+    render(<ChatPanel workspaceId="org" currentUser={me} members={members}/>);
+    await user.click(screen.getByRole('button',{name:'Create group chat'}));
+    const dialog=screen.getByRole('dialog');
+    const groupName=dialog.querySelector<HTMLInputElement>('input[placeholder="e.g. Design discussion"]');
+    expect(groupName).toBeTruthy();
+    await user.type(groupName!,'Project group');
+    const first=screen.getByRole('checkbox',{name:'First colleague (one@example.test)'}) as HTMLInputElement;
+    const second=screen.getByRole('checkbox',{name:'Second colleague (two@example.test)'}) as HTMLInputElement;
+    const create=Array.from(dialog.querySelectorAll('button')).find(button=>button.textContent?.trim()==='Create');
+    expect(create).toBeTruthy();
+    expect(create!.disabled).toBe(true);
+    await user.click(first.closest('label')!);
+    expect(first.checked).toBe(true);
+    expect(first.closest('label')?.classList.contains('selected')).toBe(true);
+    expect(create!.disabled).toBe(true);
+    await user.click(second.closest('label')!);
+    expect(second.checked).toBe(true);
+    expect(create!.disabled).toBe(false);
+    await user.click(first);
+    expect(first.checked).toBe(false);
+    expect(create!.disabled).toBe(true);
   });
 });
