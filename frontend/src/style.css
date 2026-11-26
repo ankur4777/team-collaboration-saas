@@ -520,13 +520,10 @@ h1,h2,h3,h4,.brand{font-family:"Inter Variable", Inter, sans-serif}
 .pinned-messages-compact h4{font-size:13px;margin:0 0 8px}
 @media(max-width:560px){.channel-heading-title{flex-basis:calc(100% - 42px)}.channel-header-actions{margin-left:0;width:100%;justify-content:flex-end}.conversation-icon-button{width:32px;height:32px}}
 
-/* Message actions stay out of the conversation flow. */
-.message,.private-message{position:relative}
-.message .msg-content{flex:1;padding-right:34px}
-.message-action-anchor{position:absolute;top:-3px;right:0;z-index:2}
-.private-message .message-action-anchor{right:-30px;top:0}
-.private-message.mine .message-action-anchor{right:auto;left:-30px}
-.message-action-trigger{display:grid;place-items:center;width:28px;height:28px;padding:0;border:1px solid #efccd2;background:#fff;color:#526575;border-radius:7px;cursor:pointer;opacity:0;transition:opacity .12s,background .12s}
+/* Keep the compact menu directly underneath each message, not at the panel edge. */
+.message-action-anchor{display:flex;align-items:center;width:max-content;max-width:100%;margin-top:2px}
+.private-message.mine .message-action-anchor{margin-left:auto}
+.message-action-trigger{display:grid;place-items:center;width:26px;height:22px;padding:0;border:1px solid transparent;background:transparent;color:#526575;border-radius:6px;cursor:pointer;opacity:.65;transition:opacity .12s,background .12s}
 .message:hover .message-action-trigger,.private-message:hover .message-action-trigger,.message:focus-within .message-action-trigger,.private-message:focus-within .message-action-trigger,.message-action-trigger[aria-expanded=true]{opacity:1}
 .message-action-trigger:hover,.message-action-trigger[aria-expanded=true]{background:#fff0f2;color:#e60019}
 .message-action-trigger:disabled{cursor:not-allowed;opacity:.4}
@@ -535,4 +532,3 @@ h1,h2,h3,h4,.brand{font-family:"Inter Variable", Inter, sans-serif}
 .message-action-popover button:hover,.message-action-popover button:focus-visible{background:#fff0f2;color:#e60019}
 .message-action-popover button.danger{color:#c60016}
 @media(hover:none),(pointer:coarse){.message-action-trigger{opacity:1}}
-@media(max-width:560px){.private-chat-history{padding-left:34px;padding-right:34px}}

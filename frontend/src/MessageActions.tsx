@@ -51,7 +51,7 @@ export default function MessageActions({busy=false,pinned=false,onReply,onForwar
     if(!rect)return;
     const height=actions.length*34+12;
     const top=rect.bottom+height+8<=window.innerHeight?rect.bottom+4:Math.max(8,rect.top-height-4);
-    setPosition({top,left:Math.max(8,Math.min(rect.right-156,window.innerWidth-164))});
+    setPosition({top,left:Math.max(8,Math.min(rect.left,window.innerWidth-164))});
   }
   return <div className="message-action-anchor">
     <button ref={trigger} type="button" className="message-action-trigger" title="Message options" aria-label="Message options" aria-expanded={open} disabled={busy} onClick={toggle}><Ellipsis size={18}/></button>
