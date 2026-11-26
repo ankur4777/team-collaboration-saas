@@ -393,3 +393,66 @@ body,.page-loader{background:#fff;color:var(--shabdd-ink)}
 .pa-global-brand>.brand{font-size:16px}
 .pa-global-brand>.brand .brand-mark{width:33px;height:33px}
 .page-loader>.brand .brand-accent{color:#ff101c}
+
+
+/* TeamWorkspace plum, white and red visual system. */
+:root{--tw-plum:#2a1124;--tw-plum-raised:#40243a;--tw-red:#f10018;--tw-red-hover:#cc0015;--tw-pink:#fce1e6;--tw-ink:#111b2c;--tw-muted:#687588;--tw-line:#ead5dc;--tw-surface:#fff;--tw-soft:#fff7f8;color:var(--tw-ink);background:#fff}
+body,button,input,textarea,select{font-family:'DM Sans',Inter,system-ui,sans-serif}
+h1,h2,h3,h4,.brand{font-family:Manrope,Inter,system-ui,sans-serif}
+.brand,.sidebar .brand{color:var(--tw-ink)}
+.brand .brand-accent,.sidebar .brand-accent{color:var(--tw-red)}
+.brand .brand-mark,.sidebar .brand-mark,.auth-aside .brand-mark{background:var(--tw-red);color:#fff;box-shadow:0 8px 22px #f100182b}
+.auth-layout{background:#fff}
+.auth-aside{background:var(--tw-plum);color:#fff}
+.auth-aside .brand{background:transparent;padding:0;border-radius:0;color:#fff}
+.auth-aside .brand .brand-accent{color:#fff}
+.auth-aside .eyebrow.light{color:#fff}
+.auth-aside .little-star{color:#ff4b5c}
+.auth-aside .aside-copy h1{color:#fff}
+.auth-aside .aside-copy h1 em{color:#ffd5dc}
+.auth-aside .aside-copy>p{color:#fff}
+.auth-aside .testimonial{background:#ffffff0c;border-color:#ffffff35;color:#fff}
+.auth-aside .testimonial-icon{color:#ffaab9}
+.auth-aside .testimonial>span:last-child,.auth-aside .aside-foot{color:#f6e7ee}
+.auth-main{background:#fff}
+.auth-card h2,.invite-card h2,.recovery-card h1{color:var(--tw-ink)}
+.auth-card label,.invite-card label,.modal label{color:var(--tw-ink)}
+.auth-card input,.invite-card input,.modal input,.modal select,.recovery-form input{border-color:var(--tw-line);color:var(--tw-ink);background:#fff}
+.auth-card input:focus,.invite-card input:focus,.modal input:focus,.modal select:focus,.recovery-form input:focus{border-color:var(--tw-red);box-shadow:0 0 0 3px #f100181a}
+.mini-mark,.recovery-icon{background:var(--tw-pink);color:var(--tw-red)}
+.eyebrow,.text-link{color:var(--tw-red)}
+.primary-button,.send-button{background:var(--tw-red);color:#fff;box-shadow:0 8px 22px #f100182d}
+.primary-button:hover,.send-button:hover{background:var(--tw-red-hover)}
+.outline-button{background:#fff;border-color:var(--tw-line);color:var(--tw-ink)}
+.outline-button:hover{background:var(--tw-soft);border-color:#f3aeb9}
+:where(button,input,select,textarea):focus-visible{outline-color:#e46575}
+.app-layout{background:#fff}
+.sidebar,.app-layout .sidebar-bottom,.top-bar,.main-panel{background:#fff;border-color:#f0e7ea}
+.nav-item{color:#5c6371}
+.nav-item:hover,.nav-item.active{background:#fff0f2;color:var(--tw-red)}
+.nav-item.active{box-shadow:inset 3px 0 0 var(--tw-red)}
+.org-picker,.settings-card,.message-search-form,.message-search-result,.modal,.invite-card,.recovery-card{background:#fff;border-color:#f0e4e8;box-shadow:0 8px 24px #2a112409}
+.org-icon,.future-icon,.empty-state .empty-icon{background:var(--tw-pink);color:var(--tw-red)}
+.workspace-heading h1,.settings-title h1,.message-search-intro h1,.future-page h1{color:var(--tw-ink)}
+.settings-page,.message-search-page,.shared-files-page,.meetings-shell{background:#fffafb;color:var(--tw-ink)}
+.message-search-empty,.shared-files-empty,.shared-file-row,.meeting-card{background:#fff;border-color:#f0e4e8}
+.email-shell{--mail-accent:#f10018;--mail-ink:#111b2c;--mail-muted:#687588;--mail-border:#f0e4e8;background:#fff;color:var(--tw-ink)}
+.email-heading,.email-command-bar,.email-folders,.email-list{background:#fff;border-color:#f0e4e8}
+.email-folders nav button.active,.email-row.selected,.email-row.selected:hover{background:#fff0f2;color:var(--tw-red)}
+.email-list-tabs button[aria-pressed=true]{border-color:var(--tw-red);color:var(--tw-red)}
+.email-reading,.email-reading-illustration,.email-empty-symbol{background:#fff5f7}
+.email-reading-illustration,.email-empty-symbol{color:var(--tw-red)}
+.email-shell .mail-primary,.shared-files-upload{background:var(--tw-red);border-color:var(--tw-red);color:#fff}
+.meetings-controls nav button[aria-pressed='true'],.shared-files-filter button.active{background:#fff0f2;color:var(--tw-red)}
+.meetings-heading,.meetings-controls,.meeting-detail,.workspace-calendar,.wc-brandbar{background:#fff;border-color:#f0e4e8}
+.wc-brandbar,.wc-brandbar h1{color:var(--tw-ink)}
+.wc-brandbar svg{color:var(--tw-red)}
+.call-room{background:#fff9fa;color:var(--tw-ink)}
+.call-room>header{background:#fff;border-color:#f0e4e8}
+.call-brand,.call-eyebrow{color:var(--tw-red)}
+.pa-login,.pa-layout{background:#fff9fa;color:var(--tw-ink)}
+.pa-admin-shell .pa-sidebar{background:var(--tw-plum)}
+.pa-admin-shell .pa-section-nav .pa-nav.selected{background:#f10018;color:#fff}
+.pa-login-card,.pa-global-header{background:#fff}
+.pa-global-header{border-color:#f0e4e8}
+@media(max-width:860px){.auth-aside .brand{padding:0}.auth-main{background:#fff}}
