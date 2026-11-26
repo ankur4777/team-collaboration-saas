@@ -83,9 +83,8 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
       const rows = await api.chats();
       if(run!==listRequest.current||scopeRef.current.workspaceId!==org)return;
       setThreads(rows);
-      setSelected(current => current && rows.some(row => row.id === current) ? current
-        : (requestedChatRef.current && rows.some(row=>row.id===requestedChatRef.current?.id)
-          ? requestedChatRef.current.id : (rows[0]?.id || null)));
+      // Loading or refreshing the list must never open a conversation by itself.
+      setSelected(current => current && rows.some(row => row.id === current) ? current : null);
     } catch (e) { if(run===listRequest.current&&scopeRef.current.workspaceId===org)setError(e instanceof Error ? e.message : 'Could not load chats'); }
   }, []);
 
@@ -506,7 +505,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
           <AttachmentPanel key={'chat-files:'+selected} kind="chat" parentId={selected!}/>
           {replyTarget&&<div className="chat-reply-compose"><ReplyPreview message={replyTarget} onCancel={()=>setReplyTo(null)}/></div>}
           <form className="private-chat-compose" onSubmit={send}><MentionInput key={selected} ariaLabel="Write a message" value={draft} placeholder="Write a message... (@ to mention)" people={active.participants.map(p=>p.user).filter(user=>user.id!==currentUser.id)} onChange={changeDraft} onBlur={()=>emitTyping(false)}/><button className="send-button" aria-label="Send message" disabled={!draft.trim()||working}><Send size={18}/></button></form>
-        </> : <div className="private-chat-welcome"><MessageCircle size={32}/><h3>Connect with your team</h3><p>Choose a conversation or start a new one.</p></div>}
+        </> : <div className="private-chat-welcome"><MessageCircle size={32}/><h3>Select a conversation</h3><p>Choose a chat or group from the list to start messaging.</p></div>}
       </div>
     </div>
     {managingGroup && active?.kind==='group' && active.created_by.id===currentUser.id && <div className="modal-backdrop" onMouseDown={e => {if (e.target===e.currentTarget) setManagingGroup(false);}}>

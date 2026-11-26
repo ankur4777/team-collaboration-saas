@@ -29,6 +29,7 @@ describe('Chat conversation panel identity',()=>{
     const user=userEvent.setup();
     const props={workspaceId:'org',currentUser:me,members:[]};
     const view=render(<ChatPanel {...props}/>);
+    await user.click(await screen.findByRole('button',{name:/First colleague/}));
     await screen.findByRole('heading',{name:'First colleague'});
     const check=()=>{
       expect(screen.getAllByRole('button',{name:/^Pinned messages$/})).toHaveLength(1);
@@ -86,6 +87,7 @@ describe('Conversation draft isolation',()=>{
     const user=userEvent.setup();
     vi.mocked(api.chats).mockResolvedValue([thread('one','First colleague'),{...thread('two','Second colleague'),kind:'group',title:'Project group'}]);
     render(<DraftProvider><ChatPanel workspaceId="org" currentUser={me} members={[]}/></DraftProvider>);
+    await user.click(await screen.findByRole('button',{name:/First colleague/}));
     await screen.findByRole('heading',{name:'First colleague'});
     const composer=()=>screen.getByRole('textbox',{name:'Write a message'}) as HTMLInputElement;
     await user.type(composer(),'Direct draft');
@@ -107,6 +109,7 @@ describe('Unread conversation badges',()=>{
     const group={...thread('three','Third colleague'),kind:'group' as const,title:'Project group'};
     vi.mocked(api.chats).mockResolvedValue([thread('one','First colleague'),thread('two','Second colleague'),group]);
     const view=render(<ChatPanel {...props}/>);
+    await userEvent.setup().click(await screen.findByRole('button',{name:/First colleague/}));
     await screen.findByRole('heading',{name:'First colleague'});
     vi.mocked(api.chats).mockResolvedValue([thread('one','First colleague'),{...thread('two','Second colleague'),unread_count:3},{...group,unread_count:102}]);
     view.rerender(<ChatPanel {...props} notificationVersion={1}/>);
@@ -116,5 +119,30 @@ describe('Unread conversation badges',()=>{
     vi.mocked(api.chats).mockResolvedValue([thread('one','First colleague'),thread('two','Second colleague'),group]);
     view.rerender(<ChatPanel {...props} notificationVersion={2}/>);
     await waitFor(()=>expect(screen.queryByLabelText('3 unread messages')).toBeNull());
+  });
+});
+
+describe('Explicit conversation selection',()=>{
+  it('leaves the conversation panel empty on entry and unread refresh until a user selects a chat',async()=>{
+    const user=userEvent.setup();
+    const props={workspaceId:'org',currentUser:me,members:[]};
+    const group={...thread('group','Colleague'),kind:'group' as const,title:'Corporate',unread_count:3};
+    vi.mocked(api.chats).mockResolvedValue([group,thread('one','First colleague')]);
+    const view=render(<ChatPanel {...props}/>);
+    const button=await screen.findByRole('button',{name:/Corporate/});
+    expect(screen.getByRole('heading',{name:'Select a conversation'})).toBeTruthy();
+    expect(screen.queryByRole('textbox',{name:'Write a message'})).toBeNull();
+    expect(api.chatMessagePage).not.toHaveBeenCalled();
+    view.rerender(<ChatPanel {...props} notificationVersion={1}/>);
+    await waitFor(()=>expect(api.chats).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('heading',{name:'Select a conversation'})).toBeTruthy();
+    expect(screen.getByLabelText('3 unread messages')).toBeTruthy();
+    await user.click(button);
+    await screen.findByRole('heading',{name:'Corporate'});
+    expect(screen.getByRole('textbox',{name:'Write a message'})).toBeTruthy();
+  });
+  it('opens a chat when explicitly requested from a notification or search result',async()=>{
+    render(<ChatPanel workspaceId="org" currentUser={me} members={[]} requestedChat={{id:'two',nonce:1}}/>);
+    await screen.findByRole('heading',{name:'Second colleague'});
   });
 });
