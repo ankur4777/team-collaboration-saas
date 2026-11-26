@@ -613,3 +613,10 @@ h1,h2,h3,h4,.brand{font-family:"Inter Variable", Inter, sans-serif}
 .chat-thread-details{flex:1;min-width:0}
 .chat-unread-badge{background:#e60019;color:#fff;min-width:20px;height:20px;font-size:10px;font-weight:700;flex-shrink:0;font-variant-numeric:tabular-nums}
 .chat-thread.has-unread .chat-thread-details strong{font-weight:800;color:#101c2c}
+
+/* Explicit team selection on entry. */
+.team-selection-list{display:flex;flex-direction:column;align-items:stretch;gap:8px;max-width: min(360px,75vw);max-height:45vh;overflow:auto;padding:3px}
+.team-selection-list .outline-button{display:flex;align-items:center;gap:9px;text-align:left;white-space:normal;overflow-wrap:anywhere}
+.team-selection-list .outline-button svg{flex-shrink:0}
+.team-selection-list .outline-button svg:last-child{margin-left:auto}
+.team-selection-list .text-link{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:5px}
