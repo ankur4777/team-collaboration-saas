@@ -416,7 +416,7 @@ class ChatMessageDetailView(APIView):
 
 class ChatReactionView(APIView):
     """Toggle a supported emoji on a message visible to the active chat member."""
-    ALLOWED_EMOJIS = ('👍', '❤️', '😂', '🎉', '👀')
+    ALLOWED_EMOJIS = ('👍', '✅', '👏', '🙏', '🤝', '🎉', '💡', '👌', '💯', '❤️', '😂', '👀')
 
     def post(self, request, chat_id, message_id):
         chat = accessible_chat(request, chat_id)

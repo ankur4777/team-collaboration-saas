@@ -138,3 +138,17 @@ class ChatReactionTests(TestCase):
         self.assertEqual(ChatReaction.objects.count(),0)
         res=self.post(endpoint,{'emoji':'👍'})
         self.assertEqual(res.status_code,400,res.content)
+
+    def test_workplace_reactions_are_persisted_and_toggleable(self):
+        org=self.register()
+        friend=self.employee(org,'colleague@first.test')
+        chat=self.post('/api/chats/',{'kind':'direct','email':friend.email}).json()
+        message=self.post(f"/api/chats/{chat['id']}/messages/",{'body':'Project update'}).json()
+        endpoint=f"/api/chats/{chat['id']}/messages/{message['id']}/reactions/"
+        for emoji in ('✅', '👏', '🙏', '🤝', '💡', '👌', '💯'):
+            with self.subTest(emoji=emoji):
+                result=self.post(endpoint,{'emoji':emoji})
+                self.assertEqual(result.status_code,200,result.content)
+                self.assertTrue(ChatReaction.objects.filter(emoji=emoji).exists())
+                self.assertEqual(self.post(endpoint,{'emoji':emoji}).status_code,200)
+                self.assertFalse(ChatReaction.objects.filter(emoji=emoji).exists())
