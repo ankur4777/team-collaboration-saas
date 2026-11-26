@@ -7,6 +7,7 @@ import {ApiError} from './api';
 import AttachmentPanel from './AttachmentPanel';
 import MentionInput from './MentionInput';
 import ReplyPreview from './ReplyPreview';
+import MessageActions from './MessageActions';
 import MessageContext from './MessageContext';
 import {PresenceStatus,presenceLabel} from './WorkspacePresence';
 import PinnedMessages from './PinnedMessages';
@@ -473,8 +474,11 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
               }</div>}
               <ChatReactionBar chatId={selected!} message={message} currentUserId={currentUser.id}
                 onUpdated={updated=>setMessages(current=>current.map(item=>item.id===updated.id?updated:item))}/>
-              {!message.deleted_at&&editingId!==message.id&&<div className="private-message-actions"><button type="button" disabled={working} onClick={()=>setReplyTo({chatId:selected!,messageId:message.id})} >Reply</button><button type="button" disabled={working} onClick={()=>setForwardId(message.id)} >Forward</button><button type="button" disabled={working} onClick={()=>void pinMessage(message)}>{message.pinned_at?'Unpin':'Pin'}</button></div>}
-              {message.sender.id===currentUser.id && !message.deleted_at && editingId!==message.id && <div className="private-message-actions"><button type="button" disabled={working} onClick={() => {setEditingId(message.id);setEditDraft(message.body);}}>Edit</button><button type="button" disabled={working} onClick={() => void deleteMessage(message)}>Delete</button></div>}
+              {!message.deleted_at&&editingId!==message.id&&<MessageActions busy={working} pinned={Boolean(message.pinned_at)}
+                onReply={()=>setReplyTo({chatId:selected!,messageId:message.id})} onForward={()=>setForwardId(message.id)}
+                onPin={()=>void pinMessage(message)}
+                onEdit={message.sender.id===currentUser.id?()=>{setEditingId(message.id);setEditDraft(message.body);}:undefined}
+                onDelete={message.sender.id===currentUser.id?()=>void deleteMessage(message):undefined}/>}
             </div>)}
             <div ref={bottomRef}/>
           </div>

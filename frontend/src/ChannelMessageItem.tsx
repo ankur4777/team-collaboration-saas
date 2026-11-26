@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { api, type Message } from './api';
 import ReplyPreview from './ReplyPreview';
+import MessageActions from './MessageActions';
 
 interface Props {
   channelId: string;
@@ -73,14 +74,11 @@ export default function ChannelMessageItem({channelId,message,isMine,samePerson,
           {message.deleted_at?'Message deleted':message.body}
           {!message.deleted_at&&message.edited_at&&<small className="channel-edited-note"> (edited)</small>}
         </div>}
-      {!readOnly&&!message.deleted_at && !editing && onReply&&<div className="channel-message-actions"><button type="button" onClick={onReply}>Reply</button></div>}
-      {!message.deleted_at&&!editing&&onForward&&<div className="channel-message-actions"><button type="button" onClick={onForward}>Forward</button></div>}
-      {!readOnly&&!message.deleted_at&&!editing&&<div className="channel-message-actions"><button type="button" disabled={busy} onClick={()=>void pin()}>{message.pinned_at?'Unpin':'Pin'}</button></div>}
-      {!readOnly&&isMine && !message.deleted_at && !editing &&
-        <div className="channel-message-actions">
-          <button type="button" disabled={busy} onClick={()=>{setDraft(message.body);setError('');setEditing(true);}}>Edit</button>
-          <button type="button" disabled={busy} onClick={()=>void remove()}>Delete</button>
-        </div>}
+      {!message.deleted_at&&!editing&&<MessageActions busy={busy} pinned={Boolean(message.pinned_at)}
+        onReply={!readOnly?onReply:undefined} onForward={onForward}
+        onPin={!readOnly?()=>void pin():undefined}
+        onEdit={!readOnly&&isMine?()=>{setDraft(message.body);setError('');setEditing(true);}:undefined}
+        onDelete={!readOnly&&isMine?()=>void remove():undefined}/>}
       {error&&<div role="alert" className="channel-message-error">{error}</div>}
     </div>
   </div>;
