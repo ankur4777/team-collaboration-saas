@@ -478,7 +478,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
                   ? (active.kind==='direct' ? 'Seen' : `Seen by ${active.participants.filter(p=>p.user.id!==currentUser.id && p.last_read_at && new Date(p.last_read_at).getTime()>=new Date(message.created_at).getTime()).length}`)
                   : 'Sent'
               }</div>}
-              <ChatReactionBar chatId={selected!} message={message} currentUserId={currentUser.id}
+              <ChatReactionBar key={'reactions:'+message.id} chatId={selected!} message={message} currentUserId={currentUser.id} participants={active.participants.map(p=>p.user)}
                 onUpdated={updated=>setMessages(current=>current.map(item=>item.id===updated.id?updated:item))}/>
             </div>)}
             <div ref={bottomRef}/>

@@ -433,10 +433,11 @@ class ChatReactionView(APIView):
                 participant = ChatParticipant.objects.get(conversation=chat, user=request.user)
                 if message.created_at < participant.joined_at:
                     raise PermissionDenied('This message predates your group membership')
-            existing = ChatReaction.objects.filter(message=message, user=request.user, emoji=emoji)
-            if existing.exists():
-                existing.delete()
-            else:
+            # Serialize changes under the message lock: one reaction per user.
+            own = ChatReaction.objects.filter(message=message, user=request.user)
+            same = own.filter(emoji=emoji).exists()
+            own.delete()
+            if not same:
                 ChatReaction.objects.create(message=message, user=request.user, emoji=emoji)
             updated = ChatMessage.objects.select_related('sender').prefetch_related('reactions').get(pk=message.pk)
             payload = ChatMessageSerializer(updated).data

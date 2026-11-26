@@ -597,3 +597,14 @@ h1,h2,h3,h4,.brand{font-family:"Inter Variable", Inter, sans-serif}
 .group-person-details{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1;line-height:1.35}
 .group-person-details strong{color:#101c2c;font-size:12px;font-weight:600;overflow-wrap:anywhere}
 .modal .group-person-details small{color:#64748b;font-size:11px;font-weight:400;margin:0;overflow-wrap:anywhere}
+
+/* Show only actual reactions; the full picker and reactor list open on demand. */
+.compact-reactions{align-items:center;gap:4px;margin:4px 0 2px}
+.compact-reactions .more-reactions{border-color:transparent;background:transparent;color:#64748b}
+.compact-reactions .more-reactions:hover,.compact-reactions .more-reactions[aria-expanded=true]{background:#fff0f2;color:#e60019;border-color:#efccd2}
+.chat-reaction-picker,.chat-reaction-detail{flex:0 0 100%;min-width:0;max-width:260px;background:#fff;border:1px solid #efccd2;border-radius:9px;padding:6px;box-shadow:0 5px 14px #2415250c}
+.chat-reaction-picker{display:flex;flex-wrap:wrap;gap:4px}
+.chat-reaction-picker button{border-color:transparent;min-width:28px;justify-content:center}
+.chat-reaction-detail{display:flex;flex-direction:column;gap:5px;font-size:11px;color:#526575;max-height:160px;overflow:auto}
+.chat-reaction-detail strong{font-size:12px;color:#243446}
+.chat-reaction-detail span{overflow-wrap:anywhere}

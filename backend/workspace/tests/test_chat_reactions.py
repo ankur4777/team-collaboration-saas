@@ -152,3 +152,19 @@ class ChatReactionTests(TestCase):
                 self.assertTrue(ChatReaction.objects.filter(emoji=emoji).exists())
                 self.assertEqual(self.post(endpoint,{'emoji':emoji}).status_code,200)
                 self.assertFalse(ChatReaction.objects.filter(emoji=emoji).exists())
+
+    def test_reaction_replaces_previous_choice_without_affecting_other_member(self):
+        org=self.register()
+        friend=self.employee(org,'colleague@first.test')
+        chat=self.post('/api/chats/',{'kind':'direct','email':friend.email}).json()
+        message=self.post(f"/api/chats/{chat['id']}/messages/",{'body':'Update'}).json()
+        endpoint=f"/api/chats/{chat['id']}/messages/{message['id']}/reactions/"
+        self.assertEqual(self.post(endpoint,{'emoji':'👍'}).status_code,200)
+        self.login(friend.email)
+        self.assertEqual(self.post(endpoint,{'emoji':'👍'}).status_code,200)
+        changed=self.post(endpoint,{'emoji':'✅'})
+        self.assertEqual(changed.status_code,200,changed.content)
+        self.assertEqual({row['emoji']:row['count'] for row in changed.json()['reactions']},{'👍':1,'✅':1})
+        self.assertEqual(ChatReaction.objects.filter(user=friend).count(),1)
+        self.assertEqual(self.post(endpoint,{'emoji':'✅'}).status_code,200)
+        self.assertFalse(ChatReaction.objects.filter(user=friend).exists())
