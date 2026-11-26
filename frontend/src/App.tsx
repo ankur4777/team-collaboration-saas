@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check, ChevronDown, Hash, Inbox, MessageCircle,
   Settings2, Sparkles, Users, Video, X, CalendarDays, FolderOpen, Search, Ellipsis, Pencil, Archive, ArchiveRestore, Pin, PinOff, Bell, BellOff } from 'lucide-react';
 import { api, csrf, type Channel, type ChannelMessageCursor, type ChannelNotice, type Member, type Message, type Person, type Session, type Team } from './api';
 import Brand from './Brand';
+import WorkspacePicker from './WorkspacePicker';
 import ChatPanel from './ChatPanel';
 import PlatformAdmin from './PlatformAdmin';
 import {showPlatformAdmin} from './adminRouting';
@@ -421,9 +422,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   async function signOut(){try{await api.logout();onLogout();}catch(e){setError(errorText(e));}}
 
   return <div className={`app-layout${view==='inbox'?' mail-view':''}`}><aside className={`sidebar ${sidebarOpen?'mobile-visible':''}`}><div className="sidebar-scroll"><div className="sidebar-header"><Brand/><button className="mobile-close icon-button" onClick={()=>setSidebarOpen(false)}><X size={20}/></button></div>
-    <div className="org-picker"><div className="org-icon">{initials(activeOrg?.name||'TW')}</div><div className="org-label"><strong>{activeOrg?.name||'Choose workspace'}</strong><small>{activeOrg?.role||'No organization'}</small></div><ChevronDown size={16}/>
-      <select aria-label="Switch organization" value={session.active_organization_id||''} onChange={e=>switchOrg(e.target.value)}>{session.organizations.map(org=><option key={org.id} value={org.id}>{org.name}</option>)}</select>
-    </div>
+    <WorkspacePicker organizations={session.organizations} activeId={session.active_organization_id} disabled={pending} onSelect={switchOrg}/>
     {activeOrg?.subscription&&<SubscriptionSummary subscription={activeOrg.subscription} compact onDetails={()=>{setView('settings');setSidebarOpen(false);}}/>}
     <div className="sidebar-title">WORKSPACE</div><nav className="nav-list">{visibleNav.map(item=><button key={item.id} className={`nav-item ${view===item.id?'active':''}`} onClick={()=>{setView(item.id);setSidebarOpen(false);}}><item.icon size={18}/><span>{item.label}</span>{!item.ready&&<span className="soon-dot" title="Coming next"/>}</button>)}</nav>
     <button className="nav-item" onClick={()=>{setModal('members');setSidebarOpen(false);}}><Users size={18}/><span>Members</span><span className="count-chip">{members.length}</span></button>
