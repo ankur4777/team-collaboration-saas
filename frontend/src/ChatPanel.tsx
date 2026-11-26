@@ -452,8 +452,8 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
             <button className="group-manage-button" type="button" disabled={working} onClick={()=>void changeChatPreference('is_pinned')}>{active.is_pinned?'Unpin chat':'Pin chat'}</button><button className="group-manage-button" type="button" disabled={working} onClick={()=>void changeChatPreference('is_muted')}>{active.is_muted?'Unmute':'Mute'}</button>
             <span className={`chat-connected ${connected ? 'yes' : ''}`} title={connected ? 'Live updates connected' : 'Messages saved; live updates unavailable'}/>
           </header>
-          {requestedChat?.id===selected&&requestedChat.messageId&&jumpClosed!==requestedChat.nonce&&<MessageContext key={requestedChat.nonce} kind="chat" id={selected!} messageId={requestedChat.messageId} version={pinVersion} onClose={()=>setJumpClosed(requestedChat.nonce)}/>}
-          <PinnedMessages key={selected!} kind="chat" id={selected!} version={pinVersion} onUnpin={updated=>{if("reactions" in updated){setMessages(old=>old.map(row=>row.id===updated.id?updated as ChatMessage:row));setPinVersion(value=>value+1);}}}/>
+          {requestedChat?.id===selected&&requestedChat.messageId&&jumpClosed!==requestedChat.nonce&&<MessageContext key={'chat-context:'+requestedChat.nonce} kind="chat" id={selected!} messageId={requestedChat.messageId} version={pinVersion} onClose={()=>setJumpClosed(requestedChat.nonce)}/>}
+          <PinnedMessages key={'chat-pins:'+selected} kind="chat" id={selected!} version={pinVersion} onUnpin={updated=>{if("reactions" in updated){setMessages(old=>old.map(row=>row.id===updated.id?updated as ChatMessage:row));setPinVersion(value=>value+1);}}}/>
           <div className="private-chat-history" ref={historyRef}>
             {historyCursor && <div style={{textAlign:"center",padding:"8px"}}><button type="button" className="outline-button" disabled={loadingOlder} onClick={()=>void loadOlder()}>{loadingOlder?"Loading…":"Load older messages"}</button></div>}
             {messages.length === 0 && <div className="private-chat-welcome"><MessageCircle size={30}/><h3>Start the conversation</h3><p>Only participants in this workspace can read these messages.</p></div>}
@@ -479,7 +479,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
             <div ref={bottomRef}/>
           </div>
           {Object.keys(typingUsers).length>0&&<div className="chat-typing-indicator" aria-live="polite">{Object.values(typingUsers).join(', ')} {Object.keys(typingUsers).length>1?'are':'is'} typing…</div>}
-          <AttachmentPanel key={selected!} kind="chat" parentId={selected!}/>
+          <AttachmentPanel key={'chat-files:'+selected} kind="chat" parentId={selected!}/>
           {replyTarget&&<div className="chat-reply-compose"><ReplyPreview message={replyTarget} onCancel={()=>setReplyTo(null)}/></div>}
           <form className="private-chat-compose" onSubmit={send}><MentionInput ariaLabel="Write a message" value={draft} placeholder="Write a message... (@ to mention)" people={active.participants.map(p=>p.user).filter(user=>user.id!==currentUser.id)} onChange={changeDraft} onBlur={()=>emitTyping(false)}/><button className="send-button" aria-label="Send message" disabled={!draft.trim()||working}><Send size={18}/></button></form>
         </> : <div className="private-chat-welcome"><MessageCircle size={32}/><h3>Connect with your team</h3><p>Choose a conversation or start a new one.</p></div>}
