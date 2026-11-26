@@ -30,12 +30,12 @@ describe('Chat conversation panel identity',()=>{
     const view=render(<ChatPanel {...props}/>);
     await screen.findByRole('heading',{name:'First colleague'});
     const check=()=>{
-      expect(screen.getAllByRole('button',{name:'Pinned messages',exact:true})).toHaveLength(1);
+      expect(screen.getAllByRole('button',{name:/^Pinned messages$/})).toHaveLength(1);
       expect(screen.getAllByRole('region',{name:'Shared attachments'})).toHaveLength(1);
       expect(screen.getAllByRole('button',{name:'Send message'})).toHaveLength(1);
     };
     check();
-    await user.click(screen.getByRole('button',{name:'Pinned messages',exact:true}));
+    await user.click(screen.getByRole('button',{name:/^Pinned messages$/}));
     await screen.findByText('No pinned messages yet.');
     await user.click(screen.getByRole('button',{name:/Second colleague/}));
     await screen.findByRole('heading',{name:'Second colleague'});

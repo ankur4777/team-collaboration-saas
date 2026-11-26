@@ -500,3 +500,22 @@ h1,h2,h3,h4,.brand{font-family:"Inter Variable", Inter, sans-serif}
   .compact-team-heading h1{font-size:19px}
   .compact-team-heading .heading-actions .primary-button,.compact-team-heading .heading-actions .outline-button,.chat-workspace .conversation-top .outline-button{font-size:11px;padding:6px 8px}
 }
+
+/* Compact, distinct team and channel action menus. */
+.conversation-actions-menu,.pinned-messages-compact{position:relative;flex-shrink:0}
+.conversation-icon-button{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;flex-shrink:0;padding:0;border:1px solid #efccd2;border-radius:8px;background:#fff;color:#243446;cursor:pointer}
+.conversation-icon-button:hover,.conversation-icon-button[aria-expanded=true],.conversation-icon-button[aria-pressed=true]{background:#fff0f2;color:#e60019;border-color:#efb1bd}
+.conversation-icon-button:disabled{opacity:.5;cursor:not-allowed}
+.conversation-actions-popover,.pinned-messages-compact .pinned-message-list{position:absolute;right:0;top:calc(100% + 6px);z-index:15;border:1px solid #efccd2;border-radius:10px;background:#fff;box-shadow:0 8px 24px #24152520}
+.conversation-actions-popover{min-width:180px;padding:5px}
+.conversation-actions-popover button{display:flex;align-items:center;gap:9px;width:100%;border:0;border-radius:6px;background:transparent;padding:10px 11px;text-align:left;font-size:12px;color:#243446;white-space:nowrap;cursor:pointer}
+.conversation-actions-popover button:hover{background:#fff0f2;color:#e60019}
+.conversation-actions-popover button:disabled{opacity:.5;cursor:not-allowed}
+.channel-heading-title{min-width:0;flex:1}
+.channel-heading-title h3{overflow-wrap:anywhere}
+.channel-header-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-left:auto}
+.channel-header-actions .connection-light{margin:0 2px;flex-shrink:0}
+.pinned-messages-compact{padding:0;border:0}
+.pinned-messages-compact .pinned-message-list{width:min(340px,calc(100vw - 40px));margin:0;padding:12px;max-height:min(280px,45vh);overflow:auto}
+.pinned-messages-compact h4{font-size:13px;margin:0 0 8px}
+@media(max-width:560px){.channel-heading-title{flex-basis:calc(100% - 42px)}.channel-header-actions{margin-left:0;width:100%;justify-content:flex-end}.conversation-icon-button{width:32px;height:32px}}

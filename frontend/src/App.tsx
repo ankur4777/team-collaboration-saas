@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Hash, Inbox, MessageCircle,
   LayoutGrid, LockKeyhole, LogOut, Mail, Menu, Plus, Send,
-  Settings2, Sparkles, Users, Video, X, CalendarDays, FolderOpen, Search } from 'lucide-react';
+  Settings2, Sparkles, Users, Video, X, CalendarDays, FolderOpen, Search, Ellipsis, Pencil, Archive, ArchiveRestore, Pin, PinOff, Bell, BellOff } from 'lucide-react';
 import { api, csrf, type Channel, type ChannelMessageCursor, type ChannelNotice, type Member, type Message, type Person, type Session, type Team } from './api';
 import Brand from './Brand';
 import ChatPanel from './ChatPanel';
@@ -37,6 +37,22 @@ function ErrorBanner({ message, onClose }: {message:string;onClose?:()=>void}) {
 }
 function Empty({ icon, title, description, action }: {icon:ReactNode;title:string;description:string;action?:ReactNode}) {
   return <div className="empty-state"><span className="empty-icon">{icon}</span><h3>{title}</h3><p>{description}</p>{action}</div>;
+}
+
+function ConversationActions({label,children}:{label:string;children:ReactNode}){
+  const [open,setOpen]=useState(false);
+  const root=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null);
+  useEffect(()=>{
+    if(!open)return;
+    function outside(e:PointerEvent){if(!root.current?.contains(e.target as Node))setOpen(false);}
+    function escape(e:KeyboardEvent){if(e.key==='Escape'){setOpen(false);trigger.current?.focus();}}
+    document.addEventListener('pointerdown',outside);document.addEventListener('keydown',escape);
+    return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape);};
+  },[open]);
+  return <div className="conversation-actions-menu" ref={root}>
+    <button ref={trigger} type="button" className="conversation-icon-button" title={label} aria-label={label} aria-expanded={open} onClick={()=>setOpen(v=>!v)}><Ellipsis size={19}/></button>
+    {open&&<div className="conversation-actions-popover" aria-label={label} role="group" onClick={()=>{setOpen(false);trigger.current?.focus();}}>{children}</div>}
+  </div>;
 }
 
 type AuthMode = 'login' | 'register';
@@ -425,12 +441,26 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
           onOpenChannel={(teamId,channelId)=>{setSelectedTeam(teamId);setSelectedChannel(channelId);setView('teams');setSidebarOpen(false);}}/><div className="top-avatar">{initials(session.user.full_name)}</div></div></header>
   {error&&<div className="floating-error"><ErrorBanner message={error} onClose={()=>setError('')}/></div>}
   {view==='teams' ? <>{!activeTeam?<div className="hero-empty"><Empty icon={<Users size={32}/>} title="Bring your team together" description="Create your first team to begin organizing conversations and projects." action={<button className="primary-button" onClick={()=>setModal('team')}><Plus size={17}/>Create your first team</button>}/></div>:
-    <><div className="workspace-heading compact-team-heading"><div className="team-heading-title"><h1>{activeTeam.name}{activeTeam.archived_at?' · Archived':''}</h1></div><div className="heading-actions">{(myTeamRole==='owner'||activeOrg?.role==='owner'||activeOrg?.role==='admin')&&<button className="outline-button" disabled={pending} onClick={()=>renameTeamOrChannel()} >Rename team</button>}{(myTeamRole==='owner'||activeOrg?.role==='owner'||activeOrg?.role==='admin')&&<button type="button" className="outline-button" disabled={pending} onClick={()=>archiveTeamOrChannel()}>{activeTeam.archived_at?'Restore team':'Archive team'}</button>}<button className="outline-button" onClick={()=>setModal('members')}><Users size={16}/> Manage members</button>{myTeamRole==='member'&&<button type="button" className="outline-button" disabled={pending} onClick={leaveActiveTeam}>Leave team</button>}<button className="primary-button" disabled={Boolean(activeTeam.archived_at)} onClick={()=>setModal('channel')}><Plus size={17}/> New channel</button></div></div>
+    <><div className="workspace-heading compact-team-heading"><div className="team-heading-title"><h1>{activeTeam.name}{activeTeam.archived_at?' · Archived':''}</h1></div><div className="heading-actions">
+      <button className="outline-button" onClick={()=>setModal('members')}><Users size={16}/> Manage members</button>
+      <button className="primary-button" disabled={Boolean(activeTeam.archived_at)} onClick={()=>setModal('channel')}><Plus size={17}/> New channel</button>
+      {(myTeamRole==='owner'||activeOrg?.role==='owner'||activeOrg?.role==='admin'||myTeamRole==='member')&&<ConversationActions key={'team-menu:'+activeTeam.id} label="Team options">
+        {(myTeamRole==='owner'||activeOrg?.role==='owner'||activeOrg?.role==='admin')&&<><button type="button" disabled={pending} onClick={()=>renameTeamOrChannel()}><Pencil size={16}/> Rename team</button><button type="button" disabled={pending} onClick={()=>archiveTeamOrChannel()}>{activeTeam.archived_at?<ArchiveRestore size={16}/>:<Archive size={16}/>} {activeTeam.archived_at?'Restore team':'Archive team'}</button></>}
+        {myTeamRole==='member'&&<button type="button" disabled={pending} onClick={leaveActiveTeam}><LogOut size={16}/> Leave team</button>}
+      </ConversationActions>}
+    </div></div>
       <div className="chat-workspace"><section className="channels-panel"><div className="panel-title">CHANNELS <button className="icon-button" title="New channel" disabled={Boolean(activeTeam.archived_at)} onClick={()=>setModal('channel')}><Plus size={17}/></button></div>{[...channels].sort((a,b)=>Number(Boolean(channelNotices.find(n=>n.channel_id===b.id)?.is_pinned))-Number(Boolean(channelNotices.find(n=>n.channel_id===a.id)?.is_pinned))).map(ch=><button className={`channel-card ${selectedChannel===ch.id?'active':''}`} key={ch.id} onClick={()=>setSelectedChannel(ch.id)}><span className="channel-symbol"><Hash size={17}/></span><span>{channelNotices.find(n=>n.channel_id===ch.id)?.is_pinned?'★ ':''}{ch.is_private?'🔒 ':''}{ch.name}{ch.archived_at?' (Archived)':''}</span>{channelUnread(ch.id)>0&&<span className="channel-unread-count" aria-label={`${channelUnread(ch.id)} unread messages`}>{channelUnread(ch.id)>99?'99+':channelUnread(ch.id)}</span>}{selectedChannel===ch.id&&<span className="selected-indicator"/>}</button>)}<div className="channel-help"><Sparkles size={18}/><strong>A place for every topic</strong><p>Create channels to keep discussions organized.</p></div></section>
-        <section className="conversation-panel">{activeChannel?<><div className="conversation-top"><div className="channel-avatar"><Hash size={23}/></div><div><h3>{activeChannel.is_private?'Private · ':''}{activeChannel.name}{channelReadOnly?' · Read-only':''}</h3><p>{activeTeam.name} · {connected?'Live updates connected':'Messages are saved securely'}</p></div>{(myTeamRole==='owner'||activeOrg?.role==='owner'||activeOrg?.role==='admin')&&<button className="outline-button" disabled={pending} onClick={()=>renameTeamOrChannel(true)} >Rename channel</button>}{(myTeamRole==='owner'||activeOrg?.role==='owner'||activeOrg?.role==='admin')&&<button type="button" className="outline-button" disabled={pending} onClick={()=>archiveTeamOrChannel(true)}>{activeChannel.archived_at?'Restore channel':'Archive channel'}</button>}{activeChannel.is_private&&<button className="outline-button" type="button" onClick={()=>setManagePrivate(value=>!value)}>Private members</button>}<button className="outline-button" type="button" disabled={pending} onClick={()=>changeChannelPreference('is_pinned')}>{channelPreference?.is_pinned?'Unpin channel':'Pin channel'}</button><button className="outline-button" type="button" disabled={pending} onClick={()=>changeChannelPreference('is_muted')}>{channelPreference?.is_muted?'Unmute':'Mute'}</button><span className={`connection-light ${connected?'online':''}`} title={connected?'WebSocket connected':'WebSocket disconnected'}/></div>
+        <section className="conversation-panel">{activeChannel?<><div className="conversation-top"><div className="channel-avatar"><Hash size={23}/></div><div className="channel-heading-title"><h3>{activeChannel.is_private?'Private · ':''}{activeChannel.name}{channelReadOnly?' · Read-only':''}</h3><p>{activeTeam.name} · {connected?'Live updates connected':'Messages are saved securely'}</p></div>
+          <div className="channel-header-actions">
+            <PinnedMessages key={'channel-pins:'+selectedChannel} compact kind="channel" id={selectedChannel!} version={pinVersion} readOnly={channelReadOnly} onUnpin={updated=>{setMessages(old=>old.map(row=>row.id===updated.id?updated:row));setPinVersion(value=>value+1);}}/>
+            <button className="conversation-icon-button" type="button" disabled={pending} aria-label={channelPreference?.is_pinned?'Unpin channel':'Pin channel'} title={channelPreference?.is_pinned?'Unpin channel':'Pin channel'} aria-pressed={Boolean(channelPreference?.is_pinned)} onClick={()=>changeChannelPreference('is_pinned')}>{channelPreference?.is_pinned?<PinOff size={17}/>:<Pin size={17}/>}</button>
+            <button className="conversation-icon-button" type="button" disabled={pending} aria-label={channelPreference?.is_muted?'Unmute channel':'Mute channel'} title={channelPreference?.is_muted?'Unmute channel':'Mute channel'} aria-pressed={Boolean(channelPreference?.is_muted)} onClick={()=>changeChannelPreference('is_muted')}>{channelPreference?.is_muted?<BellOff size={17}/>:<Bell size={17}/>}</button>
+            {activeChannel.is_private&&<button type="button" className="conversation-icon-button" title="Private members" aria-label="Private members" aria-expanded={managePrivate} onClick={()=>setManagePrivate(value=>!value)}><Users size={17}/></button>}
+            {(myTeamRole==='owner'||activeOrg?.role==='owner'||activeOrg?.role==='admin')&&<ConversationActions key={'channel-menu:'+activeChannel.id} label="Channel options"><button type="button" disabled={pending} onClick={()=>renameTeamOrChannel(true)}><Pencil size={16}/> Rename channel</button><button type="button" disabled={pending} onClick={()=>archiveTeamOrChannel(true)}>{activeChannel.archived_at?<ArchiveRestore size={16}/>:<Archive size={16}/>} {activeChannel.archived_at?'Restore channel':'Archive channel'}</button></ConversationActions>}
+            <span className={`connection-light ${connected?'online':''}`} title={connected?'WebSocket connected':'WebSocket disconnected'}/>
+          </div></div>
           {activeChannel.is_private&&managePrivate&&<PrivateChannelMembers key={'channel-members:'+selectedChannel} id={selectedChannel!} currentUserId={session.user.id} canManage={!channelReadOnly&&(myTeamRole==='owner'||activeOrg?.role==='owner'||activeOrg?.role==='admin')} onClose={()=>setManagePrivate(false)}/>}
           {channelJump?.id===selectedChannel&&<MessageContext key={'channel-context:'+channelJump.nonce} kind="channel" id={selectedChannel!} messageId={channelJump.messageId} version={pinVersion} onClose={()=>setChannelJump(null)}/>}
-          <PinnedMessages key={'channel-pins:'+selectedChannel} kind="channel" id={selectedChannel!} version={pinVersion} readOnly={channelReadOnly} onUnpin={updated=>{setMessages(old=>old.map(row=>row.id===updated.id?updated:row));setPinVersion(value=>value+1);}}/>
           <div className="message-area" ref={channelScrollRef} onScroll={e=>{
               const el=e.currentTarget;
               if(!olderRequestRef.current&&!channelScrollAnchorRef.current){
