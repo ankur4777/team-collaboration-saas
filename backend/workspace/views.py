@@ -349,6 +349,8 @@ class TeamMembersView(APIView):
         obj, created = TeamMember.objects.get_or_create(team=team, user=member.user)
         if not created:
             raise ValidationError({'email': 'Employee is already on this team'})
+        transaction.on_commit(lambda: publish_team_membership_change(team.pk))
+        transaction.on_commit(lambda: publish_notification_refresh(team.organization_id, [member.user_id]))
         return Response({'user_id': str(member.user.id), 'role': obj.role}, status=status.HTTP_201_CREATED)
 
 

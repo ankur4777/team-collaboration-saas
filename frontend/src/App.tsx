@@ -198,6 +198,14 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   },[teamsEnabled]);
   useEffect(()=>{setTeams([]);setChannels([]);setMembers([]);setSelectedTeam(null);setSelectedChannel(null);setMessages([]);loadTeams();if(session.active_organization_id)api.members(session.active_organization_id).then(setMembers).catch(()=>{});},[session.active_organization_id,loadTeams]);
   useEffect(()=>{
+    if(!session.active_organization_id||!teamsEnabled)return;
+    const refresh=()=>{if(!document.hidden)void loadTeams();};
+    const timer=window.setInterval(refresh,20000);
+    window.addEventListener('focus',refresh);
+    document.addEventListener('visibilitychange',refresh);
+    return()=>{window.clearInterval(timer);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};
+  },[session.active_organization_id,teamsEnabled,loadTeams]);
+  useEffect(()=>{
     setTeamMentionPeople([]);setTeamRoster([]);
     if(!selectedTeam)return;
     let valid=true;
@@ -412,7 +420,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
     <div className="sidebar-bottom"><div className="profile"><div className="avatar">{initials(session.user.full_name)}</div><div className="profile-name"><strong>{session.user.full_name}</strong><small>{session.user.email}</small></div><button className="icon-button" aria-label="Log out" title="Log out" onClick={signOut}><LogOut size={18}/></button></div></div>
   </aside>
   {sidebarOpen&&<div className="mobile-shade" onClick={()=>setSidebarOpen(false)}/>}
-  <main className={"main-panel"+(view==='meetings'||view==='calendar'?' meetings-main':'')}><header className="top-bar"><div className="top-bar-left"><button className="mobile-menu icon-button" onClick={()=>setSidebarOpen(true)}><Menu/></button><span className="crumb">Workspace</span><span className="crumb-divider">/</span><strong>{view==='teams'?(activeTeam?.name||'Teams'):navItems.find(n=>n.id===view)?.label||'Settings'}</strong></div><div className="top-bar-right"><ChatNotificationBell enabledModules={allowedModules} workspaceId={session.active_organization_id} userId={session.user.id} emailVerified={session.user.email_verified} onOpenMeeting={id=>{setOpenMeetingRequest({id,nonce:Date.now()});setView(meetingsEnabled?'meetings':'calendar');setSidebarOpen(false);}} refreshVersion={notificationRefresh} onRealtimeNotification={()=>{void loadChannelNotices();}}
+  <main className={"main-panel"+(view==='meetings'||view==='calendar'?' meetings-main':'')}><header className="top-bar"><div className="top-bar-left"><button className="mobile-menu icon-button" onClick={()=>setSidebarOpen(true)}><Menu/></button><span className="crumb">Workspace</span><span className="crumb-divider">/</span><strong>{view==='teams'?(activeTeam?.name||'Teams'):navItems.find(n=>n.id===view)?.label||'Settings'}</strong></div><div className="top-bar-right"><ChatNotificationBell enabledModules={allowedModules} workspaceId={session.active_organization_id} userId={session.user.id} emailVerified={session.user.email_verified} onOpenMeeting={id=>{setOpenMeetingRequest({id,nonce:Date.now()});setView(meetingsEnabled?'meetings':'calendar');setSidebarOpen(false);}} refreshVersion={notificationRefresh} onRealtimeNotification={()=>{void loadChannelNotices();void loadTeams();}}
           onOpenChat={id=>{setOpenChatRequest({id,nonce:Date.now()});setView('chats');setSidebarOpen(false);}}
           onOpenChannel={(teamId,channelId)=>{setSelectedTeam(teamId);setSelectedChannel(channelId);setView('teams');setSidebarOpen(false);}}/><div className="top-avatar">{initials(session.user.full_name)}</div></div></header>
   {error&&<div className="floating-error"><ErrorBanner message={error} onClose={()=>setError('')}/></div>}

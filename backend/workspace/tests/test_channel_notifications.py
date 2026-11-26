@@ -1,5 +1,6 @@
 """Channel unread/read cursor tests: per-member state and tenant isolation."""
 import json
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase, override_settings
@@ -108,3 +109,23 @@ class ChannelNotificationTests(TestCase):
         self.assertNotEqual(second.pk, org.pk)
         self.assertEqual(self.client.get('/api/channel-notifications/').json(), [])
         self.assertEqual(self.post(f'/api/channels/{channel_id}/read/', {'message_id': message['id']}).status_code, 403)
+
+    def test_new_team_member_gets_refresh_and_new_channel_message(self):
+        org = self.register()
+        team_id, channel_id = self.channel()
+        other = self.employee(org, 'new-member@a.test')
+        old = self.post(f'/api/channels/{channel_id}/messages/', {'body': 'Before joining'})
+        self.assertEqual(old.status_code, 201)
+        with patch('workspace.views.publish_notification_refresh') as notify, patch('workspace.views.publish_team_membership_change') as changed:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.post(f'/api/teams/{team_id}/members/', {'email': other.email})
+            self.assertEqual(response.status_code, 201, response.content)
+            notify.assert_called_once_with(org.pk, [other.pk])
+            changed.assert_called_once_with(TeamMember.objects.get(team_id=team_id, user=other).team_id)
+        fresh = self.post(f'/api/channels/{channel_id}/messages/', {'body': 'After joining'})
+        self.assertEqual(fresh.status_code, 201)
+        self.login(other.email)
+        self.assertIn(team_id, [row['id'] for row in self.client.get('/api/teams/').json()])
+        page = self.client.get(f'/api/channels/{channel_id}/messages/?page=1')
+        self.assertEqual(page.status_code, 200, page.content)
+        self.assertEqual([row['id'] for row in page.json()['items']], [fresh.json()['id']])
