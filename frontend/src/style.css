@@ -580,3 +580,8 @@ h1,h2,h3,h4,.brand{font-family:"Inter Variable", Inter, sans-serif}
 .role-picker-popover button:hover,.role-picker-popover button.selected,.role-picker-popover button:focus-visible{background:#fff0f2;color:#e60019;border-color:#f5d7dd;outline:none}
 .role-picker-check{color:#e60019;flex-shrink:0}
 .invite-role-field{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:600;color:#243446}
+
+/* Long option labels stay readable on smaller channel creation dialogs. */
+.role-picker-trigger.full-width{white-space:normal;text-align:left}
+.role-picker-trigger>svg,.role-picker-popover button>svg{flex-shrink:0}
+.role-picker-popover button span{min-width:0;overflow-wrap:anywhere;line-height:1.4}
