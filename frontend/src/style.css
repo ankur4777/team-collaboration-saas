@@ -520,10 +520,12 @@ h1,h2,h3,h4,.brand{font-family:"Inter Variable", Inter, sans-serif}
 .pinned-messages-compact h4{font-size:13px;margin:0 0 8px}
 @media(max-width:560px){.channel-heading-title{flex-basis:calc(100% - 42px)}.channel-header-actions{margin-left:0;width:100%;justify-content:flex-end}.conversation-icon-button{width:32px;height:32px}}
 
-/* Keep the compact menu directly underneath each message, not at the panel edge. */
-.message-action-anchor{display:flex;align-items:center;width:max-content;max-width:100%;margin-top:2px}
-.private-message.mine .message-action-anchor{margin-left:auto}
-.message-action-trigger{display:grid;place-items:center;width:26px;height:22px;padding:0;border:1px solid transparent;background:transparent;color:#526575;border-radius:6px;cursor:pointer;opacity:.65;transition:opacity .12s,background .12s}
+/* Keep message actions inline immediately after each timestamp. */
+.msg-meta,.private-message-meta{align-items:center;flex-wrap:wrap;column-gap:7px;row-gap:2px}
+.msg-meta>span,.private-message-meta>time{white-space:nowrap}
+.message-action-anchor{display:inline-flex;align-items:center;flex:0 0 auto;margin:0}
+.message.consecutive .msg-meta{margin-bottom:2px}
+.message-action-trigger{display:grid;place-items:center;width:24px;height:20px;padding:0;border:1px solid transparent;background:transparent;color:#526575;border-radius:6px;cursor:pointer;opacity:.65;transition:opacity .12s,background .12s}
 .message:hover .message-action-trigger,.private-message:hover .message-action-trigger,.message:focus-within .message-action-trigger,.private-message:focus-within .message-action-trigger,.message-action-trigger[aria-expanded=true]{opacity:1}
 .message-action-trigger:hover,.message-action-trigger[aria-expanded=true]{background:#fff0f2;color:#e60019}
 .message-action-trigger:disabled{cursor:not-allowed;opacity:.4}

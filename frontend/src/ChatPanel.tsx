@@ -459,7 +459,13 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
             {historyCursor && <div style={{textAlign:"center",padding:"8px"}}><button type="button" className="outline-button" disabled={loadingOlder} onClick={()=>void loadOlder()}>{loadingOlder?"Loading…":"Load older messages"}</button></div>}
             {messages.length === 0 && <div className="private-chat-welcome"><MessageCircle size={30}/><h3>Start the conversation</h3><p>Only participants in this workspace can read these messages.</p></div>}
             {messages.map(message => <div key={message.id} className={`private-message ${message.sender.id===currentUser.id ? 'mine' : ''}`}>
-              <div className="private-message-meta"><strong>{message.sender.full_name}</strong><time>{timeFor(message.created_at)}</time></div>
+              <div className="private-message-meta"><strong>{message.sender.full_name}</strong><time>{timeFor(message.created_at)}</time>
+                {!message.deleted_at&&editingId!==message.id&&<MessageActions busy={working} pinned={Boolean(message.pinned_at)}
+                onReply={()=>setReplyTo({chatId:selected!,messageId:message.id})} onForward={()=>setForwardId(message.id)}
+                onPin={()=>void pinMessage(message)}
+                onEdit={message.sender.id===currentUser.id?()=>{setEditingId(message.id);setEditDraft(message.body);}:undefined}
+                onDelete={message.sender.id===currentUser.id?()=>void deleteMessage(message):undefined}/>}
+              </div>
               {!message.deleted_at&&message.pinned_at&&<div className="forwarded-label">Pinned</div>}
               {!message.deleted_at&&message.is_forwarded&&<div className="forwarded-label">Forwarded</div>}
               {!message.deleted_at&&message.reply_to_id&&<ReplyPreview message={messages.find(row=>row.id===message.reply_to_id)}/>}
@@ -467,11 +473,6 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
                 <input autoFocus aria-label="Edit message" maxLength={4000} value={editDraft} onChange={e => setEditDraft(e.target.value)}/>
                 <div><button type="button" onClick={() => setEditingId(null)} disabled={working}>Cancel</button><button type="submit" disabled={working || !editDraft.trim()}>Save</button></div>
               </form> : <div className={`private-message-body ${message.deleted_at ? 'deleted' : ''}`}>{message.deleted_at ? 'Message deleted' : message.body}{!message.deleted_at && message.edited_at && <small className="edited-note"> (edited)</small>}</div>}
-              {!message.deleted_at&&editingId!==message.id&&<MessageActions busy={working} pinned={Boolean(message.pinned_at)}
-                onReply={()=>setReplyTo({chatId:selected!,messageId:message.id})} onForward={()=>setForwardId(message.id)}
-                onPin={()=>void pinMessage(message)}
-                onEdit={message.sender.id===currentUser.id?()=>{setEditingId(message.id);setEditDraft(message.body);}:undefined}
-                onDelete={message.sender.id===currentUser.id?()=>void deleteMessage(message):undefined}/>}
               {message.sender.id===currentUser.id && <div className="chat-read-receipt">{
                 active.participants.some(p=>p.user.id!==currentUser.id && p.last_read_at && new Date(p.last_read_at).getTime()>=new Date(message.created_at).getTime())
                   ? (active.kind==='direct' ? 'Seen' : `Seen by ${active.participants.filter(p=>p.user.id!==currentUser.id && p.last_read_at && new Date(p.last_read_at).getTime()>=new Date(message.created_at).getTime()).length}`)

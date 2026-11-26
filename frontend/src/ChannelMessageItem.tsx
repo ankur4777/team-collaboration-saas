@@ -60,7 +60,13 @@ export default function ChannelMessageItem({channelId,message,isMine,samePerson,
   return <div className={`message ${samePerson?'consecutive':''}`}>
     {!samePerson?<div className="msg-avatar">{initials(message.sender.full_name)}</div>:<div className="msg-avatar-placeholder"/>}
     <div className="msg-content">
-      {!samePerson&&<div className="msg-meta"><strong>{message.sender.full_name}</strong><span>{new Date(message.created_at).toLocaleString([], {hour:'2-digit',minute:'2-digit'})}</span></div>}
+      <div className="msg-meta">{!samePerson&&<strong>{message.sender.full_name}</strong>}<span>{new Date(message.created_at).toLocaleString([], {hour:'2-digit',minute:'2-digit'})}</span>
+        {!message.deleted_at&&!editing&&<MessageActions busy={busy} pinned={Boolean(message.pinned_at)}
+        onReply={!readOnly?onReply:undefined} onForward={onForward}
+        onPin={!readOnly?()=>void pin():undefined}
+        onEdit={!readOnly&&isMine?()=>{setDraft(message.body);setError('');setEditing(true);}:undefined}
+        onDelete={!readOnly&&isMine?()=>void remove():undefined}/>}
+      </div>
       {!message.deleted_at&&message.pinned_at&&<div className="forwarded-label">Pinned</div>}
       {!message.deleted_at&&message.is_forwarded&&<div className="forwarded-label">Forwarded</div>}
       {!message.deleted_at&&message.reply_to_id&&<ReplyPreview message={replyTarget}/>}
@@ -74,11 +80,6 @@ export default function ChannelMessageItem({channelId,message,isMine,samePerson,
           {message.deleted_at?'Message deleted':message.body}
           {!message.deleted_at&&message.edited_at&&<small className="channel-edited-note"> (edited)</small>}
         </div>}
-      {!message.deleted_at&&!editing&&<MessageActions busy={busy} pinned={Boolean(message.pinned_at)}
-        onReply={!readOnly?onReply:undefined} onForward={onForward}
-        onPin={!readOnly?()=>void pin():undefined}
-        onEdit={!readOnly&&isMine?()=>{setDraft(message.body);setError('');setEditing(true);}:undefined}
-        onDelete={!readOnly&&isMine?()=>void remove():undefined}/>}
       {error&&<div role="alert" className="channel-message-error">{error}</div>}
     </div>
   </div>;
