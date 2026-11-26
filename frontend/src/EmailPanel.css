@@ -115,3 +115,16 @@
 .email-empty{color:#7c8b9a}.email-empty h2,.email-list-empty h3{color:#263545}.email-empty-symbol,.email-reading-illustration{background:#fff0f1;color:#ec3038;box-shadow:0 10px 28px #f42a3211}
 .email-dialog-shade{background:#35111642}.email-account-dialog,.email-compose{border-color:#f1dfe1;box-shadow:0 24px 70px #45101528}.email-compose-field input,.email-compose-body textarea{border-color:#e3e8ed}.email-compose-field input:focus,.email-compose-body textarea:focus{border-color:#f7979d;box-shadow:0 0 0 3px #f42a3216}
 .email-shell :where(button,input,select,textarea):focus-visible{outline-color:#ffb3b8}
+
+
+/* Sign-in inspired mail palette. */
+.email-shell{--mail-accent:#f00018;--mail-ink:#101c2c;--mail-muted:#7b8e99;--mail-border:#f0e3e6;color:var(--mail-ink);background:#fff}
+.email-heading,.email-command-bar,.email-folders,.email-list,.email-reading-content{background:#fff;border-color:#f0e3e6}
+.email-reading{background:#fffafb}.email-folders nav button{color:#506575}
+.email-folders nav button.active,.email-row.selected,.email-row.selected:hover{background:#fff0f2;color:#e90019}
+.email-list-tabs button[aria-pressed=true]{border-bottom-color:#f00018;color:#e90019}
+.email-row.unread:before,.email-row.selected:before{background:#f00018}
+.email-avatar,.email-row-avatar,.email-empty-symbol,.email-reading-illustration{background:#fde8ec;color:#e90019}
+.email-command-bar .mail-primary,.email-shell .mail-primary{background:#f00018;color:#fff;border-color:#f00018}
+.email-shell .mail-primary:hover{background:#cf0016}
+.email-search,.email-compose-field input,.email-compose-body textarea{border-color:#f1cdd4}

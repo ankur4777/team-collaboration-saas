@@ -18,3 +18,13 @@
 .shared-file-download{background:#fff;border-color:#f3cfd2;color:#e72d35}.shared-file-download:hover{background:#fff3f4}
 .shared-files-empty{background:#fff;border-color:#f2cfd2;color:#8090a0;box-shadow:0 12px 32px #f42a3208}.shared-files-empty h2{color:#263443}
 .shared-files-error{background:#fff2f2;border-color:#f8c7ca;color:#b52d35}
+
+
+/* Sign-in inspired shared file palette. */
+.shared-files-page{background:#fff;color:#101c2c}
+.shared-files-heading h1,.shared-file-main strong,.shared-files-empty h2{color:#101c2c}
+.shared-files-heading p,.shared-file-main small,.shared-files-note,.shared-files-summary{color:#758895}
+.shared-files-upload{background:#f00018;color:#fff}.shared-files-upload:hover{background:#cf0016}
+.shared-files-search,.shared-files-filter,.shared-file-row,.shared-files-empty{background:#fff;border-color:#f0dfe3}
+.shared-files-filter button.active,.shared-file-icon{background:#fde8ec;color:#e60019}
+.shared-file-download{background:#fff;border-color:#f0cdd3;color:#d60018}.shared-file-download:hover{background:#fff0f2}

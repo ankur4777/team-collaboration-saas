@@ -890,3 +890,13 @@
 /* Shabdd light product styling — Calendar */
 .workspace-calendar{background:radial-gradient(circle at 83% -12%,#fff0f1 0,transparent 34%),#fff;color:#25323f}.workspace-calendar button{border-color:#e5e9ee;color:#4a5867;background:#fff}.workspace-calendar button:hover:not(:disabled){background:#fff3f4;border-color:#ffc8cc;color:#e42a33}
 .wc-brandbar{background:#fff;border-color:#edf0f4;color:#1d2936;box-shadow:0 6px 22px #f42a320b}.wc-brandbar h1{color:#1d2936}.wc-brandbar svg{color:#f42a32}.wc-search{border-color:#e6e9ee;box-shadow:0 7px 18px #f42a3208}.calendar-shell .calendar-layout.meeting-selected .meeting-detail{box-shadow:-10px 0 30px #f42a3214}
+
+
+/* Sign-in inspired calendar palette. */
+.workspace-calendar,.wc-brandbar,.wc-sidebar,.wc-main,.wc-toolbar,.wc-navigator{background:#fff;color:#101c2c;border-color:#f0e3e6}
+.wc-brandbar h1{color:#101c2c}.wc-brandbar svg{color:#f00018}
+.workspace-calendar button{background:#fff;color:#354858;border-color:#f0dfe3}
+.workspace-calendar button:hover:not(:disabled){background:#fff0f2;color:#e60019;border-color:#f2a6af}
+.wc-mini-days .today,.wc-mini-days .chosen,.wc-month-day.today,.wc-month-day.chosen{background:#fff0f2;color:#a90014}
+.wc-month-day.today .wc-day-heading>button:first-child{background:#f00018;color:#fff}
+.wc-event{background:#fde8ec;color:#9b0010;border-color:#f6c4cb}

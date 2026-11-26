@@ -720,3 +720,13 @@
 .meetings-heading,.meetings-controls,.meeting-detail{background:#fff;border-color:#edf0f4}.meetings-heading{box-shadow:0 5px 20px #f42a3208}.meetings-heading p{color:#7b8999}
 .meetings-controls nav button[aria-pressed='true']{background:#fff0f1;color:#e42b34}.meetings-controls input,.meetings-controls select,.meeting-task-form input,.meeting-task-form select{border-color:#e4e9ee;color:#31404e}
 .meeting-card{border-color:#edf0f4;box-shadow:0 8px 24px #f42a3208}.meeting-card:hover{border-color:#ffc8cc;box-shadow:0 10px 27px #f42a3214}.meeting-detail{box-shadow:-10px 0 28px #f42a320a}
+
+
+/* Sign-in inspired meeting palette. */
+.meetings-shell,.meetings-heading,.meetings-controls,.meeting-detail{background:#fff;color:#101c2c;border-color:#f0e3e6}
+.meeting-card,.meeting-modal{background:#fff;border-color:#f0dfe3;color:#101c2c}
+.meeting-card.selected,.meeting-card:hover{background:#fff5f6;border-color:#f09aa5}
+.meetings-controls nav button[aria-pressed='true'],.meeting-date-tile{background:#fde8ec;color:#e60019}
+.meeting-back,.meeting-join{color:#d80018}
+.meeting-join.primary-button{background:#f00018;color:white}
+.meeting-task-form input,.meeting-task-form select,.meetings-controls input,.meetings-controls select{border-color:#f1cdd4;color:#253547}

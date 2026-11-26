@@ -456,3 +456,21 @@ h1,h2,h3,h4,.brand{font-family:Manrope,Inter,system-ui,sans-serif}
 .pa-login-card,.pa-global-header{background:#fff}
 .pa-global-header{border-color:#f0e4e8}
 @media(max-width:860px){.auth-aside .brand{padding:0}.auth-main{background:#fff}}
+
+
+/* Unified light workspace colors, matching the sign-in screen. */
+.app-layout,.main-panel,.sidebar,.app-layout .sidebar-bottom,.top-bar,.channels-panel,.conversation-panel,.message-area,.private-chat-page,.private-chat-list,.private-chat-conversation,.settings-page,.message-search-page{background:#fff;color:#101c2c}
+.app-layout .sidebar,.top-bar,.channels-panel,.private-chat-list{border-color:#f2dfe3}
+.sidebar .nav-item,.tree-team,.tree-channel,.channel-card{color:#526575}
+.sidebar .nav-item:hover,.sidebar .nav-item.active,.tree-team.selected,.tree-channel.selected,.channel-card.active{background:#fff0f2;color:#f00018}
+.sidebar .nav-item.active{box-shadow:inset 3px 0 #f00018}
+.org-picker,.settings-card,.message-search-form,.message-search-result,.modal,.compose-box,.private-chat-layout{background:#fff;border-color:#f1d7dc}
+.org-icon,.channel-avatar,.channel-intro-mark,.empty-state .empty-icon,.message-search-result-icon{background:#fde8ec;color:#e60019}
+.brand .brand-mark,.sidebar .brand-mark{background:#f00018;color:#fff}
+.sidebar .brand{color:#101c2c}.sidebar .brand-accent{color:#f00018}
+.primary-button,.send-button{background:#f00018;color:#fff;box-shadow:0 8px 20px #f0001826}
+.primary-button:hover,.send-button:hover{background:#cf0016}
+.outline-button{background:#fff;border-color:#efccd2;color:#243446}.outline-button:hover{background:#fff3f5}
+.eyebrow,.text-link{color:#e60019}
+.settings-title h1,.settings-card-head h2,.message-search-intro h1,.private-chat-heading h1{color:#101c2c}
+.message-search-empty{background:#fff;border-color:#f0d6dc}.message-search-result:hover{border-color:#ee94a1}
