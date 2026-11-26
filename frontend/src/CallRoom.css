@@ -242,7 +242,7 @@
   inset: 0;
   display: grid;
   place-items: center;
-  font-family: Manrope, inherit;
+  font-family:"Inter Variable", Inter, sans-serif;
   font-size: 42px;
   color: #e6b7ba;
   pointer-events: none;
@@ -954,9 +954,7 @@
 /* Keep TeamWorkspace Latin typography, with readable Indic caption fallbacks. */
 .call-captions-overlay p,
 .call-captions-overlay small {
-  font-family:
-    'DM Sans', 'Nirmala UI', 'Noto Sans Devanagari', 'Noto Sans Gurmukhi',
-    Mangal, system-ui, sans-serif;
+  font-family:"Inter Variable", Inter, 'Nirmala UI', 'Noto Sans Devanagari', 'Noto Sans Gurmukhi', Mangal, sans-serif;
 }
 
 /* Immersive room: one centered stage and a compact floating call dock. */
@@ -1033,7 +1031,7 @@
   place-items: center;
   background: #dfa9ad;
   color: #4c1b1e;
-  font-family: Manrope, system-ui, sans-serif;
+  font-family:"Inter Variable", Inter, sans-serif;
   font-size: 32px;
   font-weight: 700;
   box-shadow: 0 6px 24px #260e0f22;
