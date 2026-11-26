@@ -22,6 +22,7 @@ import PinnedMessages from './PinnedMessages';
 import ForwardMessageDialog from './ForwardMessageDialog';
 import AttachmentPanel from './AttachmentPanel';
 import MentionInput from './MentionInput';
+import {DraftProvider,useConversationDraft} from './conversationDrafts';
 import EmailPanel from './EmailPanel';
 import MessageSearchPanel from './MessageSearchPanel';
 import MessageContext from './MessageContext';
@@ -160,7 +161,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   const forwardTarget=messages.find(row=>row.id===forwardId);
   const [replyTo,setReplyTo] = useState<{channelId:string;messageId:string}|null>(null);
   const replyTarget=replyTo?.channelId===selectedChannel?messages.find(row=>row.id===replyTo.messageId&&!row.deleted_at):undefined;
-  const [draft,setDraft] = useState(''); const [pending,setPending] = useState(false);
+  const {draft,setDraft,writeDraft}=useConversationDraft(session.user.id,session.active_organization_id,'channel',selectedChannel); const [pending,setPending] = useState(false);
   const [teamMentionPeople,setTeamMentionPeople] = useState<Person[]>([]);
   const [teamRoster,setTeamRoster] = useState<Array<{user:Person;role:string}>>([]);
   const myTeamRole=teamRoster.find(row=>row.user.id===session.user.id)?.role;
@@ -210,11 +211,11 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
       const current=selectedTeamRef.current;
       if(current&&!rows.some(t=>t.id===current)){
         setChannels([]);setSelectedChannel(null);setMessages([]);setLoadedChannelId(null);
-        setReplyTo(null);setForwardId(null);setDraft('');setModal(null);
+        setReplyTo(null);setForwardId(null);writeDraft(selectedChannelRef.current,'');setModal(null);
       }
       setTeams(rows);setSelectedTeam(old=>old&&rows.some(t=>t.id===old)?old:(rows[0]?.id||null));
     }catch(e){if(currentOrgRef.current===orgId)setError(errorText(e));}
-  },[teamsEnabled]);
+  },[teamsEnabled,writeDraft]);
   useEffect(()=>{setTeams([]);setChannels([]);setMembers([]);setSelectedTeam(null);setSelectedChannel(null);setMessages([]);loadTeams();if(session.active_organization_id)api.members(session.active_organization_id).then(setMembers).catch(()=>{});},[session.active_organization_id,loadTeams]);
   useEffect(()=>{
     if(!session.active_organization_id||!teamsEnabled)return;
@@ -246,7 +247,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
     function denied(){
       if(!valid)return;valid=false;revision++;channelHistoryGeneration.current++;
       stopSocket();setConnected(false);setMessages([]);setLoadedChannelId(null);
-      setSelectedChannel(null);setChannels([]);setReplyTo(null);setForwardId(null);setDraft('');
+      setSelectedChannel(null);setChannels([]);setReplyTo(null);setForwardId(null);writeDraft(channelId,'');
       void loadTeams();void loadChannelNotices();
     }
     async function refresh(){
@@ -282,7 +283,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
     // REST history remains available even when the network/socket is initially offline.
     if(!navigator.onLine)void refresh();
     return()=>{valid=false;revision++;channelHistoryGeneration.current++;stopSocket();};
-  },[selectedChannel,session.active_organization_id,loadTeams,loadChannelNotices]);
+  },[selectedChannel,session.active_organization_id,loadTeams,loadChannelNotices,writeDraft]);
   useLayoutEffect(()=>{
     const area=channelScrollRef.current;
     if(!area)return;
@@ -348,7 +349,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
       if(selectedTeamRef.current===teamId){
         setSelectedTeam(null);setSelectedChannel(null);setChannels([]);setMessages([]);
         setLoadedChannelId(null);setTeamRoster([]);setTeamMentionPeople([]);
-        setDraft('');setReplyTo(null);setForwardId(null);setModal(null);
+        writeDraft(selectedChannelRef.current,'');setReplyTo(null);setForwardId(null);setModal(null);
       }
       await loadTeams();void loadChannelNotices();
     },false);
@@ -376,11 +377,11 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   useEffect(()=>{setReplyTo(null);setForwardId(null);setManagePrivate(false);},[selectedChannel,session.active_organization_id,view]);
   async function send(e:FormEvent){e.preventDefault();if(!selectedChannel||!draft.trim()||channelReadOnly)return;
     const channelId=selectedChannel,orgId=session.active_organization_id,body=draft,original=replyTarget?.id;
-    setDraft('');setReplyTo(null);
+    writeDraft(channelId,'');setReplyTo(null);
     try{const message=await api.sendMessage(channelId,body,original);
       if(selectedChannelRef.current!==channelId||currentOrgRef.current!==orgId)return;
       channelAutoScrollRef.current=true;setMessages(old=>old.some(m=>m.id===message.id)?old:[...old,message]);
-    }catch(err){if(selectedChannelRef.current===channelId&&currentOrgRef.current===orgId){setDraft(current=>current||body);if(original)setReplyTo(current=>current||{channelId,messageId:original});setError(errorText(err));}}
+    }catch(err){if(currentOrgRef.current===orgId){writeDraft(channelId,current=>current||body);if(selectedChannelRef.current===channelId){if(original)setReplyTo(current=>current||{channelId,messageId:original});setError(errorText(err));}}}
   }
 
   async function loadOlderChannelMessages(){
@@ -478,7 +479,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
           {!activeChannel.is_private&&(meetingsEnabled||calendarEnabled)&&<ChannelMeetingCards key={'meetings-'+selectedChannel} channelId={selectedChannel!} onOpen={id=>{setOpenMeetingRequest({id,nonce:Date.now()});setView(meetingsEnabled?'meetings':'calendar');setSidebarOpen(false);}}/>}
           {(meetingsEnabled||calendarEnabled)&&<div className="channel-meeting-shortcut"><button className="text-link" onClick={()=>{setView(meetingsEnabled?'meetings':'calendar');setSidebarOpen(false);}}><Video size={15}/>Open workspace meetings</button></div>}
           <AttachmentPanel key={'channel-files:'+selectedChannel} kind="channel" parentId={selectedChannel!} readOnly={channelReadOnly}/>
-           {channelReadOnly?<div className="compose-caption">Archived conversation — restore it to send messages or upload files.</div>:<form className="message-compose" onSubmit={send}>{replyTarget&&<ReplyPreview message={replyTarget} onCancel={()=>setReplyTo(null)}/>}<div className="compose-box"><MentionInput value={draft} onChange={setDraft} people={activeChannel.is_private?[]:teamMentionPeople.filter(person=>person.id!==session.user.id)} placeholder={`Message #${activeChannel.name}`} ariaLabel="New message"/><button type="submit" className="send-button" disabled={!draft.trim()} aria-label="Send message"><Send size={18}/></button></div><div className="compose-caption">Type @ to mention a teammate · Enter to send · Only team members can read this channel</div></form>}
+           {channelReadOnly?<div className="compose-caption">Archived conversation — restore it to send messages or upload files.</div>:<form className="message-compose" onSubmit={send}>{replyTarget&&<ReplyPreview message={replyTarget} onCancel={()=>setReplyTo(null)}/>}<div className="compose-box"><MentionInput key={selectedChannel} value={draft} onChange={setDraft} people={activeChannel.is_private?[]:teamMentionPeople.filter(person=>person.id!==session.user.id)} placeholder={`Message #${activeChannel.name}`} ariaLabel="New message"/><button type="submit" className="send-button" disabled={!draft.trim()} aria-label="Send message"><Send size={18}/></button></div><div className="compose-caption">Type @ to mention a teammate · Enter to send · Only team members can read this channel</div></form>}
         </>:<Empty icon={<Hash size={32}/>} title="Choose a channel" description="Select a channel to see its conversations."/>}</section></div>
     </>}
   </>:view==='chats' ? <ChatPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id} currentUser={session.user} members={members} presence={presence} requestedChat={openChatRequest} onRead={()=>setNotificationRefresh(current=>current+1)}/>
@@ -537,7 +538,9 @@ export default function App() {
   if(!session)return <>{bootError&&<div className="boot-error"><ErrorBanner message={bootError}/></div>}<AuthScreen onAuth={setSession}/></>;
   const activeSubscription=session.organizations.find(org=>org.id===session.active_organization_id)?.subscription;
   if(activeSubscription&&!activeSubscription.allowed)return <SubscriptionBlocked session={session} onSession={setSession}/>;
-  return <Workspace key={(session.active_organization_id||'none')+':'+(activeSubscription?.modules?.join(',')|| (activeSubscription?.modules?'none':'all'))} session={session} onSession={setSession} onLogout={()=>setSession(null)}/>;
+  return <DraftProvider key={session.user.id+':'+(session.active_organization_id||'none')}>
+  <Workspace key={(session.active_organization_id||'none')+':'+(activeSubscription?.modules?.join(',')|| (activeSubscription?.modules?'none':'all'))} session={session} onSession={setSession} onLogout={()=>setSession(null)}/>
+  </DraftProvider>;
 }
 
 

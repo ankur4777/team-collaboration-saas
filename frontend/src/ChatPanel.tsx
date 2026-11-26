@@ -6,6 +6,7 @@ import {connectConversationSocket,mergeFreshHistory} from './conversationSocket'
 import {ApiError} from './api';
 import AttachmentPanel from './AttachmentPanel';
 import MentionInput from './MentionInput';
+import {useConversationDraft} from './conversationDrafts';
 import ReplyPreview from './ReplyPreview';
 import MessageActions from './MessageActions';
 import MessageContext from './MessageContext';
@@ -43,7 +44,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
   const scrollRestoreRef = useRef<{height:number;top:number}|null>(null);
   const scopeRef = useRef({selected,workspaceId});
   scopeRef.current = {selected,workspaceId};
-  const [draft, setDraft] = useState('');
+  const {draft,setDraft,writeDraft}=useConversationDraft(currentUser.id,workspaceId,'chat',selected);
   const [forwardId,setForwardId]=useState<string|null>(null);
   const forwardTarget=messages.find(row=>row.id===forwardId);
   const [replyTo,setReplyTo] = useState<{chatId:string;messageId:string}|null>(null);
@@ -126,7 +127,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
     function denied(){
       if(!valid)return;valid=false;revision++;historyRequestRef.current++;
       stopSocket();socketRef.current=null;setConnected(false);setHistoryCursor(null);setLoadingOlder(false);
-      setLoadedChatId(null);setMessages([]);setReplyTo(null);setForwardId(null);setDraft('');
+      setLoadedChatId(null);setMessages([]);setReplyTo(null);setForwardId(null);writeDraft(selected,'');
       setThreads(old=>old.filter(t=>t.id!==selected));setSelected(null);void loadThreads();
     }
     async function refresh(){
@@ -195,7 +196,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
       typingTimersRef.current.clear();
       stopSocket();
     };
-  }, [selected, workspaceId, loadThreads]);
+  }, [selected, workspaceId, loadThreads,writeDraft]);
 
   const latest = messages[messages.length-1];
   const latestId = latest?.id;
@@ -288,9 +289,10 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
   async function send(e: FormEvent) {
     e.preventDefault();
     if (!selected || !draft.trim() || working) return;
+    const originalDraft=draft;
     const body = draft.trim();
     const chatId=selected,orgId=workspaceId,original=replyTarget?.id;
-    setDraft('');setReplyTo(null);
+    writeDraft(chatId,'');setReplyTo(null);
     emitTyping(false);
     if(stopTypingRef.current) clearTimeout(stopTypingRef.current);
     setError('');
@@ -302,7 +304,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
         ? current : [...current, sent].sort(messageOrder));
       await loadThreads();
     } catch (e) {
-      if(scopeRef.current.selected===chatId&&scopeRef.current.workspaceId===orgId){setError(e instanceof Error ? e.message : 'Could not send message');setDraft(current=>current||body);if(original)setReplyTo(current=>current||{chatId,messageId:original});}
+      if(scopeRef.current.workspaceId===orgId){writeDraft(chatId,current=>current||originalDraft);if(scopeRef.current.selected===chatId){setError(e instanceof Error ? e.message : 'Could not send message');if(original)setReplyTo(current=>current||{chatId,messageId:original});}}
     } finally { setWorking(false); }
   }
 
@@ -416,7 +418,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
     try {
       await api.leaveGroup(selected);
       setThreads(old => old.filter(thread => thread.id !== selected));
-      setMessages([]); setSelected(null); setManagingGroup(false); setDraft('');
+      setMessages([]); setSelected(null); setManagingGroup(false); writeDraft(selected,'');
       await loadThreads();
       onReadRef.current?.();
     } catch(e) { setError(e instanceof Error ? e.message : 'Could not leave group'); }
@@ -486,7 +488,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
           {Object.keys(typingUsers).length>0&&<div className="chat-typing-indicator" aria-live="polite">{Object.values(typingUsers).join(', ')} {Object.keys(typingUsers).length>1?'are':'is'} typing…</div>}
           <AttachmentPanel key={'chat-files:'+selected} kind="chat" parentId={selected!}/>
           {replyTarget&&<div className="chat-reply-compose"><ReplyPreview message={replyTarget} onCancel={()=>setReplyTo(null)}/></div>}
-          <form className="private-chat-compose" onSubmit={send}><MentionInput ariaLabel="Write a message" value={draft} placeholder="Write a message... (@ to mention)" people={active.participants.map(p=>p.user).filter(user=>user.id!==currentUser.id)} onChange={changeDraft} onBlur={()=>emitTyping(false)}/><button className="send-button" aria-label="Send message" disabled={!draft.trim()||working}><Send size={18}/></button></form>
+          <form className="private-chat-compose" onSubmit={send}><MentionInput key={selected} ariaLabel="Write a message" value={draft} placeholder="Write a message... (@ to mention)" people={active.participants.map(p=>p.user).filter(user=>user.id!==currentUser.id)} onChange={changeDraft} onBlur={()=>emitTyping(false)}/><button className="send-button" aria-label="Send message" disabled={!draft.trim()||working}><Send size={18}/></button></form>
         </> : <div className="private-chat-welcome"><MessageCircle size={32}/><h3>Connect with your team</h3><p>Choose a conversation or start a new one.</p></div>}
       </div>
     </div>

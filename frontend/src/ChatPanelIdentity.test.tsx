@@ -2,6 +2,7 @@ import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {cleanup,render,screen,waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ChatPanel from './ChatPanel';
+import {DraftProvider} from './conversationDrafts';
 import {api,type ChatThread,type Person,type Member} from './api';
 
 vi.mock('./api',async importOriginal=>{
@@ -77,5 +78,25 @@ describe('Group member selection',()=>{
     await user.click(first);
     expect(first.checked).toBe(false);
     expect(create!.disabled).toBe(true);
+  });
+});
+
+describe('Conversation draft isolation',()=>{
+  it('keeps direct and group drafts separate and restores them after switching',async()=>{
+    const user=userEvent.setup();
+    vi.mocked(api.chats).mockResolvedValue([thread('one','First colleague'),{...thread('two','Second colleague'),kind:'group',title:'Project group'}]);
+    render(<DraftProvider><ChatPanel workspaceId="org" currentUser={me} members={[]}/></DraftProvider>);
+    await screen.findByRole('heading',{name:'First colleague'});
+    const composer=()=>screen.getByRole('textbox',{name:'Write a message'}) as HTMLInputElement;
+    await user.type(composer(),'Direct draft');
+    await user.click(screen.getByRole('button',{name:/Project group/}));
+    await screen.findByRole('heading',{name:'Project group'});
+    expect(composer().value).toBe('');
+    await user.type(composer(),'Group draft');
+    await user.click(screen.getByRole('button',{name:/First colleague/}));
+    await screen.findByRole('heading',{name:'First colleague'});
+    expect(composer().value).toBe('Direct draft');
+    await user.click(screen.getByRole('button',{name:/Project group/}));
+    expect(composer().value).toBe('Group draft');
   });
 });
