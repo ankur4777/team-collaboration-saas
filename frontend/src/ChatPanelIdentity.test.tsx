@@ -100,3 +100,21 @@ describe('Conversation draft isolation',()=>{
     expect(composer().value).toBe('Group draft');
   });
 });
+
+describe('Unread conversation badges',()=>{
+  it('refreshes counts for unopened direct and group chats on notification',async()=>{
+    const props={workspaceId:'org',currentUser:me,members:[]};
+    const group={...thread('three','Third colleague'),kind:'group' as const,title:'Project group'};
+    vi.mocked(api.chats).mockResolvedValue([thread('one','First colleague'),thread('two','Second colleague'),group]);
+    const view=render(<ChatPanel {...props}/>);
+    await screen.findByRole('heading',{name:'First colleague'});
+    vi.mocked(api.chats).mockResolvedValue([thread('one','First colleague'),{...thread('two','Second colleague'),unread_count:3},{...group,unread_count:102}]);
+    view.rerender(<ChatPanel {...props} notificationVersion={1}/>);
+    await waitFor(()=>expect(screen.getByLabelText('3 unread messages').textContent).toBe('3'));
+    expect(screen.getByLabelText('102 unread messages').textContent).toBe('99+');
+    expect(screen.getByRole('heading',{name:'First colleague'})).toBeTruthy();
+    vi.mocked(api.chats).mockResolvedValue([thread('one','First colleague'),thread('two','Second colleague'),group]);
+    view.rerender(<ChatPanel {...props} notificationVersion={2}/>);
+    await waitFor(()=>expect(screen.queryByLabelText('3 unread messages')).toBeNull());
+  });
+});

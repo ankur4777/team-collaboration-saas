@@ -28,9 +28,9 @@ function messageOrder(a: ChatMessage, b: ChatMessage) {
   return a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id);
 }
 
-interface Props { workspaceId: string|null; currentUser: Person; members: Member[]; presence?: PresenceMap; requestedChat?: {id:string;nonce:number;messageId?:string}|null; onRead?: ()=>void }
+interface Props { workspaceId: string|null; currentUser: Person; members: Member[]; presence?: PresenceMap; requestedChat?: {id:string;nonce:number;messageId?:string}|null; onRead?: ()=>void; notificationVersion?:number }
 
-export default function ChatPanel({workspaceId, currentUser, members, presence={}, requestedChat, onRead}: Props) {
+export default function ChatPanel({workspaceId, currentUser, members, presence={}, requestedChat, onRead,notificationVersion=0}: Props) {
   const [jumpClosed,setJumpClosed]=useState<number|null>(null);
   const [showArchived,setShowArchived]=useState(false);
   const [threads, setThreads] = useState<ChatThread[]>([]);
@@ -74,14 +74,19 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
   const requestedChatRef = useRef(requestedChat);
   requestedChatRef.current = requestedChat;
 
+  const listRequest=useRef(0);
   const loadThreads = useCallback(async () => {
+    const run=++listRequest.current;
+    const org=scopeRef.current.workspaceId;
+    if(!org)return;
     try {
       const rows = await api.chats();
+      if(run!==listRequest.current||scopeRef.current.workspaceId!==org)return;
       setThreads(rows);
       setSelected(current => current && rows.some(row => row.id === current) ? current
         : (requestedChatRef.current && rows.some(row=>row.id===requestedChatRef.current?.id)
           ? requestedChatRef.current.id : (rows[0]?.id || null)));
-    } catch (e) { setError(e instanceof Error ? e.message : 'Could not load chats'); }
+    } catch (e) { if(run===listRequest.current&&scopeRef.current.workspaceId===org)setError(e instanceof Error ? e.message : 'Could not load chats'); }
   }, []);
 
   useEffect(() => {
@@ -93,7 +98,18 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
     setManagingGroup(false);
     setThreads([]);
     if (workspaceId) void loadThreads();
+    return()=>{listRequest.current++;};
   }, [workspaceId, loadThreads]);
+
+  useEffect(()=>{
+    if(!workspaceId)return;
+    const refresh=()=>{if(!document.hidden)void loadThreads();};
+    const timer=window.setInterval(refresh,15000);
+    window.addEventListener('focus',refresh);
+    document.addEventListener('visibilitychange',refresh);
+    return()=>{window.clearInterval(timer);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};
+  },[workspaceId,loadThreads]);
+  useEffect(()=>{if(notificationVersion>0&&workspaceId)void loadThreads();},[notificationVersion,workspaceId,loadThreads]);
 
   useEffect(() => {
     if(requestedChat?.id) setSelected(requestedChat.id);
@@ -103,11 +119,12 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
     try{
       const read = await api.markChatRead(chatId,messageId);
       setThreads(current=>current.map(t=>t.id===chatId
-        ? {...t,unread_count:0,participants:t.participants.map(p=>p.user.id===currentUser.id
+        ? {...t,participants:t.participants.map(p=>p.user.id===currentUser.id
           ? {...p,last_read_at:read.last_read_at} : p)} : t));
+      void loadThreads();
       onReadRef.current?.();
-    }catch(e){setError(e instanceof Error?e.message:'Could not mark chat read');}
-  },[currentUser.id]);
+    }catch(e){lastMarkedRef.current=null;setError(e instanceof Error?e.message:'Could not mark chat read');}
+  },[currentUser.id,loadThreads]);
 
   useEffect(() => {
     setReplyTo(null);setForwardId(null);
@@ -436,7 +453,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
       <aside className="private-chat-list">
         <div className="private-chat-list-heading"><strong>Conversations</strong><button type="button" className="outline-button" aria-pressed={showArchived} onClick={()=>setShowArchived(value=>!value)}>{showArchived?'Active':'Archived'}</button><button type="button" className="icon-button" aria-label="Refresh chats" title="Refresh chats" onClick={() => void loadThreads()}><RefreshCw size={16}/></button></div>
         <input className="chat-filter" aria-label="Search conversations" placeholder="Search conversations" value={filter} onChange={e => setFilter(e.target.value)}/>
-        {visibleThreads.map(thread => <button type="button" key={thread.id} className={`chat-thread ${selected === thread.id ? 'selected' : ''}`} onClick={() => setSelected(thread.id)}>
+        {visibleThreads.map(thread => <button type="button" key={thread.id} className={`chat-thread ${selected === thread.id ? 'selected' : ''}${thread.unread_count>0?' has-unread':''}`} onClick={() => setSelected(thread.id)}>
           <span className="chat-thread-avatar">{thread.kind === 'group' ? <Users size={17}/> : initials(titleFor(thread,currentUser.id))}</span>
           <span className="chat-thread-details"><strong>{thread.is_pinned?'★ ':''}{titleFor(thread,currentUser.id)}{thread.is_muted?' · Muted':''}</strong><small>{thread.kind === 'group' ? `${thread.participants.length} participants` : presenceLabel(presence[thread.participants.find(p=>p.user.id!==currentUser.id)?.user.id||''])}</small></span>
           {thread.unread_count>0&&<span className="chat-unread-badge" aria-label={`${thread.unread_count} unread messages`}>{thread.unread_count>99?'99+':thread.unread_count}</span>}
