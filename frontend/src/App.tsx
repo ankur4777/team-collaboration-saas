@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Check, ChevronDown, Hash, Inbox, MessageCircle,
   LayoutGrid, LockKeyhole, LogOut, Mail, Menu, Plus, Send,
   Settings2, Sparkles, Users, Video, X, CalendarDays, FolderOpen, Search } from 'lucide-react';
 import { api, csrf, type Channel, type ChannelMessageCursor, type ChannelNotice, type Member, type Message, type Person, type Session, type Team } from './api';
+import Brand from './Brand';
 import ChatPanel from './ChatPanel';
 import PlatformAdmin from './PlatformAdmin';
 import {showPlatformAdmin} from './adminRouting';
@@ -29,9 +30,7 @@ import SharedFilesPanel from './SharedFilesPanel';
 
 function initials(name: string) { return name.split(' ').filter(Boolean).slice(0, 2).map(t => t[0].toUpperCase()).join('') || 'TW'; }
 function errorText(error: unknown) { return error instanceof Error ? error.message : 'Something went wrong'; }
-function Brand({ compact = false }: { compact?: boolean }) {
-  return <div className="brand"><span className="brand-mark"><LayoutGrid size={19} strokeWidth={2.6}/></span>{!compact && <span>team<span className="brand-accent">workspace</span></span>}</div>;
-}
+
 function Spinner() { return <div className="spin" aria-label="Loading"/>; }
 function ErrorBanner({ message, onClose }: {message:string;onClose?:()=>void}) {
   return <div className="error-banner" role="alert">{message}{onClose && <button className="icon-button" onClick={onClose} aria-label="Dismiss"><X size={15}/></button>}</div>;

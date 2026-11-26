@@ -387,3 +387,9 @@ body,.page-loader{background:#fff;color:var(--shabdd-ink)}
 .brand .brand-accent,.sidebar .brand-accent,.auth-aside .brand-accent{color:#ff101c}
 .brand .brand-mark,.sidebar .brand-mark,.auth-aside .brand-mark{background:#ff101c;color:#fff;box-shadow:0 8px 22px #ff101c33}
 .auth-aside .brand{align-self:flex-start;background:#fff;border-radius:14px;padding:8px 12px}
+
+/* Shared branding on recovery, administration and subscription pages. */
+.recovery-card>.brand,.pa-login-card>.brand{margin-bottom:24px}
+.pa-global-brand>.brand{font-size:16px}
+.pa-global-brand>.brand .brand-mark{width:33px;height:33px}
+.page-loader>.brand .brand-accent{color:#ff101c}

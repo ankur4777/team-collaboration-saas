@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle, KeyRound, MailCheck } from 'lucide-react';
 import { api } from './api';
+import Brand from './Brand';
 
 type Mode = 'forgot' | 'reset' | 'verify';
 interface Props { mode: Mode }
@@ -49,6 +50,7 @@ export default function AccountRecoveryScreen({mode}:Props) {
     :'Confirm the email address you used for your TeamWorkspace account.';
   return <main className="recovery-layout">
     <div className="recovery-card">
+      <Brand/>
       <div className="recovery-icon">{mode==='verify'?<MailCheck size={24}/>:<KeyRound size={24}/>}</div>
       <div className="eyebrow">TEAMWORKSPACE / ACCOUNT SECURITY</div>
       <h1>{title}</h1><p className="muted">{description}</p>
