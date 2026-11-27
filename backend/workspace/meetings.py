@@ -4,7 +4,7 @@ from django.conf import settings
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.db import transaction
-from django.db.models import Q, F, Prefetch
+from django.db.models import Q, F, Prefetch, Exists, OuterRef
 from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -13,7 +13,7 @@ from rest_framework.exceptions import NotFound, PermissionDenied, ValidationErro
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Meeting, MeetingAttendee, MeetingActionItem, OrganizationMember, TeamMember, Channel
+from .models import Meeting, MeetingAttendee, MeetingActionItem, MeetingCallPeer, OrganizationMember, TeamMember, Channel
 from .permissions import get_active_membership, require_channel_access
 from .notification_events import publish_notification_refresh
 
@@ -28,7 +28,7 @@ def visible(request):
     # A channel-linked meeting also requires current membership of that team.
     return Meeting.objects.filter(organization_id=org, attendees__user=request.user, attendees__invited_at__gte=membership.joined_at).filter(
         Q(channel__isnull=True) | Q(channel__team__members__user=request.user, channel__team__members__joined_at__lte=F('attendees__invited_at'))
-    ).distinct().select_related('organizer', 'channel__team').prefetch_related(
+    ).distinct().annotate(organizer_in_call=Exists(MeetingCallPeer.objects.filter(meeting_id=OuterRef('pk'), user_id=OuterRef('organizer_id'), updated_at__gte=timezone.now()-timedelta(seconds=90)))).select_related('organizer', 'channel__team').prefetch_related(
         Prefetch('attendees', queryset=MeetingAttendee.objects.filter(user_id__in=active_users(org)).select_related('user')),
         'action_items',
     )
@@ -61,6 +61,7 @@ def serialize(row, user):
         'starts_at': row.starts_at.isoformat(), 'ends_at': row.ends_at.isoformat(),
         'time_zone': row.time_zone, 'meeting_url': settings.FRONTEND_ORIGIN+'/?meeting='+str(row.pk), 'notes': row.notes, 'call_ended': bool(row.call_ended_at),
         'cancelled': row.cancelled, 'revision': row.revision, 'organizer': person(row.organizer),
+        'organizer_in_call': row.organizer_in_call and not row.cancelled and not row.call_ended_at and row.ends_at > timezone.now(),
         'channel': {'id': str(row.channel_id), 'name': row.channel.name, 'team_id': str(row.channel.team_id), 'team_name': row.channel.team.name} if row.channel_id else None,
         'my_response': next((a.response for a in attendees if a.user_id == user.pk), 'pending'),
         'attendees': [{'user': person(a.user), 'response': a.response} for a in attendees],
