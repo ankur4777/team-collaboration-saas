@@ -9,7 +9,6 @@ import RolePicker from './RolePicker';
 import ThemedPicker from './ThemedPicker';
 import {retainSelection} from './explicitSelection';
 import ChatPanel from './ChatPanel';
-import TasksPanel from './TasksPanel';
 import PlatformAdmin from './PlatformAdmin';
 import {showPlatformAdmin} from './adminRouting';
 import SubscriptionBlocked from './SubscriptionBlocked';
@@ -119,7 +118,6 @@ function InviteScreen({ session, onDone, onBack }: {session:Session|null;onDone:
 const navItems = [
   {id:'teams', label:'Teams & Channels', icon:Users, ready:true},
   {id:'chats', label:'Chats & Groups', icon:MessageCircle, ready:true},
-  {id:'tasks', label:'Tasks', icon:LayoutGrid, ready:true},
   {id:'search', label:'Search messages', icon:Search, ready:true},
   {id:'inbox', label:'Email inbox', icon:Mail, ready:true},
   {id:'meetings', label:'Meetings', icon:Video, ready:true},
@@ -130,7 +128,7 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
   const presence=useWorkspacePresence(session.active_organization_id);
   const [requestedView,setView] = useState(new URLSearchParams(location.search).has('meeting')?'meetings':new URLSearchParams(location.search).has('mail')?'inbox':'teams'); const [teams,setTeams] = useState<Team[]>([]);
   const allowedModules=session.organizations.find(o=>o.id===session.active_organization_id)?.subscription?.modules;
-  const moduleEnabled=(id:string)=>!allowedModules||allowedModules.includes(id==='inbox'?'email':id==='tasks'?'chats':id);
+  const moduleEnabled=(id:string)=>!allowedModules||allowedModules.includes(id==='inbox'?'email':id);
   const teamsEnabled=moduleEnabled('teams'),meetingsEnabled=moduleEnabled('meetings'),calendarEnabled=moduleEnabled('calendar');
   const visibleNav=navItems.filter(item=>moduleEnabled(item.id));
   const view=requestedView==='settings'||moduleEnabled(requestedView)?requestedView:(visibleNav[0]?.id||'settings');
@@ -497,7 +495,6 @@ function Workspace({ session, onSession, onLogout }: {session:Session;onSession:
         </>:<Empty icon={<Hash size={32}/>} title="Select a channel" description="Choose a channel from the list to start collaborating."/>}</section></div>
     </>}
   </>:view==='chats' ? <ChatPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id} currentUser={session.user} members={members} presence={presence} requestedChat={openChatRequest} notificationVersion={chatNotificationVersion} onRead={()=>setNotificationRefresh(current=>current+1)}/>
-   :view==='tasks' ? <TasksPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id}/>
    :view==='inbox' ? <EmailPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id} user={session.user}/>
    :view==='files' ? <SharedFilesPanel key={session.active_organization_id||'none'} workspaceId={session.active_organization_id}/>
    :view==='meetings'||view==='calendar' ? <MeetingsPanel key={(session.active_organization_id||'none')+view} workspaceId={session.active_organization_id} userId={session.user.id} members={members} teams={teams} calendar={view==='calendar'} callsEnabled={meetingsEnabled} requestedMeeting={openMeetingRequest} onChanged={()=>setNotificationRefresh(v=>v+1)}/>
