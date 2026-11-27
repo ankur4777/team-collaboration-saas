@@ -39,6 +39,7 @@ class OrganizationMemberDetailView(APIView):
         if role not in (OrganizationMember.Role.ADMIN, OrganizationMember.Role.MEMBER):
             raise ValidationError({'role': 'Role must be admin or member'})
         with transaction.atomic():
+            self._authorize(request, pk, member_id, role_change=True)
             Organization.objects.select_for_update().get(pk=pk)
             target = self._authorize(request, pk, member_id, role_change=True)
             # Lock the row and reauthorize against its current role.
