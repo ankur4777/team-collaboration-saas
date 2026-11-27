@@ -67,14 +67,89 @@ describe('Shared file previews',() => {
     expect(createUrl).not.toHaveBeenCalled();
   });
 
-  it('automatically previews a newly uploaded file',async() => {
-    vi.spyOn(api,'uploadWorkspaceFile').mockResolvedValue({...image,id:'new-image',name:'New photo.png'});
+  it('previews the selected file locally and waits for Upload confirmation',async() => {
+    const upload = vi.spyOn(api,'uploadWorkspaceFile').mockResolvedValue({...image,id:'new-image',name:'New photo.png'});
     const user = userEvent.setup();
     render(<SharedFilesPanel workspaceId="workspace-a"/>);
     await screen.findByRole('button',{name:'Preview Team photo.png'});
-    await user.upload(screen.getByLabelText('Upload a shared file'),new File(['png'],'New photo.png',{type:'image/png'}));
+    const selectedFile = new File(['png'],'New photo.png',{type:'image/png'});
+    await user.upload(screen.getByLabelText('Upload a shared file'),selectedFile);
     expect(await screen.findByRole('dialog',{name:'New photo.png'})).toBeTruthy();
     expect(await screen.findByRole('img',{name:'New photo.png'})).toBeTruthy();
+    expect(upload).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button',{name:'Upload'}));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(upload).toHaveBeenCalledWith(selectedFile);
+    expect(screen.getByRole('button',{name:'Preview New photo.png'})).toBeTruthy();
+  });
+
+  it('cancels without uploading and allows selecting the same file again',async() => {
+    const upload = vi.spyOn(api,'uploadWorkspaceFile');
+    const user = userEvent.setup();
+    render(<SharedFilesPanel workspaceId="workspace-a"/>);
+    await screen.findByRole('button',{name:'Preview Team photo.png'});
+    const selectedFile = new File(['png'],'New photo.png',{type:'image/png'});
+    const input = screen.getByLabelText('Upload a shared file');
+    await user.upload(input,selectedFile);
+    await screen.findByRole('img',{name:selectedFile.name});
+    await user.click(screen.getByRole('button',{name:'Cancel'}));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(upload).not.toHaveBeenCalled();
+    expect(revokeUrl).toHaveBeenCalledWith('blob:shared-preview');
+    await user.upload(input,selectedFile);
+    expect(await screen.findByRole('img',{name:selectedFile.name})).toBeTruthy();
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it('previews a local PDF without a network request',async() => {
+    const user = userEvent.setup();
+    render(<SharedFilesPanel workspaceId="workspace-a"/>);
+    await screen.findByRole('button',{name:'Preview Team photo.png'});
+    await user.upload(screen.getByLabelText('Upload a shared file'),new File(['%PDF-1.4'],'Draft.pdf',{type:'application/pdf'}));
+    expect(await screen.findByTitle('PDF preview of Draft.pdf')).toBeTruthy();
+    expect(createUrl.mock.calls[0][0].type).toBe('application/pdf');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('previews local text as plain text before uploading',async() => {
+    const user = userEvent.setup();
+    render(<SharedFilesPanel workspaceId="workspace-a"/>);
+    await screen.findByRole('button',{name:'Preview Team photo.png'});
+    const contents = '<script>local preview</script>\nDraft notes';
+    await user.upload(screen.getByLabelText('Upload a shared file'),new File([contents],'Draft.txt',{type:'text/plain'}));
+    const pre = await screen.findByText(contents,{selector:'pre',normalizer:value=>value});
+    expect(pre.querySelector('script')).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('retains the selected file and allows retrying a failed upload',async() => {
+    const upload = vi.spyOn(api,'uploadWorkspaceFile').mockRejectedValueOnce(new Error('Upload failed')).mockResolvedValue({...image,id:'new-image',name:'New photo.png'});
+    const user = userEvent.setup();
+    render(<SharedFilesPanel workspaceId="workspace-a"/>);
+    await screen.findByRole('button',{name:'Preview Team photo.png'});
+    const selectedFile = new File(['png'],'New photo.png',{type:'image/png'});
+    await user.upload(screen.getByLabelText('Upload a shared file'),selectedFile);
+    await screen.findByRole('img',{name:selectedFile.name});
+    await user.click(screen.getByRole('button',{name:'Upload'}));
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent','Upload failed');
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    await user.click(screen.getByRole('button',{name:'Upload'}));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(upload).toHaveBeenCalledTimes(2);
+  });
+
+  it('discards an unuploaded selection when switching workspaces',async() => {
+    const upload = vi.spyOn(api,'uploadWorkspaceFile');
+    const user = userEvent.setup();
+    const view = render(<SharedFilesPanel workspaceId="workspace-a"/>);
+    await screen.findByRole('button',{name:'Preview Team photo.png'});
+    await user.upload(screen.getByLabelText('Upload a shared file'),new File(['png'],'Draft.png',{type:'image/png'}));
+    await screen.findByRole('img',{name:'Draft.png'});
+    view.rerender(<SharedFilesPanel workspaceId="workspace-b"/>);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(upload).not.toHaveBeenCalled();
+    expect(revokeUrl).toHaveBeenCalledWith('blob:shared-preview');
   });
 
   it('shows denied access as an error and supports retry',async() => {

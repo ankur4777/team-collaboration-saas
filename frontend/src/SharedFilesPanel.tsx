@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Download, Eye, File, FileText, FolderOpen, Image, Search, Upload } from 'lucide-react';
+import { Download, Eye, File as FileIcon, FileText, FolderOpen, Image, Search, Upload } from 'lucide-react';
 import { api, type WorkspaceFile } from './api';
 import SharedFilePreview from './SharedFilePreview';
 import './SharedFilesPanel.css';
@@ -14,7 +14,7 @@ function dateLabel(value:string) {
   return new Intl.DateTimeFormat(undefined, {day:'numeric', month:'short', year:'numeric'}).format(new Date(value));
 }
 function FileGlyph({type}:{type:string}) {
-  return type.startsWith('image/') ? <Image size={21}/> : type === 'application/pdf' ? <FileText size={21}/> : <File size={21}/>;
+  return type.startsWith('image/') ? <Image size={21}/> : type === 'application/pdf' ? <FileText size={21}/> : <FileIcon size={21}/>;
 }
 
 export default function SharedFilesPanel({workspaceId}:{workspaceId:string|null}) {
@@ -24,8 +24,11 @@ export default function SharedFilesPanel({workspaceId}:{workspaceId:string|null}
   const [loading,setLoading] = useState(true);
   const [uploading,setUploading] = useState(false);
   const [error,setError] = useState('');
-  const [preview,setPreview] = useState<{file:WorkspaceFile;workspaceId:string|null}|null>(null);
+  const [preview,setPreview] = useState<{file:WorkspaceFile|File;workspaceId:string|null}|null>(null);
+  const [uploadError,setUploadError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const activeWorkspace = useRef(workspaceId);
+  activeWorkspace.current = workspaceId;
 
   useEffect(() => { setPreview(null); }, [workspaceId]);
 
@@ -43,19 +46,33 @@ export default function SharedFilesPanel({workspaceId}:{workspaceId:string|null}
   }
   useEffect(() => { void load(); }, [workspaceId, category]);
 
-  async function upload(file:File|undefined) {
+  function selectFile(file:File|undefined) {
+    if (inputRef.current) inputRef.current.value = '';
     if (!file) return;
     if (file.size <= 0 || file.size > LIMIT) {
       setError('Choose a file up to 5 MB.');
       return;
     }
-    setUploading(true); setError('');
+    if (!/\.(png|jpe?g|webp|pdf|txt)$/i.test(file.name)) {
+      setError('Choose a PNG, JPEG, WebP, PDF, or TXT file.');
+      return;
+    }
+    setError(''); setUploadError('');
+    setPreview({file,workspaceId});
+  }
+
+  async function upload(file:File) {
+    if (uploading) return;
+    const uploadWorkspace = workspaceId;
+    setUploading(true); setUploadError('');
     try {
       const row = await api.uploadWorkspaceFile(file);
-      setFiles(current => [row, ...current.filter(item => item.id !== row.id)]);
-      setPreview({file:row,workspaceId});
+      if (activeWorkspace.current === uploadWorkspace) {
+        setFiles(current => [row, ...current.filter(item => item.id !== row.id)]);
+        setPreview(null);
+      }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not upload file');
+      if (activeWorkspace.current === uploadWorkspace) setUploadError(reason instanceof Error ? reason.message : 'Could not upload file');
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -81,7 +98,7 @@ export default function SharedFilesPanel({workspaceId}:{workspaceId:string|null}
       <label className={"shared-files-upload" + (uploading ? ' busy' : '')}>
         <Upload size={16}/>{uploading ? 'Uploading…' : 'Upload file'}
         <input ref={inputRef} type="file" aria-label="Upload a shared file" disabled={uploading}
-          accept=".png,.jpg,.jpeg,.webp,.pdf,.txt" onChange={event => void upload(event.target.files?.[0])}/>
+          accept=".png,.jpg,.jpeg,.webp,.pdf,.txt" onChange={event => selectFile(event.target.files?.[0])}/>
       </label>
     </header>
 
@@ -115,7 +132,9 @@ export default function SharedFilesPanel({workspaceId}:{workspaceId:string|null}
           </div>
         </article>)}</div>}
     <p className="shared-files-note">Allowed: PNG, JPEG, WebP, PDF, and TXT files up to 5 MB. Files are visible only inside this workspace.</p>
-    {preview && preview.workspaceId === workspaceId && <SharedFilePreview key={preview.file.id} file={preview.file} onClose={() => setPreview(null)}/>}
+    {preview && preview.workspaceId === workspaceId && <SharedFilePreview key={preview.file instanceof File ? 'selected-file' : preview.file.id}
+      file={preview.file} uploading={uploading} uploadError={uploadError} onUpload={file => void upload(file)}
+      onClose={() => { if (!uploading) setPreview(null); }}/>}
   </section>;
 }
 
