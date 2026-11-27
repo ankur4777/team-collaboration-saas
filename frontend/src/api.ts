@@ -35,6 +35,7 @@ export interface PrivateAttachment {
 }
 export interface WorkspaceFile {
   id:string; name:string; size:number; content_type:string;
+  can_delete:boolean;
   created_at:string; uploaded_by:Pick<Person,'id'|'full_name'|'email'>;
 }
 export interface Message { id: string; body: string; created_at: string; edited_at: string|null; deleted_at: string|null; sender: Person; reply_to_id?: string|null; is_forwarded?: boolean; pinned_at?: string|null }
@@ -207,6 +208,7 @@ export const api = {
   downloadPrivateAttachment: (row:PrivateAttachment) => downloadPrivateFile(row),
   workspaceFiles: (query='',category:'all'|'images'|'documents'='all') => request<{results:WorkspaceFile[];limit:number}>(`files/?${new URLSearchParams({q:query,category}).toString()}`),
   uploadWorkspaceFile: (file:File) => uploadPrivateFile('files/',file) as Promise<WorkspaceFile>,
+  deleteWorkspaceFile: (id:string) => request<void>(`files/${encodeURIComponent(id)}/`,'DELETE'),
   downloadWorkspaceFile: (row:WorkspaceFile) => downloadWorkspaceFile(row),
   workspaceFileContent: (row:WorkspaceFile,signal?:AbortSignal) => workspaceFileContent(row,signal),
   me: () => request<Session>('auth/me/'),

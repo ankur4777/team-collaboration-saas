@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Download, Eye, File as FileIcon, FileText, FolderOpen, Image, Search, Upload } from 'lucide-react';
+import { Download, Eye, File as FileIcon, FileText, FolderOpen, Image, Search, Trash2, Upload } from 'lucide-react';
 import { api, type WorkspaceFile } from './api';
 import SharedFilePreview from './SharedFilePreview';
+import SharedFileDeleteDialog from './SharedFileDeleteDialog';
 import './SharedFilesPanel.css';
 
 type Category = 'all' | 'images' | 'documents';
@@ -26,11 +27,14 @@ export default function SharedFilesPanel({workspaceId}:{workspaceId:string|null}
   const [error,setError] = useState('');
   const [preview,setPreview] = useState<{file:WorkspaceFile|File;workspaceId:string|null}|null>(null);
   const [uploadError,setUploadError] = useState('');
+  const [deleteTarget,setDeleteTarget] = useState<{file:WorkspaceFile;workspaceId:string|null}|null>(null);
+  const [deleting,setDeleting] = useState(false);
+  const [deleteError,setDeleteError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const activeWorkspace = useRef(workspaceId);
   activeWorkspace.current = workspaceId;
 
-  useEffect(() => { setPreview(null); }, [workspaceId]);
+  useEffect(() => { setPreview(null); setDeleteTarget(null); setDeleteError(''); }, [workspaceId]);
 
   async function load(nextQuery=query, nextCategory=category) {
     if (!workspaceId) { setFiles([]); setLoading(false); return; }
@@ -88,6 +92,21 @@ export default function SharedFilesPanel({workspaceId}:{workspaceId:string|null}
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not download file'); }
   }
 
+  async function confirmDelete() {
+    if (!deleteTarget || deleting || deleteTarget.workspaceId !== activeWorkspace.current) return;
+    const target = deleteTarget;
+    setDeleting(true); setDeleteError('');
+    try {
+      await api.deleteWorkspaceFile(target.file.id);
+      if (activeWorkspace.current === target.workspaceId) {
+        setFiles(current => current.filter(file => file.id !== target.file.id));
+        setDeleteTarget(null);
+      }
+    } catch (reason) {
+      if (activeWorkspace.current === target.workspaceId) setDeleteError(reason instanceof Error ? reason.message : 'Could not delete file');
+    } finally { setDeleting(false); }
+  }
+
   return <section className="shared-files-page" aria-label="Shared files">
     <header className="shared-files-heading">
       <div>
@@ -129,12 +148,17 @@ export default function SharedFilesPanel({workspaceId}:{workspaceId:string|null}
               aria-label={`Open preview of ${file.name}`}><Eye size={16}/>Preview</button>
             <button type="button" className="shared-file-download" onClick={() => void download(file)}
               aria-label={`Download ${file.name}`}><Download size={16}/>Download</button>
+            {file.can_delete && <button type="button" className="shared-file-download shared-file-delete" disabled={deleting}
+              onClick={() => {setDeleteError('');setDeleteTarget({file,workspaceId});}}
+              aria-label={`Delete ${file.name}`}><Trash2 size={16}/>Delete</button>}
           </div>
         </article>)}</div>}
     <p className="shared-files-note">Allowed: PNG, JPEG, WebP, PDF, and TXT files up to 5 MB. Files are visible only inside this workspace.</p>
     {preview && preview.workspaceId === workspaceId && <SharedFilePreview key={preview.file instanceof File ? 'selected-file' : preview.file.id}
       file={preview.file} uploading={uploading} uploadError={uploadError} onUpload={file => void upload(file)}
       onClose={() => { if (!uploading) setPreview(null); }}/>}
+    {deleteTarget && deleteTarget.workspaceId === workspaceId && <SharedFileDeleteDialog name={deleteTarget.file.name}
+      deleting={deleting} error={deleteError} onCancel={() => {if(!deleting)setDeleteTarget(null);}} onConfirm={() => void confirmDelete()}/>}
   </section>;
 }
 

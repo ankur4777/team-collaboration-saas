@@ -107,6 +107,8 @@ urlpatterns = [
     path('channels/<uuid:channel_id>/attachments/', private_attachments.ChannelAttachmentsView.as_view()),
     path('attachments/<uuid:attachment_id>/download/', private_attachments.AttachmentDownloadView.as_view()),
     path('files/', shared_files.WorkspaceFilesView.as_view()),
+    path('files/<uuid:file_id>/', shared_files.WorkspaceFileDetailView.as_view()),
     path('files/<uuid:file_id>/download/', shared_files.WorkspaceFileDownloadView.as_view()),
 ]
+
 

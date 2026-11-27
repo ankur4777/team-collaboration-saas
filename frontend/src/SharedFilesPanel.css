@@ -59,8 +59,15 @@
 .shared-file-preview-footer-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .shared-file-preview-confirm{background:#f00018;border-color:#f00018;color:#fff}
 .shared-file-preview-confirm:hover{background:#cf0016;border-color:#cf0016}
+.shared-file-delete:hover{background:#fff0f2;border-color:#e60019;color:#b50015}
+.shared-file-delete-dialog{width:min(480px,calc(100vw - 40px))}
+.shared-file-delete-content{padding:20px;color:#64748b;font-size:13px;line-height:1.7;overflow:auto}
+.shared-file-delete-content p{margin:0}
+.shared-file-delete-content .shared-file-delete-name{margin-bottom:10px;color:#101c2c;font-weight:600;overflow-wrap:anywhere}
+.shared-file-delete-content .shared-file-delete-error{margin-top:12px;color:#b52d35}
+.shared-file-delete-footer{justify-content:flex-end}
 .shared-file-preview-dialog button:focus-visible,.shared-file-name:focus-visible,.shared-file-preview-button:focus-visible{outline:2px solid #e60019;outline-offset:3px}
 @keyframes shared-file-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.shared-file-preview-spinner{animation:none}}
-@media(max-width:700px){.shared-file-actions{margin-left:53px;flex-wrap:wrap}.shared-file-actions .shared-file-download{margin-left:0}.shared-file-preview-dialog{width:calc(100vw - 20px);max-height:calc(100dvh - 20px)}.shared-file-preview-heading{padding:14px}.shared-file-preview-heading h2{font-size:14px}.shared-file-preview-body{padding:10px}.shared-file-preview-footer{padding:12px 14px;align-items:flex-start}.shared-file-preview-footer .shared-file-download{margin-left:0;white-space:nowrap}}
+@media(max-width:700px){.shared-file-actions{margin-left:53px;flex-wrap:wrap;max-width:calc(100% - 53px)}.shared-file-actions .shared-file-download{margin-left:0}.shared-file-preview-dialog{width:calc(100vw - 20px);max-height:calc(100dvh - 20px)}.shared-file-preview-heading{padding:14px}.shared-file-preview-heading h2{font-size:14px}.shared-file-preview-body{padding:10px}.shared-file-preview-footer{padding:12px 14px;align-items:flex-start}.shared-file-preview-footer .shared-file-download{margin-left:0;white-space:nowrap}}
 

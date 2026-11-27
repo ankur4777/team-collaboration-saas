@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import SharedFilesPanel from './SharedFilesPanel';
 import {api,type WorkspaceFile} from './api';
 
-const image:WorkspaceFile = {id:'image-1',name:'Team photo.png',content_type:'image/png',size:1024,created_at:'2026-11-27T10:00:00Z',uploaded_by:{id:'user-1',full_name:'Ankur',email:'ankur@example.com'}};
+const image:WorkspaceFile = {id:'image-1',name:'Team photo.png',content_type:'image/png',size:1024,can_delete:true,created_at:'2026-11-27T10:00:00Z',uploaded_by:{id:'user-1',full_name:'Ankur',email:'ankur@example.com'}};
 const pdf = {...image,id:'pdf-1',name:'Guide.pdf',content_type:'application/pdf'};
 const text = {...image,id:'text-1',name:'Notes.txt',content_type:'text/plain'};
 const createUrl = vi.fn((_blob:Blob) => 'blob:shared-preview');
@@ -18,6 +18,7 @@ if (!HTMLDialogElement.prototype.close) HTMLDialogElement.prototype.close = func
 beforeEach(() => {
   vi.spyOn(api,'workspaceFiles').mockResolvedValue({results:[image,pdf,text],limit:100});
   vi.spyOn(api,'downloadWorkspaceFile').mockResolvedValue();
+  vi.spyOn(api,'deleteWorkspaceFile').mockResolvedValue();
   vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,blob:async()=>payload()}));
   createUrl.mockClear(); revokeUrl.mockClear();
   vi.stubGlobal('URL',class extends URL {
@@ -26,6 +27,78 @@ beforeEach(() => {
   });
   vi.spyOn(HTMLDialogElement.prototype,'showModal').mockImplementation(function(this:HTMLDialogElement) { this.setAttribute('open',''); });
   vi.spyOn(HTMLDialogElement.prototype,'close').mockImplementation(function(this:HTMLDialogElement) { this.removeAttribute('open'); });
+});
+
+describe('Shared file deletion',() => {
+  it('asks for confirmation and removes only the confirmed file',async() => {
+    const user=userEvent.setup();
+    render(<SharedFilesPanel workspaceId="workspace-a"/>);
+    await user.click(await screen.findByRole('button',{name:'Delete Team photo.png'}));
+    expect(screen.getByRole('dialog',{name:'Delete file?'})).toBeTruthy();
+    expect(api.deleteWorkspaceFile).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button',{name:'Delete file'}));
+    await waitFor(()=>expect(screen.queryByRole('button',{name:'Preview Team photo.png'})).toBeNull());
+    expect(api.deleteWorkspaceFile).toHaveBeenCalledWith(image.id);
+    expect(screen.getByRole('button',{name:'Preview Guide.pdf'})).toBeTruthy();
+    expect(screen.getByText('2 files in this workspace')).toBeTruthy();
+  });
+
+  it('cancels without deleting and restores focus to the delete button',async() => {
+    const user=userEvent.setup();
+    render(<SharedFilesPanel workspaceId="workspace-a"/>);
+    const trigger=await screen.findByRole('button',{name:'Delete Team photo.png'});
+    await user.click(trigger);
+    await user.click(screen.getByRole('button',{name:'Cancel'}));
+    expect(api.deleteWorkspaceFile).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('hides deletion when the server denies permission',async() => {
+    vi.mocked(api.workspaceFiles).mockResolvedValue({results:[{...image,can_delete:false}],limit:100});
+    render(<SharedFilesPanel workspaceId="workspace-a"/>);
+    await screen.findByRole('button',{name:'Preview Team photo.png'});
+    expect(screen.queryByRole('button',{name:'Delete Team photo.png'})).toBeNull();
+    expect(screen.getByRole('button',{name:'Download Team photo.png'})).toBeTruthy();
+  });
+
+  it('keeps the file visible and allows retry after a deletion error',async() => {
+    vi.mocked(api.deleteWorkspaceFile).mockRejectedValueOnce(new Error('Access denied')).mockResolvedValue();
+    const user=userEvent.setup();
+    render(<SharedFilesPanel workspaceId="workspace-a"/>);
+    await user.click(await screen.findByRole('button',{name:'Delete Team photo.png'}));
+    await user.click(screen.getByRole('button',{name:'Delete file'}));
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent','Access denied');
+    expect(screen.getByRole('button',{name:'Preview Team photo.png'})).toBeTruthy();
+    await user.click(screen.getByRole('button',{name:'Delete file'}));
+    await waitFor(()=>expect(screen.queryByRole('dialog')).toBeNull());
+    expect(api.deleteWorkspaceFile).toHaveBeenCalledTimes(2);
+  });
+
+  it('prevents duplicate deletion while the request is pending',async() => {
+    let complete!:()=>void;
+    vi.mocked(api.deleteWorkspaceFile).mockImplementation(()=>new Promise(resolve=>{complete=resolve;}));
+    const user=userEvent.setup();
+    render(<SharedFilesPanel workspaceId="workspace-a"/>);
+    await user.click(await screen.findByRole('button',{name:'Delete Team photo.png'}));
+    await user.click(screen.getByRole('button',{name:'Delete file'}));
+    expect(screen.getByRole('button',{name:'Deleting…'})).toHaveProperty('disabled',true);
+    expect(screen.getByRole('button',{name:'Cancel'})).toHaveProperty('disabled',true);
+    fireEvent(screen.getByRole('dialog'),new Event('cancel',{cancelable:true}));
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    await act(async()=>complete());
+    expect(api.deleteWorkspaceFile).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('closes an unconfirmed deletion when the workspace changes',async() => {
+    const user=userEvent.setup();
+    const view=render(<SharedFilesPanel workspaceId="workspace-a"/>);
+    await user.click(await screen.findByRole('button',{name:'Delete Team photo.png'}));
+    view.rerender(<SharedFilesPanel workspaceId="workspace-b"/>);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(api.deleteWorkspaceFile).not.toHaveBeenCalled();
+  });
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
