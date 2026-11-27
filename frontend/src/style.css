@@ -615,8 +615,8 @@ h1,h2,h3,h4,.brand{font-family:"Inter Variable", Inter, sans-serif}
 .chat-thread.has-unread .chat-thread-details strong{font-weight:800;color:#101c2c}
 
 /* Explicit team selection on entry. */
-.team-selection-list{display:flex;flex-direction:column;align-items:stretch;gap:8px;max-width: min(360px,75vw);max-height:45vh;overflow:auto;padding:3px}
-.team-selection-list .outline-button{display:flex;align-items:center;gap:9px;text-align:left;white-space:normal;overflow-wrap:anywhere}
+.team-selection-list{display:flex;flex-direction:column;align-items:stretch;gap:8px;width:min(320px,100%);max-width:100%;max-height:45vh;overflow:auto;padding:3px}
+.team-selection-list .outline-button{display:flex;align-items:center;gap:9px;width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere}
 .team-selection-list .outline-button svg{flex-shrink:0}
 .team-selection-list .outline-button svg:last-child{margin-left:auto}
 .team-selection-list .text-link{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:5px}
