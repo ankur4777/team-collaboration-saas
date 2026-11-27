@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Download, File, FileText, FolderOpen, Image, Search, Upload } from 'lucide-react';
+import { Download, Eye, File, FileText, FolderOpen, Image, Search, Upload } from 'lucide-react';
 import { api, type WorkspaceFile } from './api';
+import SharedFilePreview from './SharedFilePreview';
 import './SharedFilesPanel.css';
 
 type Category = 'all' | 'images' | 'documents';
@@ -23,7 +24,10 @@ export default function SharedFilesPanel({workspaceId}:{workspaceId:string|null}
   const [loading,setLoading] = useState(true);
   const [uploading,setUploading] = useState(false);
   const [error,setError] = useState('');
+  const [preview,setPreview] = useState<{file:WorkspaceFile;workspaceId:string|null}|null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setPreview(null); }, [workspaceId]);
 
   async function load(nextQuery=query, nextCategory=category) {
     if (!workspaceId) { setFiles([]); setLoading(false); return; }
@@ -49,6 +53,7 @@ export default function SharedFilesPanel({workspaceId}:{workspaceId:string|null}
     try {
       const row = await api.uploadWorkspaceFile(file);
       setFiles(current => [row, ...current.filter(item => item.id !== row.id)]);
+      setPreview({file:row,workspaceId});
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Could not upload file');
     } finally {
@@ -59,6 +64,11 @@ export default function SharedFilesPanel({workspaceId}:{workspaceId:string|null}
   function submitSearch(event:FormEvent) {
     event.preventDefault();
     void load(query, category);
+  }
+
+  async function download(file:WorkspaceFile) {
+    try { await api.downloadWorkspaceFile(file); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not download file'); }
   }
 
   return <section className="shared-files-page" aria-label="Shared files">
@@ -95,10 +105,17 @@ export default function SharedFilesPanel({workspaceId}:{workspaceId:string|null}
       : <div className="shared-files-list">{files.map(file =>
         <article key={file.id} className="shared-file-row">
           <span className="shared-file-icon"><FileGlyph type={file.content_type}/></span>
-          <div className="shared-file-main"><strong>{file.name}</strong><small>{sizeLabel(file.size)} · Uploaded by {file.uploaded_by.full_name} · {dateLabel(file.created_at)}</small></div>
-          <button type="button" className="shared-file-download" onClick={() => void api.downloadWorkspaceFile(file)}
-            aria-label={`Download ${file.name}`}><Download size={16}/>Download</button>
+          <div className="shared-file-main"><button type="button" className="shared-file-name" onClick={() => setPreview({file,workspaceId})}
+            aria-label={`Preview ${file.name}`} title={file.name}>{file.name}</button><small>{sizeLabel(file.size)} · Uploaded by {file.uploaded_by.full_name} · {dateLabel(file.created_at)}</small></div>
+          <div className="shared-file-actions">
+            <button type="button" className="shared-file-preview-button" onClick={() => setPreview({file,workspaceId})}
+              aria-label={`Open preview of ${file.name}`}><Eye size={16}/>Preview</button>
+            <button type="button" className="shared-file-download" onClick={() => void download(file)}
+              aria-label={`Download ${file.name}`}><Download size={16}/>Download</button>
+          </div>
         </article>)}</div>}
     <p className="shared-files-note">Allowed: PNG, JPEG, WebP, PDF, and TXT files up to 5 MB. Files are visible only inside this workspace.</p>
+    {preview && preview.workspaceId === workspaceId && <SharedFilePreview key={preview.file.id} file={preview.file} onClose={() => setPreview(null)}/>}
   </section>;
 }
+

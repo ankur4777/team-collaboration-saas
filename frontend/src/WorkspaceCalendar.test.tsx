@@ -19,6 +19,7 @@ const record = (id: string, start: Date, end: Date): MeetingRecord => ({
   meeting_url: '',
   notes: '',
   call_ended: false,
+  organizer_in_call: false,
   cancelled: false,
   revision: 1,
   organizer: { id: 'owner', full_name: 'Owner', email: 'owner@example.test' },
@@ -149,3 +150,4 @@ describe('Workspace calendar controls', () => {
     ).toBe(true);
   });
 });
+

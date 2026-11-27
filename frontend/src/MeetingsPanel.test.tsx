@@ -37,6 +37,7 @@ const meeting: MeetingRecord = {
   meeting_url: 'https://meet.example.test/review',
   notes: '',
   call_ended: false,
+  organizer_in_call: false,
   cancelled: false,
   revision: 1,
   organizer: { id: 'owner', full_name: 'Owner', email: 'owner@example.test' },
@@ -273,3 +274,4 @@ describe('Ended meeting deletion', () => {
     expect(screen.getByRole('button', { name: 'Delete meeting' })).toBeTruthy();
   });
 });
+

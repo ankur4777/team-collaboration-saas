@@ -140,10 +140,14 @@ async function downloadPrivateFile(row:PrivateAttachment): Promise<void> {
   window.setTimeout(()=>URL.revokeObjectURL(url),30000);
 }
 
-async function downloadWorkspaceFile(row:WorkspaceFile): Promise<void> {
-  const response=await fetch(`/api/files/${encodeURIComponent(row.id)}/download/`,{credentials:'same-origin',cache:'no-store'});
+async function workspaceFileContent(row:WorkspaceFile, signal?:AbortSignal): Promise<Blob> {
+  const response=await fetch(`/api/files/${encodeURIComponent(row.id)}/download/`,{credentials:'same-origin',cache:'no-store',signal});
   if(!response.ok)throw new Error('File unavailable or access denied');
-  const blob=await response.blob();
+  return response.blob();
+}
+
+async function downloadWorkspaceFile(row:WorkspaceFile): Promise<void> {
+  const blob=await workspaceFileContent(row);
   const url=URL.createObjectURL(blob);
   const link=document.createElement('a');
   link.href=url;link.download=row.name;
@@ -204,6 +208,7 @@ export const api = {
   workspaceFiles: (query='',category:'all'|'images'|'documents'='all') => request<{results:WorkspaceFile[];limit:number}>(`files/?${new URLSearchParams({q:query,category}).toString()}`),
   uploadWorkspaceFile: (file:File) => uploadPrivateFile('files/',file) as Promise<WorkspaceFile>,
   downloadWorkspaceFile: (row:WorkspaceFile) => downloadWorkspaceFile(row),
+  workspaceFileContent: (row:WorkspaceFile,signal?:AbortSignal) => workspaceFileContent(row,signal),
   me: () => request<Session>('auth/me/'),
   register: (body: {email:string; password:string;full_name:string;organization_name:string}) => secureLogin('auth/register/', body),
   login: (email: string, password: string) => secureLogin('auth/login/', {email, password}),
@@ -328,3 +333,4 @@ export const callsApi = {
   config:(id:string)=>request<CallConfig>(`meetings/${id}/call/`),
   end:(id:string)=>post<{status:string}>(`meetings/${id}/call/end/`,{}),
 };
+
