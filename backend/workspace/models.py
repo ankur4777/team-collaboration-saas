@@ -200,6 +200,9 @@ class OrganizationMember(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='organization_memberships')
     role = models.CharField(max_length=16, choices=Role.choices, default=Role.MEMBER)
     contact_phone = models.CharField(max_length=16, blank=True)
+    job_title = models.CharField(max_length=100, blank=True)
+    position_rank = models.PositiveIntegerField(default=100)
+    is_senior = models.BooleanField(default=False)
     joined_at = models.DateTimeField(auto_now_add=True)
     last_seen_at = models.DateTimeField(null=True, blank=True)
 
@@ -227,9 +230,20 @@ class Invitation(models.Model):
         return self.accepted_at is None and self.expires_at > timezone.now()
 
 
+class Department(models.Model):
+    id = models.UUIDField(primary_key=True, default=make_id, editable=False)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='departments')
+    name = models.CharField(max_length=120)
+
+    class Meta:
+        ordering = ['name', 'id']
+        constraints = [models.UniqueConstraint(fields=['organization', 'name'], name='uq_department_org_name')]
+
+
 class Team(models.Model):
     id = models.UUIDField(primary_key=True, default=make_id, editable=False)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='teams')
+    department = models.ForeignKey(Department, null=True, blank=True, on_delete=models.SET_NULL, related_name='teams')
     name = models.CharField(max_length=120)
     description = models.CharField(max_length=500, blank=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='teams_created')
@@ -598,4 +612,28 @@ class WorkspaceFile(models.Model):
         indexes = [
             models.Index(fields=['organization', 'created_at'], name='idx_workspace_file_date'),
         ]
+
+
+class EmployeeTask(models.Model):
+    class Status(models.TextChoices):
+        TODO = 'todo', 'To do'
+        IN_PROGRESS = 'in_progress', 'In progress'
+        DONE = 'done', 'Done'
+
+    id = models.UUIDField(primary_key=True, default=make_id, editable=False)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='employee_tasks')
+    title = models.CharField(max_length=200)
+    description = models.TextField(max_length=4000, blank=True)
+    assignee = models.ForeignKey(User, on_delete=models.PROTECT, related_name='assigned_tasks')
+    assigned_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='created_tasks')
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.TODO)
+    priority = models.CharField(max_length=10, choices=[('low','Low'),('normal','Normal'),('high','High')], default='normal')
+    due_date = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        indexes = [models.Index(fields=['organization', 'assignee', 'status'], name='idx_task_org_assignee_status')]
+
 

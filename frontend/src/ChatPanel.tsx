@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, MessageCircle, Plus, RefreshCw, Send, Users, X } from 'lucide-react';
-import { api, type ChatMessage, type ChannelMessageCursor, type ChatThread, type Member, type Person, type PresenceMap } from './api';
+import { api, type ChatMessage, type ChannelMessageCursor, type ChatThread, type Member, type Person, type PresenceMap, type ChatDirectoryData } from './api';
+import ChatDirectory from './ChatDirectory';
 import ChatReactionBar from './ChatReactionBar';
 import {connectConversationSocket,mergeFreshHistory} from './conversationSocket';
 import {ApiError} from './api';
@@ -28,9 +29,14 @@ function messageOrder(a: ChatMessage, b: ChatMessage) {
   return a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id);
 }
 
-interface Props { workspaceId: string|null; currentUser: Person; members: Member[]; presence?: PresenceMap; requestedChat?: {id:string;nonce:number;messageId?:string}|null; onRead?: ()=>void; notificationVersion?:number }
+interface Props { workspaceId: string|null; currentUser: Person; members: Member[]; presence?: PresenceMap; requestedChat?: {id:string;nonce:number;messageId?:string}|null; onRead?: ()=>void; notificationVersion?:number; onOpenTasks?:()=>void }
 
-export default function ChatPanel({workspaceId, currentUser, members, presence={}, requestedChat, onRead,notificationVersion=0}: Props) {
+export default function ChatPanel({workspaceId, currentUser, members, presence={}, requestedChat, onRead,notificationVersion=0,onOpenTasks}: Props) {
+  const [directory,setDirectory]=useState<ChatDirectoryData|null>(null),[directoryLoading,setDirectoryLoading]=useState(true);
+  const [threadKind,setThreadKind]=useState<'all'|'direct'|'group'>('all');
+  const directoryRun=useRef(0);
+  const loadDirectory=useCallback(async()=>{const run=++directoryRun.current;if(!workspaceId)return;setDirectoryLoading(true);try{const rows=await api.chatDirectory();if(run===directoryRun.current)setDirectory(rows);}catch{/* Directory displays an unavailable state; existing chats remain accessible. */}finally{if(run===directoryRun.current)setDirectoryLoading(false);}},[workspaceId]);
+  useEffect(()=>{setDirectory(null);void loadDirectory();return()=>{directoryRun.current++;};},[loadDirectory]);
   const [jumpClosed,setJumpClosed]=useState<number|null>(null);
   const [showArchived,setShowArchived]=useState(false);
   const [threads, setThreads] = useState<ChatThread[]>([]);
@@ -102,12 +108,12 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
 
   useEffect(()=>{
     if(!workspaceId)return;
-    const refresh=()=>{if(!document.hidden)void loadThreads();};
+    const refresh=()=>{if(!document.hidden){void loadThreads();void loadDirectory();}};
     const timer=window.setInterval(refresh,15000);
     window.addEventListener('focus',refresh);
     document.addEventListener('visibilitychange',refresh);
     return()=>{window.clearInterval(timer);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};
-  },[workspaceId,loadThreads]);
+  },[workspaceId,loadThreads,loadDirectory]);
   useEffect(()=>{if(notificationVersion>0&&workspaceId)void loadThreads();},[notificationVersion,workspaceId,loadThreads]);
 
   useEffect(() => {
@@ -260,10 +266,10 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
   const active = threads.find(thread => thread.id === selected);
   const peerId=active?.participants.find(p=>p.user.id!==currentUser.id)?.user.id;
   const onlineCount=active?.participants.filter(p=>presence[p.user.id]?.online).length||0;
-  const colleagues = members.filter(member => member.user.id !== currentUser.id);
+  const colleagues = (directory?.members||members).filter(member => member.user.id !== currentUser.id);
   const groupCandidates = colleagues.filter(m => !active?.participants.some(p => p.user.id === m.user.id));
   const visibleThreads = threads.filter(thread =>
-    Boolean(thread.archived_at)===showArchived && titleFor(thread, currentUser.id).toLowerCase().includes(filter.toLowerCase()),
+    Boolean(thread.archived_at)===showArchived && (threadKind==='all'||thread.kind===threadKind) && titleFor(thread, currentUser.id).toLowerCase().includes(filter.toLowerCase()),
   ).sort((a,b)=>Number(Boolean(b.is_pinned))-Number(Boolean(a.is_pinned)));
 
   async function loadOlder() {
@@ -441,24 +447,41 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
     finally { setWorking(false); }
   }
 
+  async function openEmployeeChat(email:string) {
+    if(working)return;setWorking(true);setError('');
+    const org=workspaceId;
+    try{const thread=await api.startDirectChat(email);if(scopeRef.current.workspaceId!==org)return;await loadThreads();setShowArchived(false);setThreadKind('all');setSelected(thread.id);}
+    catch(e){if(scopeRef.current.workspaceId===org)setError(e instanceof Error?e.message:'Could not open employee chat');}
+    finally{setWorking(false);}
+  }
+
+  async function deleteGroup() {
+    if(!active||!active.can_delete||working||!window.confirm(`Delete project group "${active.title}" for all participants? Messages and attachments will be permanently removed.`))return;
+    const id=active.id,org=workspaceId;setWorking(true);setError('');
+    try{await api.deleteProjectGroup(id);if(scopeRef.current.workspaceId!==org)return;setSelected(null);setMessages([]);setManagingGroup(false);writeDraft(id,'');setThreads(rows=>rows.filter(row=>row.id!==id));await loadThreads();onReadRef.current?.();}
+    catch(e){if(scopeRef.current.workspaceId===org)setError(e instanceof Error?e.message:'Could not delete group');}finally{setWorking(false);}
+  }
+
   return <section className="private-chat-page">
     {selected&&forwardTarget&&<ForwardMessageDialog key={selected+forwardTarget.id} kind="chat" sourceId={selected} message={forwardTarget} onClose={()=>setForwardId(null)} onSent={result=>{if(result.kind==='chat'&&result.destination_id===selected&&'reactions' in result.message){const sent=result.message;setMessages(old=>old.some(row=>row.id===sent.id)?old:[...old,sent].sort(messageOrder));}void loadThreads();}}/>}
     <div className="private-chat-heading">
-      <div><div className="eyebrow">YOUR WORKSPACE / MESSAGES</div><h1>Chats</h1><p>Private conversations with teammates in this company.</p></div>
-      <button className="primary-button" type="button" onClick={() => setMode('direct')}><Plus size={17}/> New chat</button>
+      <div><div className="eyebrow">YOUR WORKSPACE / MESSAGES</div><h1>Chats &amp; Groups</h1><p>Browse departments and teams to chat with an employee.</p></div>
+      <div className="org-chat-heading-actions">{onOpenTasks&&<button className="outline-button" type="button" onClick={onOpenTasks}>Tasks</button>}<button className="primary-button" type="button" onClick={() => setMode('direct')}><Plus size={17}/> New chat</button></div>
     </div>
     {error && <div className="chat-alert" role="alert">{error}<button type="button" onClick={() => setError('')} aria-label="Dismiss error"><X size={16}/></button></div>}
     <div className="private-chat-layout">
       <aside className="private-chat-list">
+        <ChatDirectory data={directory} loading={directoryLoading} currentUserId={currentUser.id} busy={working} onReload={()=>void loadDirectory()} onStartChat={email=>void openEmployeeChat(email)}/>
         <div className="private-chat-list-heading"><strong>Conversations</strong><button type="button" className="outline-button" aria-pressed={showArchived} onClick={()=>setShowArchived(value=>!value)}>{showArchived?'Active':'Archived'}</button><button type="button" className="icon-button" aria-label="Refresh chats" title="Refresh chats" onClick={() => void loadThreads()}><RefreshCw size={16}/></button></div>
         <input className="chat-filter" aria-label="Search conversations" placeholder="Search conversations" value={filter} onChange={e => setFilter(e.target.value)}/>
+        <div className="org-chat-kind-filter" role="group" aria-label="Conversation type">{([['all','All'],['direct','Chats'],['group','Groups']] as const).map(([value,label])=><button type="button" key={value} aria-pressed={threadKind===value} onClick={()=>setThreadKind(value)}>{label}</button>)}</div>
         {visibleThreads.map(thread => <button type="button" key={thread.id} className={`chat-thread ${selected === thread.id ? 'selected' : ''}${thread.unread_count>0?' has-unread':''}`} onClick={() => setSelected(thread.id)}>
           <span className="chat-thread-avatar">{thread.kind === 'group' ? <Users size={17}/> : initials(titleFor(thread,currentUser.id))}</span>
           <span className="chat-thread-details"><strong>{thread.is_pinned?'★ ':''}{titleFor(thread,currentUser.id)}{thread.is_muted?' · Muted':''}</strong><small>{thread.kind === 'group' ? `${thread.participants.length} participants` : presenceLabel(presence[thread.participants.find(p=>p.user.id!==currentUser.id)?.user.id||''])}</small></span>
           {thread.unread_count>0&&<span className="chat-unread-badge" aria-label={`${thread.unread_count} unread messages`}>{thread.unread_count>99?'99+':thread.unread_count}</span>}
         </button>)}
         {visibleThreads.length === 0 && <div className="chat-list-empty">No conversations yet. Start a new chat with a colleague.</div>}
-        <button type="button" className="new-group-link" onClick={() => setMode('group')}><Users size={15}/> Create group chat</button>
+        {directory?.can_create_groups&&<button type="button" className="new-group-link" onClick={() => setMode('group')}><Users size={15}/> Create project group</button>}
       </aside>
       <div className="private-chat-conversation">
         {active ? <>
@@ -468,6 +491,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
             {active.kind==='group' && active.created_by.id===currentUser.id && <button type="button" className="group-manage-button" onClick={() => setManagingGroup(true)}><Users size={15}/> Manage group</button>}
             {active.kind==='group' && active.created_by.id!==currentUser.id && <button type="button" className="group-manage-button" disabled={working} onClick={() => void leaveGroup()}>Leave group</button>}
             <button type="button" className="group-manage-button" disabled={working} onClick={()=>void archiveActiveChat()}>{active.archived_at?'Restore chat':'Archive chat'}</button>
+            {active.kind==='group'&&active.can_delete&&<button type="button" className="group-manage-button" disabled={working} onClick={()=>void deleteGroup()}>Delete group</button>}
             <button className="group-manage-button" type="button" disabled={working} onClick={()=>void changeChatPreference('is_pinned')}>{active.is_pinned?'Unpin chat':'Pin chat'}</button><button className="group-manage-button" type="button" disabled={working} onClick={()=>void changeChatPreference('is_muted')}>{active.is_muted?'Unmute':'Mute'}</button>
             <span className={`chat-connected ${connected ? 'yes' : ''}`} title={connected ? 'Live updates connected' : 'Messages saved; live updates unavailable'}/>
           </header>
@@ -542,3 +566,4 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
     </div>}
   </section>;
 }
+

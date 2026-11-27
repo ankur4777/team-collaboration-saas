@@ -16,6 +16,7 @@ const me=person('me','Owner');
 const thread=(id:string,name:string):ChatThread=>({id,kind:'direct',title:'',created_at:now,updated_at:now,created_by:me,unread_count:0,participants:[me,person(id,name)].map(user=>({user,joined_at:now,last_read_at:null}))});
 beforeEach(()=>{
   vi.clearAllMocks();
+  vi.spyOn(api,'chatDirectory').mockResolvedValue({departments:[],teams:[],members:[],can_manage:false,can_create_groups:true,can_assign_tasks:true});
   vi.mocked(api.chats).mockResolvedValue([thread('one','First colleague'),thread('two','Second colleague')]);
   vi.mocked(api.chatMessagePage).mockResolvedValue({items:[],has_more:false,next_cursor:null});
   vi.mocked(api.chatAttachments).mockResolvedValue([]);
@@ -23,6 +24,44 @@ beforeEach(()=>{
   vi.mocked(api.messageContext).mockResolvedValue({items:[{id:'message',body:'Search result message',sender:me,created_at:now,edited_at:null,deleted_at:null}]});
 });
 afterEach(cleanup);
+
+describe('Department chat navigation and Senior project groups',()=>{
+  it('opens a direct conversation only after a department employee is clicked',async()=>{
+    const user=userEvent.setup(),peer=person('one','First colleague');
+    const entry={id:'member-one',role:'member',job_title:'Developer',position_rank:2,is_senior:false,user:peer};
+    vi.mocked(api.chatDirectory).mockResolvedValue({departments:[{id:'dept',name:'Engineering'}],teams:[{id:'team',name:'Platform',department_id:'dept',members:[entry]}],members:[entry],can_manage:false,can_create_groups:false,can_assign_tasks:false});
+    vi.mocked(api.chats).mockResolvedValueOnce([]).mockResolvedValue([thread('one','First colleague')]);
+    const start=vi.spyOn(api,'startDirectChat').mockResolvedValue(thread('one','First colleague'));
+    render(<ChatPanel workspaceId="org" currentUser={me} members={[]}/>);
+    await user.click(await screen.findByRole('button',{name:/Engineering/}));
+    await user.click(screen.getByRole('button',{name:/Platform/}));
+    expect(start).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button',{name:'Chat with First colleague'}));
+    await waitFor(()=>expect(start).toHaveBeenCalledWith(peer.email));
+    expect(await screen.findByRole('heading',{name:'First colleague'})).toBeTruthy();
+    expect(screen.queryByRole('button',{name:'Create project group'})).toBeNull();
+  });
+
+  it('confirms and deletes a project group when the server permits it',async()=>{
+    const group={...thread('project','Colleague'),kind:'group' as const,title:'Project Apollo',can_delete:true};
+    vi.mocked(api.chats).mockResolvedValue([group]);
+    const remove=vi.spyOn(api,'deleteProjectGroup').mockImplementation(async()=>{vi.mocked(api.chats).mockResolvedValue([]);});
+    const confirm=vi.spyOn(window,'confirm').mockReturnValue(true),user=userEvent.setup();
+    render(<ChatPanel workspaceId="org" currentUser={me} members={[]}/>);
+    await user.click(await screen.findByRole('button',{name:/Project Apollo/}));
+    await user.click(screen.getByRole('button',{name:'Delete group'}));
+    expect(confirm).toHaveBeenCalled();
+    await waitFor(()=>expect(remove).toHaveBeenCalledWith('project'));
+    await waitFor(()=>expect(screen.queryByRole('heading',{name:'Project Apollo'})).toBeNull());
+  });
+
+  it('hides project group deletion for ordinary participants',async()=>{
+    vi.mocked(api.chats).mockResolvedValue([{...thread('project','Colleague'),kind:'group',title:'Project Apollo',can_delete:false}]);
+    render(<ChatPanel workspaceId="org" currentUser={me} members={[]}/>);
+    await userEvent.setup().click(await screen.findByRole('button',{name:/Project Apollo/}));
+    expect(screen.queryByRole('button',{name:'Delete group'})).toBeNull();
+  });
+});
 
 describe('Chat conversation panel identity',()=>{
   it('keeps one pins panel, attachment panel and composer across chat switches and search navigation',async()=>{
@@ -58,8 +97,9 @@ describe('Group member selection',()=>{
   it('selects teammates by clicking their rows and keeps create disabled until two are selected',async()=>{
     const user=userEvent.setup();
     const members:Member[]=[person('one','First colleague'),person('two','Second colleague')].map(p=>({id:p.id,user:p,role:'member',joined_at:now}));
+    vi.mocked(api.chatDirectory).mockResolvedValue({departments:[],teams:[],members:members.map(m=>({...m,job_title:'Developer',position_rank:100,is_senior:false})),can_manage:false,can_create_groups:true,can_assign_tasks:true});
     render(<ChatPanel workspaceId="org" currentUser={me} members={members}/>);
-    await user.click(screen.getByRole('button',{name:'Create group chat'}));
+    await user.click(await screen.findByRole('button',{name:'Create project group'}));
     const dialog=screen.getByRole('dialog');
     const groupName=dialog.querySelector<HTMLInputElement>('input[placeholder="e.g. Design discussion"]');
     expect(groupName).toBeTruthy();
@@ -146,3 +186,4 @@ describe('Explicit conversation selection',()=>{
     await screen.findByRole('heading',{name:'Second colleague'});
   });
 });
+

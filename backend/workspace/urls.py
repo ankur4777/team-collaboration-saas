@@ -1,4 +1,5 @@
 from django.urls import path
+from . import directory, employee_tasks
 from .call_access import CallTranslateView
 from . import meeting_calls
 from . import meetings
@@ -12,6 +13,13 @@ from . import platform_admin, platform_billing, platform_reports, support, platf
 from . import auth_views, views, member_views, chat_views, channel_notifications, account_recovery, settings_views, session_views, message_search, mentions
 
 urlpatterns = [
+    path('chat-directory/', directory.ChatDirectoryView.as_view()),
+    path('departments/', directory.DepartmentsView.as_view()),
+    path('chat-directory/teams/<uuid:team_id>/', directory.DirectoryTeamView.as_view()),
+    path('chat-directory/teams/<uuid:team_id>/members/', directory.DirectoryTeamMembersView.as_view()),
+    path('chat-directory/members/<uuid:member_id>/', directory.DirectoryMemberView.as_view()),
+    path('tasks/', employee_tasks.EmployeeTasksView.as_view()),
+    path('tasks/<uuid:task_id>/', employee_tasks.EmployeeTaskDetailView.as_view()),
     path('platform/users/', platform_users.UserDirectoryView.as_view()),
     path('platform/users/<uuid:member_id>/', platform_users.UserMembershipView.as_view()),
     path('platform/companies/<uuid:company_id>/invite-user/', platform_users.InviteUserView.as_view()),

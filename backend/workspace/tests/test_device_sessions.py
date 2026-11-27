@@ -121,7 +121,7 @@ class AccountSessionTests(TestCase):
             name='Beta Workspace', slug='beta-workspace', created_by=user,
         )
         OrganizationMember.objects.create(
-            organization=org, user=user, role=OrganizationMember.Role.OWNER,
+            organization=org, user=user, role=OrganizationMember.Role.ADMIN,
         )
         another = Client(enforce_csrf_checks=True)
         self.write(another, 'POST', '/api/auth/login/', {
@@ -151,3 +151,4 @@ class AccountSessionTests(TestCase):
         self.assertTrue(current_record['current'])
         self.assertEqual(self.write(self.client, 'POST', '/api/auth/logout/').status_code, 200)
         self.assertIsNotNone(AccountSession.objects.get(pk=current_record['id']).revoked_at)
+

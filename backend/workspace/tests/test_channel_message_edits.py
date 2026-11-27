@@ -181,7 +181,7 @@ class ChannelMessageEditDeleteTests(TestCase):
             name='Company B', slug='channel-edit-company-b', created_by=self.owner,
         )
         OrganizationMember.objects.create(
-            organization=other, user=self.owner, role=OrganizationMember.Role.OWNER,
+            organization=other, user=self.owner, role=OrganizationMember.Role.ADMIN,
         )
         switched = self.post(f'/api/organizations/{other.pk}/activate/')
         self.assertEqual(switched.status_code, 200, switched.content)
@@ -224,3 +224,4 @@ class ChannelMessageEditDeleteTests(TestCase):
         self.assertEqual(self.delete(self.detail_url(original['id'])).status_code,204)
         self.assertEqual(self.client.get(base+'pins/').json()['items'],[])
         self.assertIsNone(Message.objects.get(pk=original['id']).pinned_at)
+

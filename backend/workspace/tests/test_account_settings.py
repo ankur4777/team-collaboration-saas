@@ -107,7 +107,7 @@ class AccountSettingsTests(TestCase):
             name='Other Company',slug='other-company',created_by=user,
         )
         OrganizationMember.objects.create(
-            organization=other,user=user,role=OrganizationMember.Role.OWNER,
+            organization=other,user=user,role=OrganizationMember.Role.ADMIN,
         )
         switched = self.write('POST', f'/api/organizations/{other.pk}/activate/')
         self.assertEqual(switched.status_code, 200, switched.content)
@@ -138,3 +138,4 @@ class AccountSettingsTests(TestCase):
         owner_prefs = NotificationPreference.objects.get(organization=org,user__email=self.email)
         self.assertFalse(owner_prefs.direct_chats)
         self.assertTrue(owner_prefs.group_chats)
+

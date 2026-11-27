@@ -56,6 +56,8 @@ def route_modules(path):
         return ('teams',)
     if first == 'chats':
         return ('chats',)
+    if first in ('chat-directory', 'departments', 'tasks'):
+        return ('chats',)
     if first == 'search':
         return ('search',)
     if first == 'mail':
@@ -91,3 +93,4 @@ def access_summary(row):
             'enforce_modules': bool(row and row.enforce_modules),
             'starts_on': row.starts_on.isoformat() if row and row.starts_on else None,
             'ends_on': row.ends_on.isoformat() if row and row.ends_on else None}
+

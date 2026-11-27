@@ -128,6 +128,24 @@ class ChatParticipantDetailView(APIView):
 
 class ChatGroupDetailView(APIView):
     @transaction.atomic
+    def delete(self, request, chat_id):
+        from .directory import can_delete_group
+        actor = get_active_membership(request)
+        chat = accessible_chat(request, chat_id)
+        chat = ChatConversation.objects.select_for_update().get(pk=chat.pk)
+        if not can_delete_group(actor, chat):
+            raise PermissionDenied('Only the creating Senior, an owner, or an admin can delete a project group.')
+        chat_id, org_id = chat.pk, chat.organization_id
+        recipients = list(chat.participants.values_list('user_id', flat=True))
+        files = [(row.file.storage, row.file.name) for row in chat.attachments.all()]
+        chat.delete()
+        for storage, name in files:
+            transaction.on_commit(lambda storage=storage, name=name: storage.delete(name), robust=True)
+        transaction.on_commit(lambda: publish_chat_participants(chat_id))
+        transaction.on_commit(lambda: publish_notification_refresh(org_id, recipients))
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @transaction.atomic
     def patch(self, request, chat_id):
         chat = manage_group(request, chat_id)
         title = request.data.get('title')
@@ -237,6 +255,9 @@ class ChatsView(APIView):
             )
 
         if kind == ChatConversation.Kind.GROUP:
+            from .directory import is_senior
+            if not is_senior(membership):
+                raise PermissionDenied('Only employees with the Senior role, owners, and admins can create project groups.')
             title = str(request.data.get('title', '')).strip()
             emails = request.data.get('emails')
             if len(title) < 2 or len(title) > 100:
@@ -480,3 +501,4 @@ class ChatReadView(APIView):
                     lambda: publish_chat_read(chat.pk, request.user.pk, read_at)
                 )
         return Response({'last_read_at': read_at.isoformat()})
+

@@ -90,7 +90,7 @@ class WorkspaceMessageSearchTests(TestCase):
         )
         OrganizationMember.objects.create(
             organization=other_org, user=get_user_model().objects.get(email='owner@a.test'),
-            role=OrganizationMember.Role.OWNER,
+            role=OrganizationMember.Role.ADMIN,
         )
         self.assertEqual(
             self.post(f'/api/organizations/{other_org.pk}/activate/').status_code, 200,
@@ -184,3 +184,4 @@ class WorkspaceMessageSearchTests(TestCase):
         self.assertEqual(self.client.get(url, {**params,'sender':'colleague','cursor':first['next_cursor']}).status_code, 400)
         self.assertEqual(self.client.get(url, {**params,'sender':'colleague'}).json()['results'], [])
         self.assertEqual(self.client.get(url, {**params,'start':'invalid'}).status_code, 400)
+

@@ -113,6 +113,8 @@ class MemberManagementTests(TestCase):
     def test_group_owner_must_transfer_before_workspace_removal(self):
         org = self.register()
         staff, membership = self.employee(org, 'staff@company-a.test')
+        membership.is_senior = True
+        membership.save(update_fields=['is_senior'])
         first, _ = self.employee(org, 'first@company-a.test')
         second, _ = self.employee(org, 'second@company-a.test')
         self.login(staff.email)

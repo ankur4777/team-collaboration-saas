@@ -50,6 +50,19 @@ class ChatConversationSerializer(serializers.ModelSerializer):
     archived_at = serializers.SerializerMethodField()
     is_muted = serializers.SerializerMethodField()
     is_pinned = serializers.SerializerMethodField()
+    can_delete = serializers.SerializerMethodField()
+
+    def get_can_delete(self, obj):
+        from .directory import can_delete_group
+        request = self.context.get('request')
+        if not request or obj.kind != 'group':
+            return False
+        cache = self.context.setdefault('_management_memberships', {})
+        key = (obj.organization_id, request.user.pk)
+        if key not in cache:
+            cache[key] = OrganizationMember.objects.filter(organization_id=obj.organization_id, user=request.user).first()
+        member = cache[key]
+        return bool(member and can_delete_group(member, obj))
 
     def get_preference(self, obj, field):
         request = self.context.get('request')
@@ -73,7 +86,7 @@ class ChatConversationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ChatConversation
-        fields = ('id', 'kind', 'title', 'created_at', 'updated_at', 'created_by', 'participants', 'unread_count', 'archived_at', 'is_muted', 'is_pinned')
+        fields = ('id', 'kind', 'title', 'created_at', 'updated_at', 'created_by', 'participants', 'unread_count', 'archived_at', 'is_muted', 'is_pinned', 'can_delete')
 
     def get_unread_count(self, obj):
         request = self.context.get('request')
@@ -109,3 +122,4 @@ class ChatMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChatMessage
         fields = ('id', 'body', 'created_at', 'edited_at', 'deleted_at', 'sender', 'reactions', 'reply_to_id', 'is_forwarded', 'pinned_at')
+

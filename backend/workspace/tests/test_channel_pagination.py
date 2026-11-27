@@ -155,8 +155,9 @@ class ChannelPaginationTests(TestCase):
         )
         OrganizationMember.objects.create(
             organization=other, user=self.owner,
-            role=OrganizationMember.Role.OWNER,
+            role=OrganizationMember.Role.ADMIN,
         )
         active=self.post(f'/api/organizations/{other.pk}/activate/')
         self.assertEqual(active.status_code, 200, active.content)
         self.assertEqual(self.client.get(self.url(), {'page':'1'}).status_code, 403)
+

@@ -22,7 +22,7 @@ class SharedFileDeleteTests(TransactionTestCase):
         self.admin = self.user('admin')
         self.other = self.user('other')
         self.org = Organization.objects.create(name='Example', slug='shared-files', created_by=self.owner)
-        for user, role in [(self.owner, 'owner'), (self.member, 'member'), (self.admin, 'admin'), (self.other, 'member')]:
+        for user, role in [(self.owner, 'admin'), (self.member, 'member'), (self.admin, 'admin'), (self.other, 'member')]:
             OrganizationMember.objects.create(organization=self.org, user=user, role=role)
         self.client = Client(enforce_csrf_checks=True)
         self.login(self.member)

@@ -44,6 +44,7 @@ export type ForwardResult = {kind:'chat'|'channel';destination_id:string;message
 export interface ChannelMessageCursor { before:string; before_id:string }
 export interface ChannelMessagePage { items:Message[]; has_more:boolean; next_cursor:ChannelMessageCursor|null }
 export interface ChatThread {
+  can_delete?:boolean;
   is_muted?:boolean;is_pinned?:boolean;
   archived_at?: string|null;
   id: string; kind: 'direct'|'group'; title: string;
@@ -71,6 +72,12 @@ export interface MessageSearchFilters {sender?:string;start?:string;end?:string;
 
 
 export interface Member { id: string; role: string; joined_at: string; user: Person }
+export interface DirectoryMember {id:string;role:string;job_title:string;position_rank:number;is_senior:boolean;user:Pick<Person,'id'|'email'|'full_name'>}
+export interface DirectoryTeam {id:string;name:string;department_id:string|null;members:DirectoryMember[]}
+export interface ChatDirectoryData {departments:{id:string;name:string}[];teams:DirectoryTeam[];members:DirectoryMember[];can_manage:boolean;can_create_groups:boolean;can_assign_tasks:boolean}
+export type TaskStatus='todo'|'in_progress'|'done';
+export interface EmployeeTask {id:string;title:string;description:string;assignee:Person;assigned_by:Person;status:TaskStatus;priority:'low'|'normal'|'high';due_date:string|null;created_at:string;updated_at:string;can_manage:boolean;can_update_status:boolean}
+export interface TaskInput {title:string;description:string;assignee_id:string;priority:EmployeeTask['priority'];due_date:string|null}
 export interface InvitePreview { email: string; organization_name: string; role: string }
 
 let csrfToken = '';
@@ -177,6 +184,16 @@ export interface RenewalInput {request_id:string;days:number;reactivate:boolean;
 export interface RenewalPage {items:SubscriptionRenewal[];total:number;page:number;page_size:number}
 export interface PlatformAudit {action:string;actor:string;created_at:string;changes:Record<string,unknown>}
 export const api = {
+  chatDirectory:()=>request<ChatDirectoryData>('chat-directory/'),
+  createDepartment:(name:string)=>post<{id:string;name:string}>('departments/',{name}),
+  moveDirectoryTeam:(id:string,department_id:string|null)=>request(`chat-directory/teams/${id}/`,'PATCH',{department_id}),
+  updateDirectoryMember:(id:string,data:{job_title:string;position_rank:number;is_senior:boolean})=>request<DirectoryMember>(`chat-directory/members/${id}/`,'PATCH',data),
+  addDirectoryTeamMember:(id:string,user_id:string)=>post(`chat-directory/teams/${id}/members/`,{user_id}),
+  employeeTasks:(status='',scope='all')=>request<{results:EmployeeTask[];can_assign:boolean;limit:number}>(`tasks/?${new URLSearchParams({status,scope})}`),
+  createEmployeeTask:(data:TaskInput)=>post<EmployeeTask>('tasks/',data),
+  updateEmployeeTask:(id:string,data:Partial<TaskInput>&{status?:TaskStatus})=>request<EmployeeTask>(`tasks/${id}/`,'PATCH',data),
+  deleteEmployeeTask:(id:string)=>request<void>(`tasks/${id}/`,'DELETE'),
+  deleteProjectGroup:(id:string)=>request<void>(`chats/${id}/`,'DELETE'),
   companyUsage:(id:string)=>request<CompanyUsage>(`platform/companies/${id}/usage/`),
   revenueReport:(start:string,end:string)=>request<RevenueReport>(`platform/revenue/?${new URLSearchParams({start,end})}`),
   supportTickets:(provider:boolean,status:string,page:number)=>request<SupportPage>(`${provider?'platform/':''}support/?${new URLSearchParams({status,page:String(page)})}`),
