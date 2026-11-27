@@ -297,7 +297,7 @@ export const api = {
 export interface MeetingActionItem {id:string;title:string;assignee_id:string|null;due_date:string|null;done:boolean}
 export interface MeetingRecord {
   id:string;title:string;agenda:string;starts_at:string;ends_at:string;time_zone:string;meeting_url:string;
-  notes:string;call_ended:boolean;cancelled:boolean;revision:number;organizer:Pick<Person,'id'|'full_name'|'email'>;
+  notes:string;call_ended:boolean;organizer_in_call:boolean;cancelled:boolean;revision:number;organizer:Pick<Person,'id'|'full_name'|'email'>;
   channel:{id:string;name:string;team_id:string;team_name:string}|null;
   my_response:'pending'|'accepted'|'tentative'|'declined';
   attendees:Array<{user:Pick<Person,'id'|'full_name'|'email'>;response:MeetingRecord['my_response']}>;

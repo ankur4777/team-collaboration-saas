@@ -435,6 +435,35 @@ export default function MeetingsPanel({
     startAt?: Date;
   } | null>(null);
   const [callMeeting, setCallMeeting] = useState<MeetingRecord | null>(null);
+  const [startedMeetings, setStartedMeetings] = useState<MeetingRecord[]>([]);
+  const [dismissedStarts, setDismissedStarts] = useState<string[]>([]);
+  const dismissedKey = `meeting-start-dismissed:${workspaceId}:${userId}`;
+  useEffect(() => {
+    try { setDismissedStarts(JSON.parse(sessionStorage.getItem(dismissedKey) || '[]')); }
+    catch { setDismissedStarts([]); }
+  }, [dismissedKey]);
+  useEffect(() => {
+    if (calendar || !callsEnabled || !workspaceId) return;
+    let active = true;
+    const refresh = () => {
+      const now = new Date();
+      meetingsApi.list(new Date(now.getTime() - 86400000).toISOString(), new Date(now.getTime() + 365 * 86400000).toISOString())
+        .then((data) => { if (active) setStartedMeetings(data.results.filter((m) => m.organizer_in_call && m.organizer.id !== userId && !m.cancelled && !m.call_ended)); })
+        .catch(() => {});
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 10000);
+    window.addEventListener('focus', refresh);
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener('focus', refresh); };
+  }, [calendar, callsEnabled, workspaceId, userId]);
+  function dismissMeetingStart(id: string) {
+    setDismissedStarts((previous) => {
+      const next = [...new Set([...previous, id])];
+      try { sessionStorage.setItem(dismissedKey, JSON.stringify(next)); } catch { /* Storage may be unavailable. */ }
+      return next;
+    });
+  }
+  const startedMeeting = !calendar && !callMeeting && !editor ? startedMeetings.find((m) => !dismissedStarts.includes(m.id)) : undefined;
   const [query, setQuery] = useState('');
   const [date, setDate] = useState(dayStart(new Date()));
   const [calendarMode, setCalendarMode] = useState<CalendarMode>('Month');
@@ -1049,6 +1078,15 @@ export default function MeetingsPanel({
           )}
         </aside>
       </div>
+      {startedMeeting && (
+        <div className="meeting-start-popup" role="status" aria-live="polite">
+          <button className="meeting-start-close" aria-label="Close meeting notification" onClick={() => dismissMeetingStart(startedMeeting.id)}><X size={16} /></button>
+          <strong>Meeting started</strong>
+          <p>{startedMeeting.title}</p>
+          <span>{startedMeeting.organizer.full_name} has started the meeting.</span>
+          <button className="primary-button" onClick={() => { dismissMeetingStart(startedMeeting.id); setCallMeeting(startedMeeting); }}>Join meeting</button>
+        </div>
+      )}
       {editor && (
         <MeetingEditor
           meeting={editor.meeting}
