@@ -615,6 +615,7 @@ h1,h2,h3,h4,.brand{font-family:"Inter Variable", Inter, sans-serif}
 .chat-thread.has-unread .chat-thread-details strong{font-weight:800;color:#101c2c}
 
 /* Explicit team selection on entry. */
+.hero-empty .empty-state:has(.team-selection-list){width:min(390px,calc(100% - 24px))}
 .team-selection-list{display:flex;flex-direction:column;align-items:stretch;gap:8px;width:min(320px,100%);max-width:100%;max-height:45vh;overflow:auto;padding:3px}
 .team-selection-list .outline-button{display:flex;align-items:center;gap:9px;width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere}
 .team-selection-list .outline-button svg{flex-shrink:0}
