@@ -732,5 +732,5 @@
 .meeting-task-form input,.meeting-task-form select,.meetings-controls input,.meetings-controls select{border-color:#f1cdd4;color:#253547}
 
 /* Live meeting notification */
-.meeting-start-popup{position:fixed;right:24px;bottom:24px;z-index:1000;width:min(320px,calc(100vw - 32px));padding:18px;background:#fff;border:1px solid #f2cbd1;border-radius:12px;box-shadow:0 12px 35px #8b001c30;color:#101c2c;display:flex;flex-direction:column;align-items:flex-start;gap:9px}
+.meeting-start-popup{position:fixed;right:24px;bottom:24px;z-index:1000;width:min(280px,calc(100vw - 32px));padding:14px;background:#fff;border:1px solid #f2cbd1;border-radius:12px;box-shadow:0 12px 35px #8b001c30;color:#101c2c;display:flex;flex-direction:column;align-items:flex-start;gap:7px}
 .meeting-start-popup strong{color:#a90014;font-size:15px}.meeting-start-popup p{margin:0;font-weight:600;overflow-wrap:anywhere}.meeting-start-popup span{font-size:12px;color:#536170}.meeting-start-popup .meeting-start-close{position:absolute;right:10px;top:10px;background:transparent;border:0;cursor:pointer;color:#536170}
