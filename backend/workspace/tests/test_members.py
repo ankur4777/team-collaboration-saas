@@ -49,9 +49,9 @@ class MemberManagementTests(TestCase):
     def member_url(self, org, membership):
         return f'/api/organizations/{org.pk}/members/{membership.pk}/'
 
-    def test_owner_can_promote_and_demote_non_owner(self):
+    def test_admin_can_promote_and_demote_other_members(self):
         org = self.register()
-        owner_membership = OrganizationMember.objects.get(organization=org, role='owner')
+        owner_membership = OrganizationMember.objects.get(organization=org, role='admin')
         _, member = self.employee(org, 'staff@company-a.test')
         url = self.member_url(org, member)
         self.assertEqual(self.write('PATCH', url, {'role': 'owner'}).status_code, 400)
@@ -66,7 +66,7 @@ class MemberManagementTests(TestCase):
             403,
         )
 
-    def test_admin_can_remove_member_but_not_assign_roles_or_remove_admins(self):
+    def test_admin_can_manage_roles_and_invite_admins_but_not_remove_self(self):
         org = self.register()
         _, admin = self.employee(org, 'admin@company-a.test', role='admin')
         member_user, member = self.employee(org, 'staff@company-a.test')
@@ -76,10 +76,10 @@ class MemberManagementTests(TestCase):
         response = self.write('POST', f'/api/teams/{team_id}/members/', {'email': member_user.email})
         self.assertEqual(response.status_code, 201)
         self.login('admin@company-a.test')
-        self.assertEqual(self.write('PATCH', self.member_url(org, member), {'role': 'admin'}).status_code, 403)
+        self.assertEqual(self.write('PATCH', self.member_url(org, member), {'role': 'admin'}).status_code, 200)
         self.assertEqual(self.write('DELETE', self.member_url(org, admin)).status_code, 403)
         self.assertEqual(self.write('POST', f'/api/organizations/{org.id}/invitations/',
-                                    {'email': 'new@company-a.test', 'role': 'admin'}).status_code, 403)
+                                    {'email': 'new@company-a.test', 'role': 'admin'}).status_code, 201)
         self.assertEqual(self.write('DELETE', self.member_url(org, member)).status_code, 204)
         self.assertFalse(OrganizationMember.objects.filter(pk=member.pk).exists())
         self.assertFalse(TeamMember.objects.filter(user=member_user).exists())
@@ -138,3 +138,13 @@ class MemberManagementTests(TestCase):
         self.assertTrue(ChatMessage.objects.filter(conversation_id=chat_id, body='Keep history').exists())
         self.login(first.email)
         self.assertEqual(self.client.get(base + 'messages/').status_code, 200)
+
+    def test_member_cannot_manage_company_roles(self):
+        org = self.register()
+        user, member = self.employee(org, 'regular@company-a.test')
+        _, other = self.employee(org, 'other@company-a.test')
+        self.login(user.email)
+        self.assertEqual(self.write('PATCH', self.member_url(org, other), {'role': 'admin'}).status_code, 403)
+        self.assertEqual(self.write('DELETE', self.member_url(org, other)).status_code, 403)
+        self.assertEqual(self.write('POST', f'/api/organizations/{org.pk}/invitations/',
+                                    {'email': 'new@company-a.test', 'role': 'admin'}).status_code, 403)

@@ -54,7 +54,7 @@ class OrganizationInvitationsView(APIView):
         membership = get_active_membership(request)
         if str(membership.organization_id) != str(pk):
             raise PermissionDenied('Not the active organization')
-        if membership.role not in (OrganizationMember.Role.OWNER, OrganizationMember.Role.ADMIN):
+        if membership.role != OrganizationMember.Role.ADMIN:
             raise PermissionDenied('Administrator access required')
         email = str(request.data.get('email', '')).lower().strip()
         role = str(request.data.get('role', 'member'))
@@ -62,18 +62,14 @@ class OrganizationInvitationsView(APIView):
             raise ValidationError({'email': 'Enter a valid email address'})
         if role not in (OrganizationMember.Role.ADMIN, OrganizationMember.Role.MEMBER):
             raise ValidationError({'role': 'Invites may grant admin or member access'})
-        if role == OrganizationMember.Role.ADMIN and membership.role != OrganizationMember.Role.OWNER:
-            raise PermissionDenied('Only the workspace owner can invite administrators')
         if OrganizationMember.objects.filter(organization_id=pk, user__email__iexact=email).exists():
             raise ValidationError({'email': 'This person is already a member'})
         with transaction.atomic():
             Organization.objects.select_for_update().get(pk=pk)
             # Reauthorize after the company lock, before issuing an invitation.
             membership = get_active_membership(request)
-            if membership.organization_id != pk or membership.role not in (OrganizationMember.Role.OWNER, OrganizationMember.Role.ADMIN):
+            if membership.organization_id != pk or membership.role != OrganizationMember.Role.ADMIN:
                 raise PermissionDenied('Administrator access required')
-            if role == OrganizationMember.Role.ADMIN and membership.role != OrganizationMember.Role.OWNER:
-                raise PermissionDenied('Only the workspace owner can invite administrators')
             if OrganizationMember.objects.filter(organization_id=pk, user__email__iexact=email).exists():
                 raise ValidationError({'email': 'This person is already a member'})
             if not seat_available(pk):

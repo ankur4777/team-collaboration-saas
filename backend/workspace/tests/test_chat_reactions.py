@@ -104,7 +104,7 @@ class ChatReactionTests(TestCase):
             name='Second Company',slug='reaction-second-company',created_by=owner,
         )
         OrganizationMember.objects.create(
-            organization=company_b,user=owner,role=OrganizationMember.Role.OWNER,
+            organization=company_b,user=owner,role=OrganizationMember.Role.ADMIN,
         )
         self.assertEqual(self.post(f'/api/organizations/{company_b.pk}/activate/').status_code,200)
         result=self.post(f"/api/chats/{chat['id']}/messages/{message['id']}/reactions/",{'emoji':'👍'})

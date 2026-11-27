@@ -5,14 +5,14 @@ import WorkspacePicker from './WorkspacePicker';
 import type {Org} from './api';
 
 afterEach(cleanup);
-const organizations:Org[]=[{id:'a',name:'Shabdd',slug:'shabdd',role:'owner'},{id:'b',name:'Design team',slug:'design',role:'member'}];
+const organizations:Org[]=[{id:'a',name:'Shabdd',slug:'shabdd',role:'admin'},{id:'b',name:'Design team',slug:'design',role:'member'}];
 describe('Workspace selector',()=>{
   it('shows workspace roles and switches only when another workspace is selected',async()=>{
     const user=userEvent.setup(),onSelect=vi.fn();
     render(<WorkspacePicker organizations={organizations} activeId="a" onSelect={onSelect}/>);
     const trigger=screen.getByRole('button',{name:'Switch organization'});
     await user.click(trigger);
-    const current=screen.getByRole('button',{name:/Shabdd Owner/});
+    const current=screen.getByRole('button',{name:/Shabdd Admin/});
     expect(current.getAttribute('aria-pressed')).toBe('true');
     await user.click(current);
     expect(onSelect).not.toHaveBeenCalled();

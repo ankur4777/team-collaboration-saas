@@ -99,9 +99,9 @@ def companies():
 def company_data(org):
     license_row = getattr(org, 'license', None) or CompanyLicense(organization=org)
     data = license_data(license_row)
-    owner_rows = list(org.members.filter(role=OrganizationMember.Role.OWNER).values('user__email','user__full_name'))
+    owner_rows = list(org.members.filter(role=OrganizationMember.Role.ADMIN).values('user__email','user__full_name'))
     owners = [r['user__email'] for r in owner_rows]
-    pending = org.invitations.filter(role=OrganizationMember.Role.OWNER, accepted_at__isnull=True, expires_at__gt=timezone.now()).order_by('-created_at').first()
+    pending = org.invitations.filter(role=OrganizationMember.Role.ADMIN, accepted_at__isnull=True, expires_at__gt=timezone.now()).order_by('-created_at').first()
     effective = effective_status(license_row)
     return {
         'id': str(org.pk), 'name': org.name, 'slug': org.slug,
@@ -121,12 +121,12 @@ def invite_owner(org, actor, email):
     if not seat_available(org.pk):
         raise ValidationError({'owner_email': SEAT_LIMIT_MESSAGE})
     # Lock prior pending invites so a resend cannot race an acceptance.
-    prior = list(Invitation.objects.select_for_update().filter(organization=org, role=OrganizationMember.Role.OWNER, accepted_at__isnull=True).order_by('pk'))
-    if org.members.filter(role=OrganizationMember.Role.OWNER).exists():
-        raise ValidationError({'owner_email': 'This company already has an owner'})
+    prior = list(Invitation.objects.select_for_update().filter(organization=org, role=OrganizationMember.Role.ADMIN, accepted_at__isnull=True).order_by('pk'))
+    if org.members.filter(role=OrganizationMember.Role.ADMIN).exists():
+        raise ValidationError({'owner_email': 'This company already has an administrator'})
     Invitation.objects.filter(pk__in=[row.pk for row in prior]).update(expires_at=timezone.now())
     token = Invitation.generate_token()
-    Invitation.objects.create(organization=org, invited_by=actor, role=OrganizationMember.Role.OWNER,
+    Invitation.objects.create(organization=org, invited_by=actor, role=OrganizationMember.Role.ADMIN,
                               email=email, token_hash=hashlib.sha256(token.encode()).hexdigest())
     return token
 
@@ -135,14 +135,14 @@ def deliver_owner_invite(org, email, token):
     try:
         count = send_mail(
             subject='Set up your TeamWorkspace company',
-            message=f'You have been invited to manage {org.name} as its company owner.\n\n'
+            message=f'You have been invited to manage {org.name} as its company administrator.\n\n'
                     f'Accept this private invitation within 7 days:\n{settings.FRONTEND_ORIGIN}/invite?token={quote(token, safe="")}\n\n'
                     'If you already have a TeamWorkspace account, sign in with the invited email first.',
             from_email=settings.DEFAULT_FROM_EMAIL, recipient_list=[email], fail_silently=False,
         )
         return bool(count)
     except Exception:
-        logger.exception('Company owner invitation delivery failed for company %s', org.pk)
+        logger.exception('Company administrator invitation delivery failed for company %s', org.pk)
         return False
 
 
@@ -159,7 +159,7 @@ class CompanyListView(PlatformView):
             raise ValidationError({'detail':'Invalid company filters'})
         rows = companies()
         if q:
-            rows = rows.filter(Q(name__icontains=q) | Q(license__contact_email__icontains=q) | Q(license__phone__icontains=q) | Q(license__tax_number__icontains=q) | Q(pk__in=OrganizationMember.objects.filter(Q(user__email__icontains=q)|Q(user__full_name__icontains=q),role='owner').values('organization_id')))
+            rows = rows.filter(Q(name__icontains=q) | Q(license__contact_email__icontains=q) | Q(license__phone__icontains=q) | Q(license__tax_number__icontains=q) | Q(pk__in=OrganizationMember.objects.filter(Q(user__email__icontains=q)|Q(user__full_name__icontains=q),role='admin').values('organization_id')))
         today = timezone.localdate()
         current = Q(license__status__in=['active','trial'])
         expired = current & Q(license__ends_on__lt=today)

@@ -11,7 +11,7 @@ class RenewalTests(TestCase):
         self.provider=get_user_model().objects.create_superuser('renew-provider@example.test','StrongProviderPass123!',full_name='Provider')
         self.owner=get_user_model().objects.create_user('renew-owner@example.test','StrongOwnerPass123!',full_name='Owner')
         self.org=Organization.objects.create(name='Renew company',slug='renew-company',created_by=self.owner)
-        OrganizationMember.objects.create(organization=self.org,user=self.owner,role='owner')
+        OrganizationMember.objects.create(organization=self.org,user=self.owner,role='admin')
         self.today=timezone.localdate()
         self.row=CompanyLicense.objects.create(organization=self.org,status='active',
             starts_on=self.today-timedelta(days=10), ends_on=self.today+timedelta(days=20),seat_limit=5,modules=['chats'],enforce_modules=True)

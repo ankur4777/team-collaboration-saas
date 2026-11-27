@@ -85,7 +85,7 @@ class SharedFileDeleteTests(TransactionTestCase):
     def test_even_uploader_cannot_delete_from_another_active_workspace(self):
         row = self.file()
         other_org = Organization.objects.create(name='Other', slug='other-shared-files', created_by=self.member)
-        OrganizationMember.objects.create(organization=other_org, user=self.member, role='owner')
+        OrganizationMember.objects.create(organization=other_org, user=self.member, role='admin')
         self.login(self.member, other_org)
         self.assertEqual(self.delete(row.pk).status_code, 404)
         self.assertTrue(WorkspaceFile.objects.filter(pk=row.pk).exists())

@@ -13,7 +13,7 @@ class PlatformAdminTests(TestCase):
         self.admin = get_user_model().objects.create_superuser('provider@example.test','StrongAdminPass123!',full_name='Provider')
         self.employee = get_user_model().objects.create_user('employee@example.test','StrongEmployeePass123!',full_name='Employee')
         self.company = Organization.objects.create(name='Existing customer',slug='existing-customer',created_by=self.employee)
-        OrganizationMember.objects.create(organization=self.company,user=self.employee,role='owner')
+        OrganizationMember.objects.create(organization=self.company,user=self.employee,role='admin')
         self.client = Client(enforce_csrf_checks=True)
         self.base = '/api/platform/companies/'
 
@@ -50,7 +50,7 @@ class PlatformAdminTests(TestCase):
         pk=payload['company']['id']
         self.assertEqual(payload['company']['employee_count'],0)
         self.assertFalse(OrganizationMember.objects.filter(organization_id=pk,user=self.admin).exists())
-        self.assertEqual(Invitation.objects.get(organization_id=pk).role,'owner')
+        self.assertEqual(Invitation.objects.get(organization_id=pk).role, 'admin')
         self.assertIn('client@example.test',mail.outbox[-1].to)
         self.assertEqual(self.client.get(self.base,{'status':'expired'}).json()['total'],1)
         path=self.base+pk+'/'

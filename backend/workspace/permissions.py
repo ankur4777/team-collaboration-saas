@@ -28,7 +28,7 @@ def require_team_access(request, team, *, manage=False):
     if not team_member:
         raise PermissionDenied('No access to this team')
     if manage and team_member.role != TeamMember.Role.OWNER and member.role not in (
-        OrganizationMember.Role.OWNER, OrganizationMember.Role.ADMIN
+        OrganizationMember.Role.ADMIN,
     ):
         raise PermissionDenied('Only team owners and organization administrators can manage this team')
     return team_member

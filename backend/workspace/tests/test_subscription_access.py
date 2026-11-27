@@ -10,7 +10,7 @@ class SubscriptionAccessTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user('subscriber@example.test','StrongPass123!',full_name='Subscriber')
         self.org = Organization.objects.create(name='Customer',slug='customer',created_by=self.user)
-        OrganizationMember.objects.create(organization=self.org,user=self.user,role='owner')
+        OrganizationMember.objects.create(organization=self.org,user=self.user,role='admin')
         self.client = Client()
         self.client.force_login(self.user)
         session = self.client.session

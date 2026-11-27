@@ -87,7 +87,7 @@ def register(request):
             user = User.objects.create_user(email=email, password=password, full_name=full_name)
             slug = f'{slugify(organization_name)[:135] or "workspace"}-{secrets.token_hex(4)}'
             org = Organization.objects.create(name=organization_name, slug=slug, created_by=user)
-            OrganizationMember.objects.create(organization=org, user=user, role=OrganizationMember.Role.OWNER)
+            OrganizationMember.objects.create(organization=org, user=user, role=OrganizationMember.Role.ADMIN)
     except IntegrityError:
         return bad('Could not create account; please try another email', 409)
     login(request, user, backend='django.contrib.auth.backends.ModelBackend')

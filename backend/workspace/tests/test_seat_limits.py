@@ -11,7 +11,7 @@ class SeatLimitTests(TestCase):
     def setUp(self):
         self.owner = get_user_model().objects.create_user('seat-owner@example.test','StrongOwnerPass123!',full_name='Owner')
         self.org = Organization.objects.create(name='Seat company',slug='seat-company',created_by=self.owner)
-        OrganizationMember.objects.create(organization=self.org,user=self.owner,role='owner')
+        OrganizationMember.objects.create(organization=self.org,user=self.owner,role='admin')
         self.license = CompanyLicense.objects.create(organization=self.org,status='active',seat_limit=2)
         self.client = Client()
         self.client.force_login(self.owner)

@@ -12,7 +12,7 @@ class BillingTests(TestCase):
         self.owner=get_user_model().objects.create_user('billing-owner@example.test','StrongOwner123!',full_name='Owner')
         self.org=Organization.objects.create(name='Billing company',slug='billing-company',created_by=self.owner)
         self.other=Organization.objects.create(name='Other customer',slug='billing-other',created_by=self.owner)
-        OrganizationMember.objects.create(organization=self.org,user=self.owner,role='owner')
+        OrganizationMember.objects.create(organization=self.org,user=self.owner,role='admin')
         self.client=Client()
         self.client.force_login(self.admin)
         self.url=f'/api/platform/companies/{self.org.pk}/invoices/'

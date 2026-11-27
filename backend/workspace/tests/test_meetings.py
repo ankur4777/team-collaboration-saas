@@ -9,14 +9,14 @@ class MeetingTests(TestCase):
     def setUp(self):
         self.owner=User.objects.create_user('owner@a.test','SafePassword123!',full_name='Owner')
         self.org=Organization.objects.create(name='A',slug='a',created_by=self.owner)
-        OrganizationMember.objects.create(organization=self.org,user=self.owner,role='owner')
+        OrganizationMember.objects.create(organization=self.org,user=self.owner,role='admin')
         self.member=User.objects.create_user('member@a.test','SafePassword123!',full_name='Member')
         OrganizationMember.objects.create(organization=self.org,user=self.member)
         self.stranger=User.objects.create_user('stranger@a.test','SafePassword123!',full_name='Stranger')
         OrganizationMember.objects.create(organization=self.org,user=self.stranger)
         self.other=User.objects.create_user('owner@b.test','SafePassword123!',full_name='Other')
         self.org_b=Organization.objects.create(name='B',slug='b',created_by=self.other)
-        OrganizationMember.objects.create(organization=self.org_b,user=self.other,role='owner')
+        OrganizationMember.objects.create(organization=self.org_b,user=self.other,role='admin')
         self.client=APIClient();self.login(self.owner)
         self.payload={'title':'Review','agenda':'Discuss work','starts_at':(timezone.now()+timedelta(hours=2)).isoformat(),
           'ends_at':(timezone.now()+timedelta(hours=3)).isoformat(),'time_zone':'Asia/Kolkata',

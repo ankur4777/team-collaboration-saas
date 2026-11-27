@@ -1,8 +1,8 @@
 """Authenticated workspace membership administration.
 
 Every mutation is scoped to the current session's active organization.
-The organization owner alone may change role assignments; admins may remove
-ordinary members, but not other admins or team owners.
+Company administrators manage membership roles and removals. Self-removal
+and self-demotion are prohibited; team/group ownership protections remain.
 """
 from django.db import transaction
 from rest_framework import status
@@ -30,17 +30,8 @@ class OrganizationMemberDetailView(APIView):
 
         if target.user_id == request.user.pk:
             raise PermissionDenied('You cannot change or remove your own membership')
-        if target.role == OrganizationMember.Role.OWNER:
-            raise PermissionDenied('Workspace ownership cannot be changed here')
-
-        if role_change:
-            if actor.role != OrganizationMember.Role.OWNER:
-                raise PermissionDenied('Only the workspace owner may change roles')
-        elif actor.role != OrganizationMember.Role.OWNER and not (
-            actor.role == OrganizationMember.Role.ADMIN
-            and target.role == OrganizationMember.Role.MEMBER
-        ):
-            raise PermissionDenied('You cannot remove this workspace member')
+        if actor.role != OrganizationMember.Role.ADMIN:
+            raise PermissionDenied('Only company administrators can manage members')
         return target
 
     def patch(self, request, pk, member_id):
@@ -48,12 +39,11 @@ class OrganizationMemberDetailView(APIView):
         if role not in (OrganizationMember.Role.ADMIN, OrganizationMember.Role.MEMBER):
             raise ValidationError({'role': 'Role must be admin or member'})
         with transaction.atomic():
+            Organization.objects.select_for_update().get(pk=pk)
             target = self._authorize(request, pk, member_id, role_change=True)
             # Lock the row and reauthorize against its current role.
             target = (OrganizationMember.objects.select_for_update()
                       .get(pk=target.pk))
-            if target.role == OrganizationMember.Role.OWNER:
-                raise PermissionDenied('Workspace ownership cannot be changed here')
             target.role = role
             target.save(update_fields=['role'])
         return Response(OrganizationMemberSerializer(target).data)
@@ -65,14 +55,6 @@ class OrganizationMemberDetailView(APIView):
             target = self._authorize(request, pk, member_id)
             target = (OrganizationMember.objects.select_for_update()
                       .get(pk=target.pk))
-            # An admin can never remove another admin, including after a
-            # concurrent role change before we acquired the row lock.
-            actor = get_active_membership(request)
-            if target.role == OrganizationMember.Role.OWNER or (
-                actor.role != OrganizationMember.Role.OWNER
-                and target.role != OrganizationMember.Role.MEMBER
-            ):
-                raise PermissionDenied('You cannot remove this workspace member')
             if TeamMember.objects.filter(
                 team__organization_id=pk,
                 user_id=target.user_id,

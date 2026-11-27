@@ -14,7 +14,7 @@ from .private_attachments import validate_upload
 
 def can_delete_file(row, membership):
     return row.uploaded_by_id == membership.user_id or membership.role in (
-        OrganizationMember.Role.OWNER, OrganizationMember.Role.ADMIN,
+        OrganizationMember.Role.ADMIN,
     )
 
 

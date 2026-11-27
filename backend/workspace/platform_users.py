@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 def member_data(row):
     return {'id':str(row.pk),'user_id':str(row.user_id),'company_id':str(row.organization_id),
             'company':row.organization.name,'full_name':row.user.full_name,'email':row.user.email,
-            'role':row.role,'contact_phone':row.contact_phone,'editable':row.role!='owner' and not row.user.is_staff and not row.user.is_superuser,'active':row.user.is_active,'email_verified':bool(row.user.email_verified_at),
+            'role':row.role,'contact_phone':row.contact_phone,'editable':not row.user.is_staff and not row.user.is_superuser,'active':row.user.is_active,'email_verified':bool(row.user.email_verified_at),
             'joined_at':row.joined_at.isoformat(),'last_seen_at':row.last_seen_at.isoformat() if row.last_seen_at else None}
 
 
@@ -35,7 +35,7 @@ class UserDirectoryView(PlatformView):
             size=int(request.query_params.get('page_size','10'))
         except ValueError:
             raise ValidationError({'page':'Invalid pagination'})
-        if len(q)>150 or role not in ('','owner','admin','member') or not 1<=page<=100000 or size not in (10,25,50,100):
+        if len(q)>150 or role not in ('','admin','member') or not 1<=page<=100000 or size not in (10,25,50,100):
             raise ValidationError({'detail':'Invalid directory filters'})
         rows=OrganizationMember.objects.select_related('organization','user')
         if q:
@@ -62,8 +62,10 @@ class UserMembershipView(PlatformView):
         initial=get_object_or_404(OrganizationMember,pk=member_id)
         org=get_object_or_404(Organization.objects.select_for_update(),pk=initial.organization_id)
         row=get_object_or_404(OrganizationMember.objects.select_for_update().select_related('organization','user'),pk=member_id,organization=org)
-        if row.role=='owner' or row.user.is_superuser or row.user.is_staff:
-            raise ValidationError({'role':'Protected owner or platform account'})
+        if row.user.is_superuser or row.user.is_staff:
+            raise ValidationError({'role':'Protected platform account'})
+        if row.role=='admin' and form.validated_data.get('role')=='member' and not org.members.filter(role='admin',user__is_active=True).exclude(pk=row.pk).exists():
+            raise ValidationError({'role':'The company must retain at least one active administrator'})
         changes={}
         for key,value in form.validated_data.items():
             old=getattr(row,key)
@@ -91,13 +93,13 @@ class InviteUserView(PlatformView):
             org=get_object_or_404(Organization.objects.select_for_update(),pk=company_id)
             if not access_allowed(org.pk):
                 raise ValidationError({'detail':'Reactivate the company before inviting new employees'})
-            if not org.members.filter(role='owner').exists():
-                raise ValidationError({'detail':'The company owner must accept their invitation first'})
+            if not org.members.filter(role='admin').exists():
+                raise ValidationError({'detail':'A company administrator must accept their invitation first'})
             if org.members.filter(user__email__iexact=email).exists():
                 raise ValidationError({'email':'This person is already a member'})
             if not seat_available(org.pk):
                 return Response({'detail':SEAT_LIMIT_MESSAGE},status=409)
-            prior=list(Invitation.objects.select_for_update().filter(organization=org,email__iexact=email,accepted_at__isnull=True).exclude(role='owner'))
+            prior=list(Invitation.objects.select_for_update().filter(organization=org,email__iexact=email,accepted_at__isnull=True))
             Invitation.objects.filter(pk__in=[r.pk for r in prior]).update(expires_at=timezone.now())
             token=Invitation.generate_token()
             inv=Invitation.objects.create(organization=org,email=email,role=role,token_hash=hashlib.sha256(token.encode()).hexdigest(),invited_by=request.user)

@@ -28,7 +28,7 @@ class WorkspaceAPITests(TestCase):
     def test_registration_creates_owner_and_csrf_logout(self):
         session = self.register()
         org_id = session['active_organization_id']
-        self.assertEqual(OrganizationMember.objects.get(organization_id=org_id).role, 'owner')
+        self.assertEqual(OrganizationMember.objects.get(organization_id=org_id).role, 'admin')
         self.assertEqual(self.client.get('/api/auth/me/').status_code, 200)
         self.assertEqual(self.post('/api/auth/logout/', {}).status_code, 200)
         self.assertEqual(self.client.get('/api/auth/me/').status_code, 401)
@@ -166,11 +166,11 @@ class WorkspaceAPITests(TestCase):
         from django.utils import timezone
         session = self.register()
         org = Organization.objects.get(pk=session['active_organization_id'])
-        owner = OrganizationMember.objects.get(organization=org, role='owner')
+        owner = OrganizationMember.objects.get(organization=org, role='admin')
         staff = get_user_model().objects.create_user('presence@company-a.test', 'SecurePass123!', full_name='Staff')
         employee = OrganizationMember.objects.create(organization=org, user=staff)
         other = Organization.objects.create(name='Presence other', slug='presence-other', created_by=owner.user)
-        other_membership = OrganizationMember.objects.create(organization=other, user=owner.user, role='owner')
+        other_membership = OrganizationMember.objects.create(organization=other, user=owner.user, role='admin')
         path = f'/api/organizations/{org.pk}/presence/'
         response = self.post(path, {'user_id':str(staff.pk)})
         self.assertEqual(response.status_code,200,response.content)

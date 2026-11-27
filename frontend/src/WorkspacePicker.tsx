@@ -4,7 +4,7 @@ import type {Org} from './api';
 
 interface Props {organizations:Org[];activeId:string|null;disabled?:boolean;onSelect:(id:string)=>void}
 function initials(name:string){return name.trim().split(/\s+/).filter(Boolean).slice(0,2).map(word=>word[0].toUpperCase()).join('')||'TW';}
-function roleLabel(role:Org['role']){return role==='admin'?'Administrator':role==='owner'?'Owner':'Member';}
+function roleLabel(role:Org['role']){return role==='admin'?'Admin':'Member';}
 
 export default function WorkspacePicker({organizations,activeId,disabled=false,onSelect}:Props){
   const [open,setOpen]=useState(false);

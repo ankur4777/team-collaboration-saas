@@ -22,7 +22,7 @@ def member(request):
 def customer_rows(request):
     membership=member(request)
     rows=SupportTicket.objects.filter(organization_id=membership.organization_id)
-    if membership.role not in ('owner','admin'):
+    if membership.role != 'admin':
         rows=rows.filter(requester=request.user)
     return rows
 

@@ -192,7 +192,6 @@ class PlatformAuditEntry(models.Model):
 
 class OrganizationMember(models.Model):
     class Role(models.TextChoices):
-        OWNER = 'owner', 'Owner'
         ADMIN = 'admin', 'Admin'
         MEMBER = 'member', 'Member'
 
