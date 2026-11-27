@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEve
 import { ArrowRight, MessageCircle, Plus, RefreshCw, Send, Users, X } from 'lucide-react';
 import { api, type ChatMessage, type ChannelMessageCursor, type ChatThread, type Member, type Person, type PresenceMap, type ChatDirectoryData } from './api';
 import ChatDirectory from './ChatDirectory';
+import TasksPanel from './TasksPanel';
 import ChatReactionBar from './ChatReactionBar';
 import {connectConversationSocket,mergeFreshHistory} from './conversationSocket';
 import {ApiError} from './api';
@@ -29,9 +30,10 @@ function messageOrder(a: ChatMessage, b: ChatMessage) {
   return a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id);
 }
 
-interface Props { workspaceId: string|null; currentUser: Person; members: Member[]; presence?: PresenceMap; requestedChat?: {id:string;nonce:number;messageId?:string}|null; onRead?: ()=>void; notificationVersion?:number; onOpenTasks?:()=>void }
+interface Props { workspaceId: string|null; currentUser: Person; members: Member[]; presence?: PresenceMap; requestedChat?: {id:string;nonce:number;messageId?:string}|null; onRead?: ()=>void; notificationVersion?:number }
 
-export default function ChatPanel({workspaceId, currentUser, members, presence={}, requestedChat, onRead,notificationVersion=0,onOpenTasks}: Props) {
+export default function ChatPanel({workspaceId, currentUser, members, presence={}, requestedChat, onRead,notificationVersion=0}: Props) {
+  const [section,setSection]=useState<'chats'|'tasks'>('chats');
   const [directory,setDirectory]=useState<ChatDirectoryData|null>(null),[directoryLoading,setDirectoryLoading]=useState(true);
   const [threadKind,setThreadKind]=useState<'all'|'direct'|'group'>('all');
   const directoryRun=useRef(0);
@@ -117,7 +119,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
   useEffect(()=>{if(notificationVersion>0&&workspaceId)void loadThreads();},[notificationVersion,workspaceId,loadThreads]);
 
   useEffect(() => {
-    if(requestedChat?.id) setSelected(requestedChat.id);
+    if(requestedChat?.id) {setSelected(requestedChat.id);setSection('chats');}
   },[requestedChat?.nonce, requestedChat?.id]);
 
   const markViewed = useCallback(async(chatId:string, messageId:string)=>{
@@ -222,7 +224,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
 
   const latest = messages[messages.length-1];
   const latestId = latest?.id;
-  useEffect(() => { if(latestId) bottomRef.current?.scrollIntoView({behavior:'smooth'}); }, [selected,latestId]);
+  useEffect(() => { if(latestId && section==='chats') bottomRef.current?.scrollIntoView({behavior:'smooth'}); }, [selected,latestId,section]);
   useLayoutEffect(() => {
     const old = scrollRestoreRef.current;
     if(old && historyRef.current) {
@@ -231,21 +233,21 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
     }
   },[messages,loadingOlder]);
   useEffect(()=>{
-    if(!selected || loadedChatId!==selected || !latestId || document.visibilityState!=='visible')return;
+    if(section!=='chats' || !selected || loadedChatId!==selected || !latestId || document.visibilityState!=='visible')return;
     const key=`${selected}:${latestId}`;
     if(lastMarkedRef.current===key)return;
     lastMarkedRef.current=key;
     void markViewed(selected,latestId);
-  },[selected,loadedChatId,latestId,markViewed]);
+  },[section,selected,loadedChatId,latestId,markViewed]);
 
   useEffect(()=>{
     const handleVisibility=()=>{
-      if(document.visibilityState==='visible' && selected && latestId && loadedChatId===selected)
+      if(section==='chats' && document.visibilityState==='visible' && selected && latestId && loadedChatId===selected)
         void markViewed(selected,latestId);
     };
     document.addEventListener('visibilitychange',handleVisibility);
     return()=>document.removeEventListener('visibilitychange',handleVisibility);
-  },[selected,latestId,loadedChatId,markViewed]);
+  },[section,selected,latestId,loadedChatId,markViewed]);
 
   function emitTyping(active:boolean) {
     const socket=socketRef.current;
@@ -466,10 +468,14 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
     {selected&&forwardTarget&&<ForwardMessageDialog key={selected+forwardTarget.id} kind="chat" sourceId={selected} message={forwardTarget} onClose={()=>setForwardId(null)} onSent={result=>{if(result.kind==='chat'&&result.destination_id===selected&&'reactions' in result.message){const sent=result.message;setMessages(old=>old.some(row=>row.id===sent.id)?old:[...old,sent].sort(messageOrder));}void loadThreads();}}/>}
     <div className="private-chat-heading">
       <div><div className="eyebrow">YOUR WORKSPACE / MESSAGES</div><h1>Chats &amp; Groups</h1><p>Browse departments and teams to chat with an employee.</p></div>
-      <div className="org-chat-heading-actions">{onOpenTasks&&<button className="outline-button" type="button" onClick={onOpenTasks}>Tasks</button>}<button className="primary-button" type="button" onClick={() => setMode('direct')}><Plus size={17}/> New chat</button></div>
+      {section==='chats'&&<div className="org-chat-heading-actions"><button className="primary-button" type="button" onClick={() => setMode('direct')}><Plus size={17}/> New chat</button></div>}
+    </div>
+    <div className="org-chat-section-switch" role="group" aria-label="Chats and groups sections">
+      <button className="outline-button" type="button" aria-pressed={section==='chats'} onClick={()=>setSection('chats')}>Chats &amp; Groups</button>
+      <button className="outline-button" type="button" aria-pressed={section==='tasks'} onClick={()=>setSection('tasks')}>Tasks</button>
     </div>
     {error && <div className="chat-alert" role="alert">{error}<button type="button" onClick={() => setError('')} aria-label="Dismiss error"><X size={16}/></button></div>}
-    <div className="private-chat-layout">
+    {section==='tasks'?<div className="org-chat-tasks"><TasksPanel key={workspaceId||'none'} workspaceId={workspaceId}/></div>:<div className="private-chat-layout">
       <aside className="private-chat-list">
         <ChatDirectory data={directory} loading={directoryLoading} currentUserId={currentUser.id} busy={working} onReload={()=>void loadDirectory()} onStartChat={email=>void openEmployeeChat(email)}/>
         <div className="private-chat-list-heading"><strong>Conversations</strong><button type="button" className="outline-button" aria-pressed={showArchived} onClick={()=>setShowArchived(value=>!value)}>{showArchived?'Active':'Archived'}</button><button type="button" className="icon-button" aria-label="Refresh chats" title="Refresh chats" onClick={() => void loadThreads()}><RefreshCw size={16}/></button></div>
@@ -532,6 +538,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
         </> : <div className="private-chat-welcome"><MessageCircle size={32}/><h3>Select a conversation</h3><p>Choose a chat or group from the list to start messaging.</p></div>}
       </div>
     </div>
+    }
     {managingGroup && active?.kind==='group' && active.created_by.id===currentUser.id && <div className="modal-backdrop" onMouseDown={e => {if (e.target===e.currentTarget) setManagingGroup(false);}}>
       <div className="modal" role="dialog" aria-modal="true" aria-label="Manage group participants">
         <div className="modal-head"><div><div className="eyebrow">GROUP CHAT</div><h2>Manage group</h2></div><button className="icon-button" onClick={() => setManagingGroup(false)} aria-label="Close"><X size={19}/></button></div>

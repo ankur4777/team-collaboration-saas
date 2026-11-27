@@ -1,5 +1,5 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
-import {cleanup,render,screen,waitFor} from '@testing-library/react';
+import {act,cleanup,render,screen,waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ChatPanel from './ChatPanel';
 import {DraftProvider} from './conversationDrafts';
@@ -17,6 +17,7 @@ const thread=(id:string,name:string):ChatThread=>({id,kind:'direct',title:'',cre
 beforeEach(()=>{
   vi.clearAllMocks();
   vi.spyOn(api,'chatDirectory').mockResolvedValue({departments:[],teams:[],members:[],can_manage:false,can_create_groups:true,can_assign_tasks:true});
+  vi.spyOn(api,'employeeTasks').mockResolvedValue({results:[],can_assign:false,limit:200});
   vi.mocked(api.chats).mockResolvedValue([thread('one','First colleague'),thread('two','Second colleague')]);
   vi.mocked(api.chatMessagePage).mockResolvedValue({items:[],has_more:false,next_cursor:null});
   vi.mocked(api.chatAttachments).mockResolvedValue([]);
@@ -24,6 +25,49 @@ beforeEach(()=>{
   vi.mocked(api.messageContext).mockResolvedValue({items:[{id:'message',body:'Search result message',sender:me,created_at:now,edited_at:null,deleted_at:null}]});
 });
 afterEach(cleanup);
+
+describe('Tasks inside Chats and Groups',()=>{
+  it('opens employee tasks in the same section and restores the selected chat and draft',async()=>{
+    const user=userEvent.setup();
+    render(<DraftProvider><ChatPanel workspaceId="org" currentUser={me} members={[]}/></DraftProvider>);
+    await user.click(await screen.findByRole('button',{name:/First colleague/}));
+    await user.type(screen.getByRole('textbox',{name:'Write a message'}),'Keep this draft');
+    await user.click(screen.getByRole('button',{name:'Tasks'}));
+    expect(await screen.findByRole('region',{name:'Employee tasks'})).toBeTruthy();
+    expect(screen.queryByRole('textbox',{name:'Write a message'})).toBeNull();
+    expect(screen.getByRole('button',{name:'Tasks'}).getAttribute('aria-pressed')).toBe('true');
+    expect(api.employeeTasks).toHaveBeenCalledWith('','all');
+    await user.click(screen.getByRole('button',{name:'Chats & Groups'}));
+    expect(screen.getByRole('heading',{name:'First colleague'})).toBeTruthy();
+    expect(screen.getByRole('textbox',{name:'Write a message'})).toHaveProperty('value','Keep this draft');
+  });
+
+  it('opens a requested conversation when a notification arrives while viewing tasks',async()=>{
+    const user=userEvent.setup(),props={workspaceId:'org',currentUser:me,members:[]};
+    const view=render(<ChatPanel {...props}/>);
+    await user.click(screen.getByRole('button',{name:'Tasks'}));
+    await screen.findByRole('region',{name:'Employee tasks'});
+    view.rerender(<ChatPanel {...props} requestedChat={{id:'two',nonce:1}}/>);
+    expect(await screen.findByRole('heading',{name:'Second colleague'})).toBeTruthy();
+    expect(screen.queryByRole('region',{name:'Employee tasks'})).toBeNull();
+  });
+
+  it('does not mark chat messages as read while the tasks section is visible',async()=>{
+    // jsdom does not implement the browser's scrolling API.
+    HTMLElement.prototype.scrollIntoView=vi.fn();
+    vi.spyOn(document,'visibilityState','get').mockReturnValue('visible');
+    let deliver!:(value:{items:import('./api').ChatMessage[];has_more:boolean;next_cursor:null})=>void;
+    vi.mocked(api.chatMessagePage).mockImplementationOnce(()=>new Promise(resolve=>{deliver=resolve;}));
+    const read=vi.spyOn(api,'markChatRead').mockResolvedValue({last_read_at:now}),user=userEvent.setup();
+    render(<ChatPanel workspaceId="org" currentUser={me} members={[]}/>);
+    await user.click(await screen.findByRole('button',{name:/First colleague/}));
+    await user.click(screen.getByRole('button',{name:'Tasks'}));
+    await act(async()=>deliver({items:[{id:'unread',body:'New message',sender:person('one','First colleague'),created_at:now,edited_at:null,deleted_at:null,reactions:[]}],has_more:false,next_cursor:null}));
+    expect(read).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button',{name:'Chats & Groups'}));
+    await waitFor(()=>expect(read).toHaveBeenCalledWith('one','unread'));
+  });
+});
 
 describe('Department chat navigation and Senior project groups',()=>{
   it('opens a direct conversation only after a department employee is clicked',async()=>{
