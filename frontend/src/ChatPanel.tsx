@@ -509,7 +509,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
     {error && <div className="chat-alert" role="alert">{error}<button type="button" onClick={() => setError('')} aria-label="Dismiss error"><X size={16}/></button></div>}
     {section==='tasks'?<div className="org-chat-tasks"><TasksPanel key={workspaceId||'none'} workspaceId={workspaceId}/></div>:<div className="private-chat-layout">
       <aside className="private-chat-list">
-        <div className="chat-list-tabs" role="group" aria-label="Browse chats"><button type="button" aria-pressed={listView==='messages'} onClick={()=>setListView('messages')}><MessageCircle size={16}/>Messages</button><button type="button" aria-pressed={listView==='people'} onClick={()=>setListView('people')}><Users size={16}/>People</button></div>
+        <div className="chat-list-tabs" role="group" aria-label="Browse chats"><button type="button" aria-pressed={listView==='people'} onClick={()=>setListView('people')}><Users size={16}/>People</button><button type="button" aria-pressed={listView==='messages'} onClick={()=>setListView('messages')}><MessageCircle size={16}/>Messages</button></div>
         <div className="chat-people-pane" hidden={listView!=='people'}>
           <p className="chat-people-help">Choose a department, then a team to find a colleague.</p>
           <button type="button" className="icon-button chat-directory-refresh" aria-label="Refresh people" title="Refresh people" onClick={()=>void loadDirectory()}><RefreshCw size={15}/></button>
