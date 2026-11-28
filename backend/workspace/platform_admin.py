@@ -163,7 +163,7 @@ class CompanyListView(PlatformView):
             page_size = int(request.query_params.get('page_size', PAGE_SIZE))
         except ValueError:
             raise ValidationError({'page':'Invalid page'})
-        if page_size not in (10,25,50,100) or not 1 <= page <= 100000 or len(q) > 140 or status not in ('', *CompanyLicense.Status.values, 'expired', 'scheduled'):
+        if page_size not in (10,25,50,100) or not 1 <= page <= 100000 or len(q) > 140 or status not in ('', *CompanyLicense.Status.values, 'expired', 'scheduled', 'expiring'):
             raise ValidationError({'detail':'Invalid company filters'})
         rows = companies()
         if q:
@@ -181,7 +181,10 @@ class CompanyListView(PlatformView):
         current = Q(license__status__in=['active','trial'])
         expired = current & Q(license__ends_on__lt=today)
         scheduled = current & Q(license__starts_on__gt=today) & (Q(license__ends_on__isnull=True) | Q(license__ends_on__gte=today))
-        if status == 'expired':
+        expiring = current & Q(license__ends_on__gte=today, license__ends_on__lte=today+timedelta(days=7)) & ~scheduled
+        if status == 'expiring':
+            rows = rows.filter(expiring)
+        elif status == 'expired':
             rows = rows.filter(expired)
         elif status == 'scheduled':
             rows = rows.filter(scheduled)
@@ -203,6 +206,8 @@ class CompanyListView(PlatformView):
             'active': all_rows.filter(license__status='active').exclude(expired | scheduled).count(),
             'trial': all_rows.filter(license__status='trial').exclude(expired | scheduled).count(),
             'expired': all_rows.filter(expired).count(),
+            'expiring': all_rows.filter(expiring).count(),
+            'scheduled': all_rows.filter(scheduled).count(),
             'suspended': all_rows.filter(license__status='suspended').count(),
             'memberships': OrganizationMember.objects.count(),
         }

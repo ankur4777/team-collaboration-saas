@@ -54,6 +54,26 @@ class RenewalTests(TestCase):
         self.assertEqual(self.renew().json()['company']['effective_status'],'suspended')
         self.assertEqual(self.renew(reactivate=True).json()['company']['effective_status'],'active')
 
+    def test_expiring_company_directory_filter(self):
+        url='/api/platform/companies/'
+        for days in (0, 7, 8, -1):
+            self.row.ends_on=self.today+timedelta(days=days)
+            self.row.save()
+            response=self.client.get(url, {'status':'expiring'})
+            self.assertEqual(response.status_code,200,response.content)
+            expected=int(days in (0,7))
+            self.assertEqual(response.json()['total'],expected)
+            self.assertEqual(response.json()['stats']['expiring'],expected)
+        self.row.starts_on=self.today+timedelta(days=2)
+        self.row.ends_on=self.today+timedelta(days=7)
+        self.row.save()
+        self.assertEqual(self.client.get(url, {'status':'expiring'}).json()['total'],0)
+        self.assertEqual(self.client.get(url).json()['stats']['scheduled'],1)
+        self.row.starts_on=self.today
+        self.row.status='suspended'
+        self.row.save()
+        self.assertEqual(self.client.get(url, {'status':'expiring'}).json()['total'],0)
+
     def test_provider_only_and_invalid_duration(self):
         self.assertEqual(self.renew(days=0).status_code,400)
         self.client.force_login(self.owner)
