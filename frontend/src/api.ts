@@ -171,7 +171,9 @@ export interface PlatformCompany extends CompanyLicense, SubscriptionTiming {id:
 export interface PlatformOverview {as_of:string;today:string;renewal_window_days:number;stats:{companies:number;active:number;trial:number;expired:number;scheduled:number;suspended:number;cancelled:number;unassigned:number;expiring:number;memberships:number;online_memberships:number;pending_tickets:number};recent_companies:PlatformCompany[];upcoming_renewals:{id:string;name:string;ends_on:string;days_remaining:number}[]}
 export interface PlatformCompanies {items:PlatformCompany[];total:number;page:number;page_size:number;stats:{companies:number;active:number;trial:number;expired:number;suspended:number;memberships:number}}
 export interface ProviderMember {id:string;user_id:string;company_id:string;company:string;full_name:string;email:string;role:'admin'|'member';contact_phone?:string;editable?:boolean;active:boolean;email_verified:boolean;joined_at:string;last_seen_at:string|null}
-export interface ProviderMemberPage {items:ProviderMember[];total:number;page:number;page_size:number}
+export interface ProviderMemberPage {items:ProviderMember[];total:number;page:number;page_size:number;stats?:{memberships:number;admins:number;members:number;active:number;unverified:number}}
+export interface ProviderInvitation {id:string;company_id:string;company:string;email:string;role:'admin'|'member';created_at:string;expires_at:string}
+export interface ProviderInvitationPage {items:ProviderInvitation[];total:number;page:number;page_size:number}
 export interface CompanyUsage {company_id:string;as_of:string;window_days:number;members:number;recent_members:number;online_members:number;teams:number;channels:number;conversations:number;channel_messages:number;chat_messages:number;recent_messages:number;meetings:number;recent_meetings:number;shared_files:number;attachments:number;storage_bytes:number}
 export interface RevenueReport {start:string;end:string;as_of:string;totals:{currency:string;billed:string;received:string;outstanding:string;overdue:string}[];monthly:{month:string;currency:string;received:string}[];customers:{company_id:string;company:string;currency:string;received:string}[];customers_limit:number}
 export type TicketStatus='open'|'in_progress'|'resolved'|'closed';
@@ -217,7 +219,9 @@ export const api = {
   platformRenewals: (id:string,page=1) => request<RenewalPage>(`platform/companies/${id}/renewals/?page=${page}`),
   renewPlatformCompany: (id:string,data:RenewalInput) => post<{company:PlatformCompany;renewal:SubscriptionRenewal;replayed:boolean}>(`platform/companies/${id}/renewals/`,data),
   platformCompanies: (q='',status='',page=1,pageSize=25,sort='newest',onboarding='') => request<PlatformCompanies>(`platform/companies/?${new URLSearchParams({q,status,page:String(page),page_size:String(pageSize),sort,onboarding})}`),
-  platformUsers:(q='',role='',page=1,pageSize=10)=>request<ProviderMemberPage>(`platform/users/?${new URLSearchParams({q,role,page:String(page),page_size:String(pageSize)})}`),
+  platformUsers:(q='',role='',page=1,pageSize=10,company='',account='',verified='')=>request<ProviderMemberPage>(`platform/users/?${new URLSearchParams({q,role,page:String(page),page_size:String(pageSize),company,account,verified})}`),
+  platformUserInvitations:(q='',role='',page=1,pageSize=10,company='')=>request<ProviderInvitationPage>(`platform/user-invitations/?${new URLSearchParams({q,role,page:String(page),page_size:String(pageSize),company})}`),
+  revokePlatformUserInvitation:(id:string)=>request<void>(`platform/user-invitations/${id}/`,'DELETE'),
   platformUserRole:(id:string,role:'admin'|'member',contact_phone:string)=>request<ProviderMember>(`platform/users/${id}/`,'PATCH',{role,contact_phone}),
   invitePlatformUser:(id:string,email:string,role:'admin'|'member')=>post<{id:string;invitation_sent:boolean}>(`platform/companies/${id}/invite-user/`,{email,role}),
   platformCompany: (id:string) => request<{company:PlatformCompany;audit:PlatformAudit[]}>(`platform/companies/${id}/`),

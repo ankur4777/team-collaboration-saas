@@ -5,7 +5,7 @@ from urllib.parse import quote
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import serializers
@@ -30,6 +30,14 @@ class UserDirectoryView(PlatformView):
     def get(self,request):
         q=request.query_params.get('q','').strip()
         role=request.query_params.get('role','')
+        company=request.query_params.get('company','')
+        account=request.query_params.get('account','')
+        verified=request.query_params.get('verified','')
+        if account not in ('','active','inactive') or verified not in ('','yes','no'):
+            raise ValidationError({'detail':'Invalid account filters'})
+        if company:
+            company=serializers.UUIDField().run_validation(company)
+            get_object_or_404(Organization,pk=company)
         try:
             page=int(request.query_params.get('page','1'))
             size=int(request.query_params.get('page_size','10'))
@@ -38,13 +46,20 @@ class UserDirectoryView(PlatformView):
         if len(q)>150 or role not in ('','admin','member') or not 1<=page<=100000 or size not in (10,25,50,100):
             raise ValidationError({'detail':'Invalid directory filters'})
         rows=OrganizationMember.objects.select_related('organization','user')
+        if company:
+            rows=rows.filter(organization_id=company)
+        stats=rows.aggregate(memberships=Count('pk'), admins=Count('pk',filter=Q(role='admin')), members=Count('pk',filter=Q(role='member')), active=Count('pk',filter=Q(user__is_active=True)), unverified=Count('pk',filter=Q(user__email_verified_at__isnull=True)))
         if q:
-            rows=rows.filter(Q(organization__name__icontains=q)|Q(user__full_name__icontains=q)|Q(user__email__icontains=q))
+            rows=rows.filter(Q(organization__name__icontains=q)|Q(user__full_name__icontains=q)|Q(user__email__icontains=q)|Q(contact_phone__icontains=q))
+        if account:
+            rows=rows.filter(user__is_active=account=='active')
+        if verified:
+            rows=rows.filter(user__email_verified_at__isnull=verified=='no')
         if role:
             rows=rows.filter(role=role)
         offset=(page-1)*size
         return Response({'items':[member_data(r) for r in rows.order_by('organization__name','user__full_name','pk')[offset:offset+size]],
-                         'total':rows.count(),'page':page,'page_size':size})
+                         'total':rows.count(),'page':page,'page_size':size,'stats':stats})
 
 
 class MembershipUpdateInput(serializers.Serializer):
@@ -93,7 +108,7 @@ class InviteUserView(PlatformView):
             org=get_object_or_404(Organization.objects.select_for_update(),pk=company_id)
             if not access_allowed(org.pk):
                 raise ValidationError({'detail':'Reactivate the company before inviting new employees'})
-            if not org.members.filter(role='admin').exists():
+            if not org.members.filter(role='admin',user__is_active=True).exists():
                 raise ValidationError({'detail':'A company administrator must accept their invitation first'})
             if org.members.filter(user__email__iexact=email).exists():
                 raise ValidationError({'email':'This person is already a member'})
@@ -111,3 +126,44 @@ class InviteUserView(PlatformView):
             logger.exception('Employee invitation delivery failed for company %s',org.pk)
             delivered=False
         return Response({'id':str(inv.pk),'invitation_sent':delivered},status=201)
+
+class PendingUserInvitationsView(PlatformView):
+    def get(self,request):
+        q=request.query_params.get('q','').strip()
+        role=request.query_params.get('role','')
+        company=request.query_params.get('company','')
+        try:
+            page=int(request.query_params.get('page','1'))
+            size=int(request.query_params.get('page_size','10'))
+        except ValueError:
+            raise ValidationError({'page':'Invalid pagination'})
+        if len(q)>150 or role not in ('','admin','member') or not 1<=page<=100000 or size not in (10,25,50,100):
+            raise ValidationError({'detail':'Invalid invitation filters'})
+        rows=Invitation.objects.filter(accepted_at__isnull=True,expires_at__gt=timezone.now()).select_related('organization')
+        if company:
+            company=serializers.UUIDField().run_validation(company)
+            get_object_or_404(Organization,pk=company)
+            rows=rows.filter(organization_id=company)
+        if role:
+            rows=rows.filter(role=role)
+        if q:
+            rows=rows.filter(Q(email__icontains=q)|Q(organization__name__icontains=q))
+        offset=(page-1)*size
+        return Response({'items':[{'id':str(row.pk),'company_id':str(row.organization_id),'company':row.organization.name,
+                                  'email':row.email,'role':row.role,'created_at':row.created_at.isoformat(),
+                                  'expires_at':row.expires_at.isoformat()}
+                                  for row in rows.order_by('-created_at','-pk')[offset:offset+size]],
+                         'total':rows.count(),'page':page,'page_size':size})
+
+
+class PendingUserInvitationDetailView(PlatformView):
+    @transaction.atomic
+    def delete(self,request,invitation_id):
+        initial=get_object_or_404(Invitation,pk=invitation_id)
+        org=get_object_or_404(Organization.objects.select_for_update(),pk=initial.organization_id)
+        row=get_object_or_404(Invitation.objects.select_for_update(),pk=invitation_id,organization=org,
+                              accepted_at__isnull=True,expires_at__gt=timezone.now())
+        row.expires_at=timezone.now()
+        row.save(update_fields=['expires_at'])
+        audit(org,request.user,'employee_invitation_revoked',{'email':row.email,'role':row.role})
+        return Response(status=204)

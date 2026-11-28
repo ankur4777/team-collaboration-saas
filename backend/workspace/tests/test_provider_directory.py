@@ -58,3 +58,32 @@ class ProviderDirectoryTests(TestCase):
         self.assertFalse(previous.is_valid)
         CompanyLicense.objects.filter(organization=self.org).update(seat_limit=2)
         self.assertEqual(self.client.post(path,{'email':'full@example.test'},content_type='application/json').status_code,409)
+
+    def test_user_filters_are_company_scoped(self):
+        other=Organization.objects.create(name='Other company',slug='other-company',created_by=self.employee)
+        OrganizationMember.objects.create(organization=other,user=self.employee,role='admin')
+        self.employee.is_active=False
+        self.employee.save(update_fields=['is_active'])
+        data=self.client.get('/api/platform/users/',{'company':str(self.org.pk),'account':'inactive','verified':'no'}).json()
+        self.assertEqual(data['total'],1)
+        self.assertEqual(data['items'][0]['id'],str(self.row.pk))
+        self.assertEqual(data['stats']['memberships'],2)
+        self.assertEqual(data['stats']['admins'],1)
+        self.assertEqual(self.client.get('/api/platform/users/',{'company':'bad'}).status_code,400)
+
+    def test_pending_user_invitations_can_be_revoked_by_provider_only(self):
+        created=self.client.post(self.path+'invite-user/',{'email':'pending-user@example.test','role':'member'},content_type='application/json')
+        self.assertEqual(created.status_code,201,created.content)
+        path='/api/platform/user-invitations/'
+        data=self.client.get(path,{'company':str(self.org.pk),'role':'member'}).json()
+        self.assertEqual(data['total'],1)
+        row=data['items'][0]
+        self.assertNotIn('token_hash',row)
+        detail=path+row['id']+'/'
+        self.client.force_login(self.owner)
+        self.assertEqual(self.client.get(path).status_code,403)
+        self.assertEqual(self.client.delete(detail).status_code,403)
+        self.client.force_login(self.provider)
+        self.assertEqual(self.client.delete(detail).status_code,204)
+        self.assertFalse(Invitation.objects.get(pk=row['id']).is_valid)
+        self.assertEqual(self.client.get(path).json()['total'],0)

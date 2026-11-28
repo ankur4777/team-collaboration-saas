@@ -25,6 +25,8 @@ urlpatterns = [
     path('tasks/', employee_tasks.EmployeeTasksView.as_view()),
     path('tasks/<uuid:task_id>/', employee_tasks.EmployeeTaskDetailView.as_view()),
     path('platform/users/', platform_users.UserDirectoryView.as_view()),
+    path('platform/user-invitations/', platform_users.PendingUserInvitationsView.as_view()),
+    path('platform/user-invitations/<uuid:invitation_id>/', platform_users.PendingUserInvitationDetailView.as_view()),
     path('platform/users/<uuid:member_id>/', platform_users.UserMembershipView.as_view()),
     path('platform/companies/<uuid:company_id>/invite-user/', platform_users.InviteUserView.as_view()),
     path('platform/overview/', platform_reports.PlatformOverviewView.as_view()),
