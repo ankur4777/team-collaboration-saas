@@ -46,6 +46,30 @@ class ProviderReportsSupportTests(TestCase):
         self.assertEqual(row['storage_bytes'],0)
         self.assertEqual(self.customer(self.owner,self.org).get(url).status_code,403)
 
+    def test_usage_window_and_activity_counts(self):
+        from workspace.models import WorkspaceFile
+        now=timezone.now()
+        OrganizationMember.objects.filter(organization=self.org,user=self.peer).update(last_seen_at=now-timedelta(days=10))
+        WorkspaceFile.objects.create(organization=self.org,uploaded_by=self.owner,file='recent.txt',original_name='recent.txt',content_type='text/plain',size=25)
+        old=WorkspaceFile.objects.create(organization=self.org,uploaded_by=self.owner,file='old.txt',original_name='old.txt',content_type='text/plain',size=40)
+        WorkspaceFile.objects.filter(pk=old.pk).update(created_at=now-timedelta(days=10))
+        WorkspaceFile.objects.create(organization=self.org2,uploaded_by=self.other,file='other.txt',original_name='other.txt',content_type='text/plain',size=900)
+        url=f'/api/platform/companies/{self.org.pk}/usage/'
+        week=self.provider.get(url,{'days':7})
+        self.assertEqual(week.status_code,200,week.content)
+        data=week.json()
+        self.assertEqual(data['window_days'],7)
+        self.assertEqual(data['recent_members'],1)
+        self.assertEqual(data['shared_files'],2)
+        self.assertEqual(data['recent_files'],1)
+        self.assertEqual(data['storage_bytes'],65)
+        self.assertEqual(sum(row['shared_files'] for row in data['daily']),1)
+        month=self.provider.get(url,{'days':30}).json()
+        self.assertEqual(month['recent_members'],2)
+        self.assertEqual(month['recent_files'],2)
+        self.assertEqual(self.provider.get(url,{'days':10}).status_code,400)
+        self.assertNotIn('original_name',str(data))
+
     def test_support_isolation_and_resolution_even_when_expired(self):
         CompanyLicense.objects.create(organization=self.org,status='suspended')
         peer=self.customer(self.peer,self.org)

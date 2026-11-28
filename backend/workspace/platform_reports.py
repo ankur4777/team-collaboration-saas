@@ -2,7 +2,7 @@
 from datetime import timedelta
 from decimal import Decimal
 from django.db.models import Sum, Count, Q
-from django.db.models.functions import TruncMonth
+from django.db.models.functions import TruncMonth, TruncDate
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import serializers
@@ -55,24 +55,43 @@ class CompanyUsageView(PlatformView):
     def get(self, request, company_id):
         org = get_object_or_404(Organization, pk=company_id)
         now = timezone.now()
-        cutoff = now - timedelta(days=30)
+        window = serializers.ChoiceField(choices=(7,30,90)).run_validation(request.query_params.get('days','30'))
+        cutoff = now - timedelta(days=window)
         members = OrganizationMember.objects.filter(organization=org)
         channels = Message.objects.filter(channel__team__organization=org, deleted_at__isnull=True)
         chats = ChatMessage.objects.filter(conversation__organization=org, deleted_at__isnull=True)
         files = WorkspaceFile.objects.filter(organization=org)
         attachments = PrivateAttachment.objects.filter(organization=org)
         meetings = Meeting.objects.filter(organization=org)
+        active_members = members.filter(user__is_active=True)
+        tz = timezone.get_default_timezone()
+        start_date, end_date = timezone.localdate(cutoff,tz), timezone.localdate(now,tz)
+        daily = {}
+        for i in range((end_date-start_date).days+1):
+            day = (start_date+timedelta(days=i)).isoformat()
+            daily[day] = {'date':day,'channel_messages':0,'chat_messages':0,'meetings':0,'shared_files':0,'attachments':0}
+        for key,query in [('channel_messages',channels),('chat_messages',chats),('meetings',meetings),
+                          ('shared_files',files),('attachments',attachments)]:
+            for record in query.filter(created_at__gte=cutoff,created_at__lte=now).order_by().annotate(
+                    day=TruncDate('created_at',tzinfo=tz)).values('day').annotate(total=Count('pk')):
+                if record['day'] is not None:
+                    day=record['day'].isoformat()
+                    if day in daily:
+                        daily[day][key]=record['total']
         return Response({
-            'company_id': str(org.pk), 'as_of': now.isoformat(), 'window_days': 30,
+            'company_id': str(org.pk), 'as_of': now.isoformat(), 'window_days': window,
+            'window_start': cutoff.isoformat(), 'timezone':str(tz), 'daily':list(daily.values()),
+            'active_accounts':active_members.count(), 'inactive_accounts':members.filter(user__is_active=False).count(),
+            'recent_files':sum(r['shared_files']+r['attachments'] for r in daily.values()),
             'members': members.count(),
-            'recent_members': members.filter(last_seen_at__gte=cutoff).count(),
-            'online_members': members.filter(last_seen_at__gte=now-timedelta(seconds=90)).count(),
+            'recent_members': active_members.filter(last_seen_at__gte=cutoff,last_seen_at__lte=now).count(),
+            'online_members': active_members.filter(last_seen_at__gte=now-timedelta(seconds=90),last_seen_at__lte=now).count(),
             'teams': Team.objects.filter(organization=org).count(),
             'channels': Channel.objects.filter(team__organization=org).count(),
             'conversations': ChatConversation.objects.filter(organization=org).count(),
             'channel_messages': channels.count(), 'chat_messages': chats.count(),
-            'recent_messages': channels.filter(created_at__gte=cutoff).count()+chats.filter(created_at__gte=cutoff).count(),
-            'meetings': meetings.count(), 'recent_meetings': meetings.filter(created_at__gte=cutoff).count(),
+            'recent_messages': sum(r['channel_messages']+r['chat_messages'] for r in daily.values()),
+            'meetings': meetings.count(), 'recent_meetings': sum(r['meetings'] for r in daily.values()),
             'shared_files': files.count(), 'attachments': attachments.count(),
             'storage_bytes': (files.aggregate(n=Sum('size'))['n'] or 0)+(attachments.aggregate(n=Sum('size'))['n'] or 0),
         })
