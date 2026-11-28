@@ -4,7 +4,7 @@ from io import BytesIO
 from xml.sax.saxutils import escape
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Sum, Q, Count
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -68,7 +68,26 @@ class InvoiceListView(PlatformView):
             raise ValidationError({'page':'Invalid page'})
         if not 1 <= page <= 100000:
             raise ValidationError({'page':'Invalid page'})
-        rows = org.billing_invoices.select_related('payment')
+        q = request.query_params.get('q','').strip()
+        status = request.query_params.get('status','')
+        currency = request.query_params.get('currency','')
+        if len(q)>300 or status not in ('','unpaid','paid','void','overdue') or currency not in ('', *CURRENCIES):
+            raise ValidationError({'detail':'Invalid invoice filters'})
+        today = timezone.localdate()
+        all_rows = org.billing_invoices.all()
+        overdue = Q(status='unpaid',due_on__lt=today)
+        counts = all_rows.aggregate(all=Count('pk'),unpaid=Count('pk',filter=Q(status='unpaid')),
+            paid=Count('pk',filter=Q(status='paid')),void=Count('pk',filter=Q(status='void')),
+            overdue=Count('pk',filter=overdue))
+        rows = all_rows.select_related('payment')
+        if status == 'overdue':
+            rows = rows.filter(overdue)
+        elif status:
+            rows = rows.filter(status=status)
+        if currency:
+            rows = rows.filter(currency=currency)
+        if q:
+            rows = rows.filter(Q(number__icontains=q)|Q(description__icontains=q)|Q(payment__reference__icontains=q))
         offset = (page-1)*PAGE_SIZE
         summary = {}
         for item in org.billing_invoices.exclude(status='void').values('currency','status').annotate(total=Sum('amount')):
@@ -76,7 +95,7 @@ class InvoiceListView(PlatformView):
             group[item['status']] = str(item['total'])
         return Response({'items':[invoice_data(row) for row in rows[offset:offset+PAGE_SIZE]],
                          'total':rows.count(),'page':page,'page_size':PAGE_SIZE,
-                         'totals':list(summary.values())})
+                         'totals':sorted(summary.values(),key=lambda item:item['currency']), 'counts':counts, 'today':today.isoformat()})
 
     @transaction.atomic
     def post(self, request, company_id):

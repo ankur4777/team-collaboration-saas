@@ -183,7 +183,7 @@ export interface SupportPage {items:SupportTicket[];total:number;page:number;pag
 export interface InvoiceInput {request_id:string;description:string;currency:string;amount:string;due_on:string|null}
 export interface PaymentInput {paid_on:string;method:string;reference:string;note:string}
 export interface BillingInvoice {id:string;number:string;company_name:string;issuer_name:string;contact_email:string;description:string;amount:string;currency:string;issued_on:string;due_on:string|null;status:'unpaid'|'paid'|'void';overdue:boolean;created_at:string;payment:PaymentInput|null}
-export interface InvoicePage {items:BillingInvoice[];total:number;page:number;page_size:number;totals:{currency:string;paid:string;unpaid:string}[]}
+export interface InvoicePage {items:BillingInvoice[];total:number;page:number;page_size:number;totals:{currency:string;paid:string;unpaid:string}[];counts?:{all:number;unpaid:number;paid:number;void:number;overdue:number};today?:string}
 export interface SubscriptionRenewal {id:string;days:number;previous_start:string|null;previous_end:string|null;previous_status:string;new_start:string;new_end:string;new_status:string;reactivate:boolean;note:string;actor:string;created_at:string}
 export interface RenewalInput {request_id:string;days:number;reactivate:boolean;note:string}
 export interface RenewalPage {items:SubscriptionRenewal[];total:number;page:number;page_size:number}
@@ -212,7 +212,7 @@ export const api = {
   supportDetail:(provider:boolean,id:string)=>request<SupportDetail>(`${provider?'platform/':''}support/${id}/`),
   createSupportTicket:(data:{subject:string;priority:string;body:string})=>post<SupportDetail>('support/',data),
   updateSupportTicket:(provider:boolean,id:string,data:{body?:string;status?:TicketStatus})=>post<SupportDetail>(`${provider?'platform/':''}support/${id}/`,data),
-  platformInvoices: (id:string,page=1) => request<InvoicePage>(`platform/companies/${id}/invoices/?page=${page}`),
+  platformInvoices: (id:string,page=1,filters:{status?:string;currency?:string;q?:string}={}) => request<InvoicePage>(`platform/companies/${id}/invoices/?${new URLSearchParams({page:String(page),status:filters.status||'',currency:filters.currency||'',q:filters.q||''})}`),
   createPlatformInvoice: (id:string,data:InvoiceInput) => post<BillingInvoice>(`platform/companies/${id}/invoices/`,data),
   recordPlatformPayment: (id:string,invoice:string,data:PaymentInput) => post<BillingInvoice>(`platform/companies/${id}/invoices/${invoice}/payment/`,data),
   voidPlatformInvoice: (id:string,invoice:string) => post<BillingInvoice>(`platform/companies/${id}/invoices/${invoice}/void/`,{}),
