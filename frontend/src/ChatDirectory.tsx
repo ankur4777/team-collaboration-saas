@@ -1,5 +1,5 @@
 import {useState,type FormEvent} from 'react';
-import {Building2,ChevronRight,MessageCircle,Settings2,Users} from 'lucide-react';
+import {Building2,ChevronRight,MessageCircle,RefreshCw,Settings2,Users} from 'lucide-react';
 import {api,type ChatDirectoryData,type DirectoryMember} from './api';
 import WorkspaceDialog from './WorkspaceDialog';
 import './OrganizationWork.css';
@@ -20,10 +20,16 @@ export default function ChatDirectory({data,loading,onReload,onStartChat,busy=fa
   const [name,setName]=useState(''),[teamId,setTeamId]=useState(''),[departmentId,setDepartmentId]=useState(''),[memberId,setMemberId]=useState('');
   const [teamName,setTeamName]=useState(''),[personId,setPersonId]=useState(''),[saving,setSaving]=useState(false),[error,setError]=useState('');
   async function save(action:()=>Promise<unknown>) {setSaving(true);setError('');try{await action();onReload();}catch(e){setError(e instanceof Error?e.message:'Could not save directory');}finally{setSaving(false);}}
-  const departments=[...(data?.departments||[]),{id:'unassigned',name:'Unassigned teams'}];
+  const departments=[...(data?.departments||[]),{id:'unassigned',name:'Teams'}];
   const employee=data?.members.find(row=>row.id===memberId);
   return <div className="org-directory">
-    <div className="org-directory-heading"><strong>Departments</strong>{data?.can_manage&&<button className="icon-button" type="button" aria-label="Manage departments and positions" title="Manage departments and positions" onClick={()=>setEditing(true)}><Settings2 size={16}/></button>}</div>
+    <div className="org-directory-heading">
+      <p>Choose a department or team to find a colleague.</p>
+      <button type="button" className="icon-button" aria-label="Refresh departments" title="Refresh departments" onClick={onReload}>
+        <RefreshCw size={15}/>
+      </button>
+      {data?.can_manage&&<button className="icon-button" type="button" aria-label="Manage departments and positions" title="Manage departments and positions" onClick={()=>setEditing(true)}><Settings2 size={16}/></button>}
+    </div>
     {loading&&!data?<p className="org-work-hint" role="status">Loading departments…</p>:!data?<p className="org-work-hint">Department directory is unavailable. Refresh to try again.</p>:<>
       {departments.filter(row=>row.id!=='unassigned'||data.teams.some(item=>!item.department_id)).map(row=>{
         const teams=data.teams.filter(item=>(item.department_id||'unassigned')===row.id),open=department===row.id;

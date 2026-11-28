@@ -37,7 +37,7 @@ describe('Department employee directory',()=>{
 
   it('shows existing teams without a department under Unassigned',async()=>{
     render(<ChatDirectory data={{...directory,departments:[],teams:[{...directory.teams[0],department_id:null}]}} loading={false} currentUserId="me" onReload={vi.fn()} onStartChat={vi.fn()}/>);
-    await userEvent.setup().click(screen.getByRole('button',{name:/Unassigned teams/}));
+    await userEvent.setup().click(screen.getByRole('button',{name:/^Teams\b/}));
     expect(screen.getByRole('button',{name:/Platform/})).toBeTruthy();
   });
 

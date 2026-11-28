@@ -509,10 +509,8 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
     {error && <div className="chat-alert" role="alert">{error}<button type="button" onClick={() => setError('')} aria-label="Dismiss error"><X size={16}/></button></div>}
     {section==='tasks'?<div className="org-chat-tasks"><TasksPanel key={workspaceId||'none'} workspaceId={workspaceId}/></div>:<div className="private-chat-layout">
       <aside className="private-chat-list">
-        <div className="chat-list-tabs" role="group" aria-label="Browse chats"><button type="button" aria-pressed={listView==='people'} onClick={()=>setListView('people')}><Users size={16}/>People</button><button type="button" aria-pressed={listView==='messages'} onClick={()=>setListView('messages')}><MessageCircle size={16}/>Messages</button></div>
+        <div className="chat-list-tabs" role="group" aria-label="Browse chats"><button type="button" aria-pressed={listView==='people'} onClick={()=>setListView('people')}><Users size={16}/>Departments</button><button type="button" aria-pressed={listView==='messages'} onClick={()=>setListView('messages')}><MessageCircle size={16}/>Messages</button></div>
         <div className="chat-people-pane" hidden={listView!=='people'}>
-          <p className="chat-people-help">Choose a department, then a team to find a colleague.</p>
-          <button type="button" className="icon-button chat-directory-refresh" aria-label="Refresh people" title="Refresh people" onClick={()=>void loadDirectory()}><RefreshCw size={15}/></button>
           <ChatDirectory data={directory} loading={directoryLoading} currentUserId={currentUser.id} busy={working} onReload={()=>void loadDirectory()} onStartChat={email=>void openEmployeeChat(email)}/>
         </div>
         <div className="chat-messages-pane" hidden={listView!=='messages'}>
@@ -529,7 +527,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
           {thread.unread_count>0&&<span className="chat-unread-badge" aria-label={`${thread.unread_count} unread messages`}>{thread.unread_count>99?'99+':thread.unread_count}</span>}
           </span>
         </button>)}
-        {threadsLoading&&threads.length===0?<div className="chat-list-empty" role="status">Loading conversations…</div>:visibleThreads.length===0&&<div className="chat-list-empty"><MessageCircle size={24}/><strong>{filter?'No matching conversations':showArchived?'No archived conversations':threadKind==='group'?'No groups yet':'No conversations yet'}</strong><p>{filter?'Try a different name or clear your search.':showArchived?'Conversations you archive will appear here.':threadKind==='group'?'Project groups you join will appear here.':'Start a new chat or find a colleague in People.'}</p></div>}
+        {threadsLoading&&threads.length===0?<div className="chat-list-empty" role="status">Loading conversations…</div>:visibleThreads.length===0&&<div className="chat-list-empty"><MessageCircle size={24}/><strong>{filter?'No matching conversations':showArchived?'No archived conversations':threadKind==='group'?'No groups yet':'No conversations yet'}</strong><p>{filter?'Try a different name or clear your search.':showArchived?'Conversations you archive will appear here.':threadKind==='group'?'Project groups you join will appear here.':'Start a new chat or find a colleague in Departments.'}</p></div>}
         </div>
         <button type="button" className="chat-archive-toggle" aria-pressed={showArchived} onClick={()=>setShowArchived(value=>!value)}>{showArchived?<ArrowLeft size={16}/>:<Archive size={16}/>}<span>{showArchived?'Back to active chats':'Archived chats'}</span><span className="chat-archive-count">{threads.filter(thread=>Boolean(thread.archived_at)).length}</span></button>
         </div>

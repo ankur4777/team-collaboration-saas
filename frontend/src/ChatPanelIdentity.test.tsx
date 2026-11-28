@@ -77,7 +77,7 @@ describe('Department chat navigation and Senior project groups',()=>{
     vi.mocked(api.chats).mockResolvedValueOnce([]).mockResolvedValue([thread('one','First colleague')]);
     const start=vi.spyOn(api,'startDirectChat').mockResolvedValue(thread('one','First colleague'));
     render(<ChatPanel workspaceId="org" currentUser={me} members={[]}/>);
-    await user.click(screen.getByRole('button',{name:'People'}));
+    await user.click(screen.getByRole('button',{name:'Departments'}));
     await user.click(await screen.findByRole('button',{name:/Engineering/}));
     await user.click(screen.getByRole('button',{name:/Platform/}));
     expect(start).not.toHaveBeenCalled();
