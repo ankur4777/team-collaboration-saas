@@ -167,7 +167,7 @@ async function downloadWorkspaceFile(row:WorkspaceFile): Promise<void> {
 
 export type LicenseStatus='unassigned'|'trial'|'active'|'suspended'|'cancelled';
 export interface CompanyLicense {contact_email:string;country?:string;country_code?:string;phone?:string;website?:string;tax_number?:string;address?:string;plan:string;status:LicenseStatus;seat_limit:number|null;starts_on:string|null;ends_on:string|null;modules:string[];enforce_modules?:boolean}
-export interface PlatformCompany extends CompanyLicense, SubscriptionTiming {id:string;name:string;slug:string;created_at:string;employee_count:number;seats_remaining?:number|null;team_count:number;owner_emails:string[];owner_names?:string[];pending_owner_email:string|null;effective_status:string}
+export interface PlatformCompany extends CompanyLicense, SubscriptionTiming {id:string;name:string;slug:string;created_at:string;employee_count:number;seats_remaining?:number|null;team_count:number;owner_emails:string[];owner_names?:string[];pending_owner_email:string|null;effective_status:string;active_admin_count?:number;onboarding_status?:'ready'|'invited'|'needs_admin'}
 export interface PlatformOverview {as_of:string;today:string;renewal_window_days:number;stats:{companies:number;active:number;trial:number;expired:number;scheduled:number;suspended:number;cancelled:number;unassigned:number;expiring:number;memberships:number;online_memberships:number;pending_tickets:number};recent_companies:PlatformCompany[];upcoming_renewals:{id:string;name:string;ends_on:string;days_remaining:number}[]}
 export interface PlatformCompanies {items:PlatformCompany[];total:number;page:number;page_size:number;stats:{companies:number;active:number;trial:number;expired:number;suspended:number;memberships:number}}
 export interface ProviderMember {id:string;user_id:string;company_id:string;company:string;full_name:string;email:string;role:'admin'|'member';contact_phone?:string;editable?:boolean;active:boolean;email_verified:boolean;joined_at:string;last_seen_at:string|null}
@@ -216,13 +216,15 @@ export const api = {
   voidPlatformInvoice: (id:string,invoice:string) => post<BillingInvoice>(`platform/companies/${id}/invoices/${invoice}/void/`,{}),
   platformRenewals: (id:string,page=1) => request<RenewalPage>(`platform/companies/${id}/renewals/?page=${page}`),
   renewPlatformCompany: (id:string,data:RenewalInput) => post<{company:PlatformCompany;renewal:SubscriptionRenewal;replayed:boolean}>(`platform/companies/${id}/renewals/`,data),
-  platformCompanies: (q='',status='',page=1,pageSize=25,sort='newest') => request<PlatformCompanies>(`platform/companies/?${new URLSearchParams({q,status,page:String(page),page_size:String(pageSize),sort})}`),
+  platformCompanies: (q='',status='',page=1,pageSize=25,sort='newest',onboarding='') => request<PlatformCompanies>(`platform/companies/?${new URLSearchParams({q,status,page:String(page),page_size:String(pageSize),sort,onboarding})}`),
   platformUsers:(q='',role='',page=1,pageSize=10)=>request<ProviderMemberPage>(`platform/users/?${new URLSearchParams({q,role,page:String(page),page_size:String(pageSize)})}`),
   platformUserRole:(id:string,role:'admin'|'member',contact_phone:string)=>request<ProviderMember>(`platform/users/${id}/`,'PATCH',{role,contact_phone}),
   invitePlatformUser:(id:string,email:string,role:'admin'|'member')=>post<{id:string;invitation_sent:boolean}>(`platform/companies/${id}/invite-user/`,{email,role}),
   platformCompany: (id:string) => request<{company:PlatformCompany;audit:PlatformAudit[]}>(`platform/companies/${id}/`),
   createPlatformCompany: (data:CompanyLicense&{name:string;owner_email:string}) => post<{company:PlatformCompany;invitation_sent:boolean}>('platform/companies/',data),
   updatePlatformCompany: (id:string,data:Partial<CompanyLicense>&{name?:string}) => request<PlatformCompany>(`platform/companies/${id}/`,'PATCH',data),
+  companyAdminInvitations:(id:string)=>request<{items:{id:string;email:string;created_at:string;expires_at:string}[];total:number}>(`platform/companies/${id}/admin-invitations/`),
+  revokeCompanyAdminInvitation:(id:string,invitationId:string)=>request<void>(`platform/companies/${id}/admin-invitations/${invitationId}/`,'DELETE'),
   invitePlatformOwner: (id:string,email:string) => post<{invitation_sent:boolean}>(`platform/companies/${id}/invite-owner/`,{email}),
   chatPreferences: (id:string,values:Partial<ConversationPreferences>) => post<ConversationPreferences>(`chats/${id}/preferences/`,values),
   channelPreferences: (id:string,values:Partial<ConversationPreferences>) => post<ConversationPreferences>(`channels/${id}/preferences/`,values),

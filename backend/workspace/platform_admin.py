@@ -102,12 +102,15 @@ def company_data(org):
     owner_rows = list(org.members.filter(role=OrganizationMember.Role.ADMIN).values('user__email','user__full_name'))
     owners = [r['user__email'] for r in owner_rows]
     pending = org.invitations.filter(role=OrganizationMember.Role.ADMIN, accepted_at__isnull=True, expires_at__gt=timezone.now()).order_by('-created_at').first()
+    active_admin_count = org.members.filter(role=OrganizationMember.Role.ADMIN, user__is_active=True).count()
+    onboarding_status = 'ready' if active_admin_count else ('invited' if pending else 'needs_admin')
     effective = effective_status(license_row)
     return {
         'id': str(org.pk), 'name': org.name, 'slug': org.slug,
         'created_at': org.created_at.isoformat(), 'employee_count': org.employee_count,
         'team_count': org.team_count, 'owner_emails': owners, 'owner_names': [r['user__full_name'] for r in owner_rows],
         'pending_owner_email': pending.email if pending else None,
+        'active_admin_count': active_admin_count, 'onboarding_status': onboarding_status,
         'effective_status': effective, **data, **expiry_summary(license_row),
         'seats_remaining': None if license_row.seat_limit is None else max(0, license_row.seat_limit-org.employee_count),
     }
@@ -118,11 +121,13 @@ def audit(org, actor, action, changes):
 
 
 def invite_owner(org, actor, email):
+    if org.members.filter(user__email__iexact=email).exists():
+        raise ValidationError({'owner_email': 'This email is already a company member. Change the role in Users instead.'})
     if not seat_available(org.pk):
         raise ValidationError({'owner_email': SEAT_LIMIT_MESSAGE})
     # Lock prior pending invites so a resend cannot race an acceptance.
     prior = list(Invitation.objects.select_for_update().filter(organization=org, role=OrganizationMember.Role.ADMIN, accepted_at__isnull=True).order_by('pk'))
-    if org.members.filter(role=OrganizationMember.Role.ADMIN).exists():
+    if org.members.filter(role=OrganizationMember.Role.ADMIN, user__is_active=True).exists():
         raise ValidationError({'owner_email': 'This company already has an administrator'})
     Invitation.objects.filter(pk__in=[row.pk for row in prior]).update(expires_at=timezone.now())
     token = Invitation.generate_token()
@@ -150,6 +155,9 @@ class CompanyListView(PlatformView):
     def get(self, request):
         q = request.query_params.get('q','').strip()
         status = request.query_params.get('status','')
+        onboarding = request.query_params.get('onboarding','')
+        if onboarding not in ('','ready','invited','needs_admin'):
+            raise ValidationError({'onboarding':'Invalid onboarding filter'})
         try:
             page = int(request.query_params.get('page','1'))
             page_size = int(request.query_params.get('page_size', PAGE_SIZE))
@@ -159,7 +167,16 @@ class CompanyListView(PlatformView):
             raise ValidationError({'detail':'Invalid company filters'})
         rows = companies()
         if q:
-            rows = rows.filter(Q(name__icontains=q) | Q(license__contact_email__icontains=q) | Q(license__phone__icontains=q) | Q(license__tax_number__icontains=q) | Q(pk__in=OrganizationMember.objects.filter(Q(user__email__icontains=q)|Q(user__full_name__icontains=q),role='admin').values('organization_id')))
+            rows = rows.filter(Q(name__icontains=q) | Q(slug__icontains=q) | Q(license__contact_email__icontains=q) | Q(license__phone__icontains=q) | Q(license__tax_number__icontains=q) | Q(license__country__icontains=q) | Q(pk__in=OrganizationMember.objects.filter(Q(user__email__icontains=q)|Q(user__full_name__icontains=q),role='admin').values('organization_id')) | Q(pk__in=Invitation.objects.filter(email__icontains=q, role='admin', accepted_at__isnull=True, expires_at__gt=timezone.now()).values('organization_id')))
+        if onboarding:
+            ready = OrganizationMember.objects.filter(role='admin',user__is_active=True).values('organization_id')
+            invited = Invitation.objects.filter(role='admin',accepted_at__isnull=True,expires_at__gt=timezone.now()).values('organization_id')
+            if onboarding == 'ready':
+                rows = rows.filter(pk__in=ready)
+            elif onboarding == 'invited':
+                rows = rows.exclude(pk__in=ready).filter(pk__in=invited)
+            else:
+                rows = rows.exclude(pk__in=ready).exclude(pk__in=invited)
         today = timezone.localdate()
         current = Q(license__status__in=['active','trial'])
         expired = current & Q(license__ends_on__lt=today)
@@ -243,6 +260,28 @@ class CompanyDetailView(PlatformView):
         if changes:
             audit(org,request.user,'license_updated',changes)
         return Response(company_data(companies().get(pk=org.pk)))
+
+
+class CompanyAdminInvitationsView(PlatformView):
+    def get(self, request, company_id):
+        org = get_object_or_404(Organization, pk=company_id)
+        now = timezone.now()
+        pending = org.invitations.filter(role='admin', accepted_at__isnull=True, expires_at__gt=now).order_by('-created_at')
+        return Response({'items': [{'id':str(row.pk),'email':row.email,'created_at':row.created_at.isoformat(),
+                                    'expires_at':row.expires_at.isoformat()} for row in pending[:100]],
+                         'total':pending.count()})
+
+class CompanyAdminInvitationDetailView(PlatformView):
+    @transaction.atomic
+    def delete(self, request, company_id, invitation_id):
+        org = get_object_or_404(Organization.objects.select_for_update(), pk=company_id)
+        invite = get_object_or_404(Invitation.objects.select_for_update(), pk=invitation_id,
+                                   organization=org, role='admin', accepted_at__isnull=True,
+                                   expires_at__gt=timezone.now())
+        invite.expires_at = timezone.now()
+        invite.save(update_fields=['expires_at'])
+        audit(org, request.user, 'admin_invitation_revoked', {'email':invite.email})
+        return Response(status=204)
 
 
 class OwnerInviteView(PlatformView):

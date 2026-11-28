@@ -75,3 +75,21 @@ class PlatformAdminTests(TestCase):
         self.assertFalse(response.json()['invitation_sent'])
         self.assertTrue(CompanyLicense.objects.filter(organization_id=response.json()['company']['id']).exists())
         self.assertNotIn('token',response.json())
+
+    def test_company_onboarding_filters_and_revoke_invitation(self):
+        self.sign_in(self.admin)
+        created=self.write('POST',self.base,{'name':'Pending customer','owner_email':'pending@example.test'})
+        self.assertEqual(created.status_code,201,created.content)
+        row=created.json()['company']
+        self.assertEqual(row['onboarding_status'],'invited')
+        path=self.base+row['id']+'/admin-invitations/'
+        pending=self.client.get(path).json()['items']
+        self.assertEqual(pending[0]['email'],'pending@example.test')
+        self.assertNotIn('token_hash',pending[0])
+        self.assertEqual(self.client.get(self.base,{'onboarding':'invited','q':'pending@example.test'}).json()['total'],1)
+        self.assertEqual(self.client.get(self.base,{'onboarding':'ready'}).json()['total'],1)
+        self.assertEqual(self.write('DELETE',path+pending[0]['id']+'/',{}).status_code,204)
+        self.assertFalse(Invitation.objects.get(pk=pending[0]['id']).is_valid)
+        self.assertEqual(self.client.get(self.base,{'onboarding':'needs_admin'}).json()['total'],1)
+        self.sign_in(self.employee)
+        self.assertEqual(self.client.get(path).status_code,403)

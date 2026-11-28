@@ -42,6 +42,8 @@ urlpatterns = [
     path('platform/companies/<uuid:company_id>/invoices/<uuid:invoice_id>/pdf/', platform_billing.InvoicePDFView.as_view()),
     path('platform/companies/<uuid:company_id>/renewals/', platform_admin.CompanyRenewalView.as_view()),
     path('platform/companies/<uuid:company_id>/invite-owner/', platform_admin.OwnerInviteView.as_view()),
+    path('platform/companies/<uuid:company_id>/admin-invitations/', platform_admin.CompanyAdminInvitationsView.as_view()),
+    path('platform/companies/<uuid:company_id>/admin-invitations/<uuid:invitation_id>/', platform_admin.CompanyAdminInvitationDetailView.as_view()),
     path('meetings/<uuid:meeting_id>/call/translate/', CallTranslateView.as_view()),
     path('meetings/<uuid:meeting_id>/call/', meeting_calls.MeetingCallConfigView.as_view()),
     path('meetings/<uuid:meeting_id>/call/end/', meeting_calls.MeetingCallEndView.as_view()),
