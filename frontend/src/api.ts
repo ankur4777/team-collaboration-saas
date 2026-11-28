@@ -179,7 +179,7 @@ export interface RevenueReport {start:string;end:string;as_of:string;totals:{cur
 export type TicketStatus='open'|'in_progress'|'resolved'|'closed';
 export interface SupportTicket {id:string;company_id:string;company:string;subject:string;priority:'normal'|'high';status:TicketStatus;requester:string;created_at:string;updated_at:string}
 export interface SupportDetail extends SupportTicket {replies:{id:string;author:string;from_provider:boolean;body:string;created_at:string}[]}
-export interface SupportPage {items:SupportTicket[];total:number;page:number;page_size:number}
+export interface SupportPage {items:SupportTicket[];total:number;page:number;page_size:number;counts?:{all:number;open:number;in_progress:number;resolved:number;closed:number;high_pending:number}}
 export interface InvoiceInput {request_id:string;description:string;currency:string;amount:string;due_on:string|null}
 export interface PaymentInput {paid_on:string;method:string;reference:string;note:string}
 export interface BillingInvoice {id:string;number:string;company_name:string;issuer_name:string;contact_email:string;description:string;amount:string;currency:string;issued_on:string;due_on:string|null;status:'unpaid'|'paid'|'void';overdue:boolean;created_at:string;payment:PaymentInput|null}
@@ -208,10 +208,10 @@ export const api = {
   companyUsage:(id:string,days=30)=>request<CompanyUsage>(`platform/companies/${id}/usage/?days=${days}`),
   platformOverview:()=>request<PlatformOverview>('platform/overview/'),
   revenueReport:(start:string,end:string)=>request<RevenueReport>(`platform/revenue/?${new URLSearchParams({start,end})}`),
-  supportTickets:(provider:boolean,status:string,page:number)=>request<SupportPage>(`${provider?'platform/':''}support/?${new URLSearchParams({status,page:String(page)})}`),
+  supportTickets:(provider:boolean,status:string,page:number,filters:{q?:string;priority?:string;sort?:string}={})=>request<SupportPage>(`${provider?'platform/':''}support/?${new URLSearchParams({status,page:String(page),q:filters.q||'',priority:filters.priority||'',sort:filters.sort||'updated'})}`),
   supportDetail:(provider:boolean,id:string)=>request<SupportDetail>(`${provider?'platform/':''}support/${id}/`),
   createSupportTicket:(data:{subject:string;priority:string;body:string})=>post<SupportDetail>('support/',data),
-  updateSupportTicket:(provider:boolean,id:string,data:{body?:string;status?:TicketStatus})=>post<SupportDetail>(`${provider?'platform/':''}support/${id}/`,data),
+  updateSupportTicket:(provider:boolean,id:string,data:{body?:string;status?:TicketStatus;priority?:'normal'|'high'})=>post<SupportDetail>(`${provider?'platform/':''}support/${id}/`,data),
   platformInvoices: (id:string,page=1,filters:{status?:string;currency?:string;q?:string}={}) => request<InvoicePage>(`platform/companies/${id}/invoices/?${new URLSearchParams({page:String(page),status:filters.status||'',currency:filters.currency||'',q:filters.q||''})}`),
   createPlatformInvoice: (id:string,data:InvoiceInput) => post<BillingInvoice>(`platform/companies/${id}/invoices/`,data),
   recordPlatformPayment: (id:string,invoice:string,data:PaymentInput) => post<BillingInvoice>(`platform/companies/${id}/invoices/${invoice}/payment/`,data),

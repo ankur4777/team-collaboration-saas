@@ -95,6 +95,29 @@ class ProviderReportsSupportTests(TestCase):
         self.assertEqual(self.post(peer,path,{'body':'Closed reply'}).status_code,400)
         self.assertEqual(SupportTicket.objects.count(),1)
 
+    def test_provider_ticket_filters_counts_and_priority(self):
+        peer=self.customer(self.peer,self.org)
+        other=self.customer(self.other,self.org2)
+        first=self.post(peer,'/api/support/',{'subject':'Billing help','priority':'normal','body':'Help.'}).json()
+        second=self.post(other,'/api/support/',{'subject':'Meeting help','priority':'high','body':'Help.'}).json()
+        url='/api/platform/support/'
+        result=self.provider.get(url,{'q':'Billing','priority':'normal'})
+        self.assertEqual(result.status_code,200,result.content)
+        self.assertEqual([r['id'] for r in result.json()['items']],[first['id']])
+        self.assertEqual(result.json()['counts']['all'],2)
+        self.assertEqual(result.json()['counts']['high_pending'],1)
+        self.assertEqual(self.provider.get(url,{'sort':'priority'}).json()['items'][0]['id'],second['id'])
+        self.assertEqual(self.provider.get(url,{'company':str(self.org.pk)}).json()['counts']['all'],1)
+        path=url+first['id']+'/'
+        changed=self.post(self.provider,path,{'priority':'high','status':'in_progress'})
+        self.assertEqual(changed.status_code,200,changed.content)
+        self.assertEqual(changed.json()['priority'],'high')
+        self.assertEqual(changed.json()['status'],'in_progress')
+        self.assertEqual(self.provider.get(url,{'priority':'high'}).json()['total'],2)
+        self.assertEqual(self.post(peer,'/api/support/'+first['id']+'/',{'body':'Attempt','priority':'normal'}).status_code,400)
+        self.assertEqual(peer.get('/api/support/',{'q':'Meeting'}).json()['total'],0)
+        self.assertEqual(self.provider.get(url,{'priority':'urgent'}).status_code,400)
+
     def test_revenue_currency_and_period_separation(self):
         def invoice(org,currency,amount,status,issued,due=None):
             return BillingInvoice.objects.create(organization=org,actor=self.admin,request_id=uuid.uuid4(),

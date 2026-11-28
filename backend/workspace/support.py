@@ -1,5 +1,6 @@
 """Explicit customer support conversations; accessible even when a license is blocked."""
 from django.db import transaction
+from django.db.models import Count, Q, Case, When, Value, IntegerField
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -48,11 +49,31 @@ def listing(request,rows):
         raise ValidationError({'page':'Invalid page'})
     if not 1<=page<=100000:
         raise ValidationError({'page':'Invalid page'})
+    q=request.query_params.get('q','').strip()
+    priority=request.query_params.get('priority','')
+    sort=request.query_params.get('sort','updated')
+    if len(q)>160 or priority not in ('','normal','high') or sort not in ('updated','oldest','priority'):
+        raise ValidationError({'detail':'Invalid ticket filters'})
+    counts=rows.aggregate(all=Count('pk'),open=Count('pk',filter=Q(status='open')),
+        in_progress=Count('pk',filter=Q(status='in_progress')),
+        resolved=Count('pk',filter=Q(status='resolved')),closed=Count('pk',filter=Q(status='closed')),
+        high_pending=Count('pk',filter=Q(priority='high',status__in=('open','in_progress'))))
     if status:
         rows=rows.filter(status=status)
+    if priority:
+        rows=rows.filter(priority=priority)
+    if q:
+        rows=rows.filter(Q(subject__icontains=q)|Q(organization__name__icontains=q)|Q(requester__email__icontains=q))
+    if sort=='oldest':
+        rows=rows.order_by('created_at','pk')
+    elif sort=='priority':
+        rows=rows.order_by(Case(When(status__in=('open','in_progress'),then=Value(0)),default=Value(1),output_field=IntegerField()),
+                           Case(When(priority='high',then=Value(0)),default=Value(1),output_field=IntegerField()),'created_at','pk')
+    else:
+        rows=rows.order_by('-updated_at','-pk')
     offset=(page-1)*PAGE_SIZE
     return Response({'items':[ticket_data(r) for r in rows.select_related('organization','requester')[offset:offset+PAGE_SIZE]],
-                     'total':rows.count(),'page':page,'page_size':PAGE_SIZE})
+                     'total':rows.count(),'page':page,'page_size':PAGE_SIZE,'counts':counts})
 
 
 class NewTicket(serializers.Serializer):
@@ -64,6 +85,10 @@ class NewTicket(serializers.Serializer):
 class ReplyInput(serializers.Serializer):
     body=serializers.CharField(max_length=4000,required=False)
     status=serializers.ChoiceField(choices=STATUSES,required=False)
+
+
+class ProviderReplyInput(ReplyInput):
+    priority=serializers.ChoiceField(choices=('normal','high'),required=False)
 
 
 class CustomerTicketsView(APIView):
@@ -95,7 +120,7 @@ class CustomerTicketView(APIView):
         row=get_object_or_404(customer_rows(request).select_for_update(),pk=ticket_id)
         form=ReplyInput(data=request.data)
         form.is_valid(raise_exception=True)
-        if not form.validated_data.get('body') or 'status' in form.validated_data:
+        if not form.validated_data.get('body') or 'status' in form.validated_data or 'priority' in request.data:
             raise ValidationError({'body':'Provide a reply; status is managed by support'})
         if row.status=='closed':
             raise ValidationError({'detail':'This ticket is closed. Create a new ticket.'})
@@ -123,16 +148,19 @@ class PlatformTicketView(PlatformView):
     @transaction.atomic
     def post(self,request,ticket_id):
         row=get_object_or_404(SupportTicket.objects.select_for_update(),pk=ticket_id)
-        form=ReplyInput(data=request.data)
+        form=ProviderReplyInput(data=request.data)
         form.is_valid(raise_exception=True)
         data=form.validated_data
         if not data:
-            raise ValidationError({'detail':'Provide a reply or status'})
+            raise ValidationError({'detail':'Provide a reply, status or priority'})
         previous=row.status
+        previous_priority=row.priority
         if 'body' in data:
             SupportReply.objects.create(ticket=row,author=request.user,from_provider=True,body=data['body'])
         if 'status' in data:
             row.status=data['status']
-        row.save(update_fields=['status','updated_at'])
-        audit(row.organization,request.user,'support_updated',{'ticket':str(row.pk),'from':previous,'to':row.status,'reply_added':'body' in data})
+        if 'priority' in data:
+            row.priority=data['priority']
+        row.save(update_fields=['status','priority','updated_at'])
+        audit(row.organization,request.user,'support_updated',{'ticket':str(row.pk),'from':previous,'to':row.status,'priority_from':previous_priority,'priority_to':row.priority,'reply_added':'body' in data})
         return Response(detail(row))
