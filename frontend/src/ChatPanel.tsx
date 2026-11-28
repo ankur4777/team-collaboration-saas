@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
-import { Archive, ArchiveRestore, ArrowLeft, ArrowRight, Bell, BellOff, CheckSquare, LogOut, MessageCircle, Pin, PinOff, Plus, RefreshCw, Search, Trash2, Users, X } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowLeft, ArrowRight, Bell, BellOff, Check, CheckCheck, CheckSquare, FileText, Info, LogOut, MessageCircle, Pin, PinOff, Plus, RefreshCw, Search, Trash2, Users, X } from 'lucide-react';
 import { api, type ChatMessage, type ChannelMessageCursor, type ChatThread, type Member, type Person, type PresenceMap, type ChatDirectoryData } from './api';
 import ChatDirectory from './ChatDirectory';
 import TasksPanel from './TasksPanel';
@@ -15,7 +15,10 @@ import {PresenceStatus,presenceLabel} from './WorkspacePresence';
 import PinnedMessages from './PinnedMessages';
 import ForwardMessageDialog from './ForwardMessageDialog';
 import ChatOptionsMenu from './ChatOptionsMenu';
+import ChatDetails from './ChatDetails';
+import ChatCallControls from './ChatCallControls';
 import './ChatPanel.css';
+import './WhatsAppChat.css';
 
 function titleFor(chat: ChatThread, userId: string) {
   if (chat.kind === 'group') return chat.title;
@@ -31,9 +34,12 @@ function messageOrder(a: ChatMessage, b: ChatMessage) {
   return a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id);
 }
 
-interface Props { workspaceId: string|null; currentUser: Person; members: Member[]; presence?: PresenceMap; requestedChat?: {id:string;nonce:number;messageId?:string}|null; onRead?: ()=>void; notificationVersion?:number }
+interface Props { workspaceId: string|null; currentUser: Person; members: Member[]; presence?: PresenceMap; requestedChat?: {id:string;nonce:number;messageId?:string}|null; onRead?: ()=>void; notificationVersion?:number; callsEnabled?:boolean }
 
-export default function ChatPanel({workspaceId, currentUser, members, presence={}, requestedChat, onRead,notificationVersion=0}: Props) {
+export default function ChatPanel({workspaceId, currentUser, members, presence={}, requestedChat, onRead,notificationVersion=0,callsEnabled=false}: Props) {
+  const [details,setDetails]=useState<'info'|'search'|'media'|null>(null),[searchJump,setSearchJump]=useState<{id:string;nonce:number}|null>(null),[notice,setNotice]=useState('');
+  useEffect(()=>{setDetails(null);setSearchJump(null);},[workspaceId]);
+  useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(''),2200);return()=>clearTimeout(timer);},[notice]);
   const [section,setSection]=useState<'chats'|'tasks'>('chats');
   const [listView,setListView]=useState<'messages'|'people'>('messages');
   const [directory,setDirectory]=useState<ChatDirectoryData|null>(null),[directoryLoading,setDirectoryLoading]=useState(true);
@@ -46,6 +52,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [threadsLoading,setThreadsLoading]=useState(true);
   const [selected, setSelected] = useState<string|null>(null);
+  useEffect(()=>{setDetails(null);setSearchJump(null);},[selected]);
   const [pinVersion,setPinVersion]=useState(0);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [historyCursor, setHistoryCursor] = useState<ChannelMessageCursor|null>(null);
@@ -272,6 +279,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
   }
 
   const active = threads.find(thread => thread.id === selected);
+  function dayLabel(value:string){const date=new Date(value),today=new Date(),yesterday=new Date();yesterday.setDate(today.getDate()-1);return date.toDateString()===today.toDateString()?'Today':date.toDateString()===yesterday.toDateString()?'Yesterday':date.toLocaleDateString([],{day:'numeric',month:'long',year:'numeric'});}
   const peerId=active?.participants.find(p=>p.user.id!==currentUser.id)?.user.id;
   const onlineCount=active?.participants.filter(p=>presence[p.user.id]?.online).length||0;
   const colleagues = (directory?.members||members).filter(member => member.user.id !== currentUser.id);
@@ -487,6 +495,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
   }
 
   return <section className={`private-chat-page simple-chats${active?' has-chat':''}`}>
+    {notice&&<div className="chat-copy-notice" role="status">{notice}</div>}
     {selected&&forwardTarget&&<ForwardMessageDialog key={selected+forwardTarget.id} kind="chat" sourceId={selected} message={forwardTarget} onClose={()=>setForwardId(null)} onSent={result=>{if(result.kind==='chat'&&result.destination_id===selected&&'reactions' in result.message){const sent=result.message;setMessages(old=>old.some(row=>row.id===sent.id)?old:[...old,sent].sort(messageOrder));}void loadThreads();}}/>}
     <div className="private-chat-heading">
       <div><h1>Chats &amp; Groups</h1><p>Conversations and project work, in one place.</p></div>
@@ -529,11 +538,16 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
           <header className="private-chat-toolbar">
             <button type="button" className="icon-button chat-back-button" aria-label="Back to conversations" onClick={()=>setSelected(null)}><ArrowLeft size={20}/></button>
             <span className="chat-thread-avatar large">{active.kind === 'group' ? <Users size={19}/> : initials(titleFor(active,currentUser.id))}</span>
-            <div className="chat-conversation-title"><h2>{titleFor(active,currentUser.id)}</h2>{active.kind==='direct'?<PresenceStatus row={presence[peerId||'']}/>:<p>{active.participants.length} participants · {onlineCount} online</p>}</div>
+            <div className="chat-conversation-title"><button type="button" className="chat-title-button" aria-label={active.kind==='group'?'Open group info':'Open contact info'} onClick={()=>setDetails('info')}><h2>{titleFor(active,currentUser.id)}</h2></button>{active.kind==='direct'?<PresenceStatus row={presence[peerId||'']}/>:<p>{active.participants.length} participants · {onlineCount} online</p>}</div>
             <div className="chat-toolbar-actions">
+              {callsEnabled&&<ChatCallControls key={'calls:'+selected} chat={active} userId={currentUser.id} onActivity={onRead}/>}
+              <button type="button" className="conversation-icon-button chat-search-button" aria-label="Search in conversation" title="Search in conversation" onClick={()=>setDetails('search')}><Search size={17}/></button>
               {active.kind==='group'&&active.created_by.id===currentUser.id&&<button type="button" className="conversation-icon-button chat-manage-button" aria-label="Manage group" title="Manage group" disabled={working} onClick={()=>setManagingGroup(true)}><Users size={17}/></button>}
               <PinnedMessages key={'chat-pins:'+selected} kind="chat" id={selected!} compact version={pinVersion} onUnpin={updated=>{if('reactions' in updated){setMessages(old=>old.map(row=>row.id===updated.id?updated as ChatMessage:row));setPinVersion(value=>value+1);}}}/>
               <ChatOptionsMenu key={selected} busy={working} items={[
+                {label:active.kind==='group'?'Group info':'Contact info',icon:Info,onSelect:()=>setDetails('info')},
+                {label:'Search in conversation',icon:Search,onSelect:()=>setDetails('search')},
+                {label:'Shared media and files',icon:FileText,onSelect:()=>setDetails('media')},
                 {label:active.is_pinned?'Unpin chat':'Pin chat',icon:active.is_pinned?PinOff:Pin,onSelect:()=>void changeChatPreference('is_pinned')},
                 {label:active.is_muted?'Unmute':'Mute',icon:active.is_muted?Bell:BellOff,onSelect:()=>void changeChatPreference('is_muted')},
                 {label:active.archived_at?'Restore chat':'Archive chat',icon:active.archived_at?ArchiveRestore:Archive,onSelect:()=>void archiveActiveChat()},
@@ -544,13 +558,14 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
             </div>
           </header>
           {requestedChat?.id===selected&&requestedChat.messageId&&jumpClosed!==requestedChat.nonce&&<MessageContext key={'chat-context:'+requestedChat.nonce} kind="chat" id={selected!} messageId={requestedChat.messageId} version={pinVersion} onClose={()=>setJumpClosed(requestedChat.nonce)}/>}
+          {searchJump&&<MessageContext key={'search-jump:'+selected+':'+searchJump.nonce} kind="chat" id={selected!} messageId={searchJump.id} version={pinVersion} onClose={()=>setSearchJump(null)}/>}
           <div className="private-chat-history" ref={historyRef}>
             {historyCursor && <div style={{textAlign:"center",padding:"8px"}}><button type="button" className="outline-button" disabled={loadingOlder} onClick={()=>void loadOlder()}>{loadingOlder?"Loading…":"Load older messages"}</button></div>}
             {messages.length === 0 && <div className="private-chat-welcome"><MessageCircle size={30}/><h3>Start the conversation</h3><p>Only participants in this workspace can read these messages.</p></div>}
-            {messages.map(message => <div key={message.id} className={`private-message ${message.sender.id===currentUser.id ? 'mine' : ''}${message.attachment&&!message.deleted_at?' has-file':''}`}>
+            {messages.map((message,index) => <div key={message.id} className="chat-timeline-entry">{(index===0||new Date(messages[index-1].created_at).toDateString()!==new Date(message.created_at).toDateString())&&<div className="chat-day-label"><span>{dayLabel(message.created_at)}</span></div>}<div className={`private-message ${message.sender.id===currentUser.id ? 'mine' : ''}${message.attachment&&!message.deleted_at?' has-file':''}`}>
               <div className="private-message-meta"><strong>{message.sender.full_name}</strong><time>{timeFor(message.created_at)}</time>
                 {!message.deleted_at&&editingId!==message.id&&<MessageActions busy={working} pinned={Boolean(message.pinned_at)}
-                onReply={()=>setReplyTo({chatId:selected!,messageId:message.id})} onForward={message.attachment?undefined:()=>setForwardId(message.id)}
+                onReply={()=>setReplyTo({chatId:selected!,messageId:message.id})} onForward={()=>setForwardId(message.id)} onCopy={()=>{if(!navigator.clipboard){setError('Clipboard access is unavailable in this browser.');return;}void navigator.clipboard.writeText(message.body).then(()=>setNotice('Message copied')).catch(()=>setError('Could not copy the message.'));}}
                 onPin={()=>void pinMessage(message)}
                 onEdit={message.sender.id===currentUser.id?()=>{setEditingId(message.id);setEditDraft(message.body);}:undefined}
                 onDelete={message.sender.id===currentUser.id?()=>void deleteMessage(message):undefined}/>}
@@ -564,17 +579,18 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
               </form> : <div className={`private-message-body ${message.deleted_at ? 'deleted' : ''}`}>{message.deleted_at?'Message deleted':message.attachment?<><ChatFileMessage file={message.attachment}/>{message.body!==message.attachment.name&&<div className="chat-file-caption">{message.body}</div>}</>:message.body}{!message.deleted_at && message.edited_at && <small className="edited-note"> (edited)</small>}</div>}
               {message.sender.id===currentUser.id && <div className="chat-read-receipt">{
                 active.participants.some(p=>p.user.id!==currentUser.id && p.last_read_at && new Date(p.last_read_at).getTime()>=new Date(message.created_at).getTime())
-                  ? (active.kind==='direct' ? 'Seen' : `Seen by ${active.participants.filter(p=>p.user.id!==currentUser.id && p.last_read_at && new Date(p.last_read_at).getTime()>=new Date(message.created_at).getTime()).length}`)
-                  : 'Sent'
+                  ? <span className="chat-read-ticks seen" aria-label={active.kind==='direct'?'Seen':`Seen by ${active.participants.filter(p=>p.user.id!==currentUser.id&&p.last_read_at&&new Date(p.last_read_at).getTime()>=new Date(message.created_at).getTime()).length}`} title="Read"><CheckCheck size={16}/></span>
+                  : <span className="chat-read-ticks" aria-label="Sent" title="Sent"><Check size={15}/></span>
               }</div>}
               <ChatReactionBar key={'reactions:'+message.id} chatId={selected!} message={message} currentUserId={currentUser.id} participants={active.participants.map(p=>p.user)}
                 onUpdated={updated=>setMessages(current=>current.map(item=>item.id===updated.id?updated:item))}/>
-            </div>)}
+            </div></div>)}
             <div ref={bottomRef}/>
           </div>
           {Object.keys(typingUsers).length>0&&<div className="chat-typing-indicator" aria-live="polite">{Object.values(typingUsers).join(', ')} {Object.keys(typingUsers).length>1?'are':'is'} typing…</div>}
           {replyTarget&&<div className="chat-reply-compose"><ReplyPreview message={replyTarget} onCancel={()=>setReplyTo(null)}/></div>}
           <ChatComposer key={'composer:'+workspaceId+':'+selected} draft={draft} onDraft={changeDraft} onBlur={()=>emitTyping(false)} people={active.participants.map(p=>p.user).filter(user=>user.id!==currentUser.id)} busy={working} onSendText={send} onSendFile={sendAttachment}/>
+          {details&&<ChatDetails key={selected+':'+details} chat={active} mode={details} currentUserId={currentUser.id} onClose={()=>setDetails(null)} onOpenMessage={id=>{setJumpClosed(requestedChat?.nonce??null);setSearchJump({id,nonce:Date.now()});setDetails(null);}}/>}
         </> : <div className="private-chat-welcome"><MessageCircle size={32}/><h3>Select a conversation</h3><p>Choose a chat or group from the list to start messaging.</p></div>}
       </div>
     </div>

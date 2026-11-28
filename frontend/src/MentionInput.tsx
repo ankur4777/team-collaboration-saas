@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react';
+import {useLayoutEffect,useRef,useState,type KeyboardEvent,type RefObject} from 'react';
 import type { Person } from './api';
 
 interface Props {
@@ -9,9 +9,14 @@ interface Props {
   ariaLabel:string;
   onBlur?:()=>void;
   disabled?:boolean;
+  multiline?:boolean;
+  textareaRef?:RefObject<HTMLTextAreaElement|null>;
+  onEnterSend?:()=>void;
 }
 
-export default function MentionInput({value,onChange,people,placeholder,ariaLabel,onBlur,disabled}:Props) {
+export default function MentionInput({value,onChange,people,placeholder,ariaLabel,onBlur,disabled,multiline=false,textareaRef,onEnterSend}:Props) {
+  const ownRef=useRef<HTMLTextAreaElement>(null),textRef=textareaRef||ownRef;
+  useLayoutEffect(()=>{if(!multiline||!textRef.current)return;const element=textRef.current;element.style.height='auto';element.style.height=Math.min(Math.max(element.scrollHeight,40),130)+'px';},[value,multiline,textRef]);
   const [choice,setChoice]=useState(0);
   const [dismissed,setDismissed]=useState<string|null>(null);
   // A mention can contain spaces, so match the text after the last @.
@@ -38,8 +43,9 @@ export default function MentionInput({value,onChange,people,placeholder,ariaLabe
     setChoice(0);
     setDismissed(next);
   }
-  function onKeyDown(event:KeyboardEvent<HTMLInputElement>) {
-    if(!suggestions.length)return;
+  function onKeyDown(event:KeyboardEvent<HTMLInputElement|HTMLTextAreaElement>) {
+    if(event.nativeEvent.isComposing)return;
+    if(!suggestions.length){if(multiline&&onEnterSend&&event.key==='Enter'&&!event.shiftKey){event.preventDefault();onEnterSend();}return;}
     if(event.key==='ArrowDown') {
       event.preventDefault();setChoice(current=>(current+1)%suggestions.length);
     } else if(event.key==='ArrowUp') {
@@ -52,10 +58,10 @@ export default function MentionInput({value,onChange,people,placeholder,ariaLabe
   }
 
   return <div className="mention-input">
-    <input aria-label={ariaLabel} value={value} maxLength={4000}
+    {multiline?<textarea ref={textRef} rows={1} aria-label={ariaLabel} value={value} maxLength={4000} autoComplete="off" placeholder={placeholder} disabled={disabled} onChange={event=>{setDismissed(null);setChoice(0);onChange(event.target.value);}} onBlur={onBlur} onKeyDown={onKeyDown}/>:<input aria-label={ariaLabel} value={value} maxLength={4000}
       autoComplete="off" placeholder={placeholder} disabled={disabled}
       onChange={event=>{setDismissed(null);setChoice(0);onChange(event.target.value);}}
-      onBlur={onBlur} onKeyDown={onKeyDown}/>
+      onBlur={onBlur} onKeyDown={onKeyDown}/>}
     {suggestions.length>0&&<div className="mention-options" role="listbox" aria-label="Mention a teammate">
       {suggestions.map((user,i)=><button type="button" key={user.id}
         className={i===index?'selected':''} role="option" aria-selected={i===index}
@@ -65,3 +71,4 @@ export default function MentionInput({value,onChange,people,placeholder,ariaLabe
     </div>}
   </div>;
 }
+

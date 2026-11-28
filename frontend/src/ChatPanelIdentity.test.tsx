@@ -111,6 +111,23 @@ describe('Department chat navigation and Senior project groups',()=>{
 });
 
 describe('Simple conversation navigation',()=>{
+  it('shows date separators and accurate read ticks and can copy a message',async()=>{
+    HTMLElement.prototype.scrollIntoView=vi.fn();
+    const user=userEvent.setup(),created=new Date().toISOString();
+    const clipboard=vi.spyOn(navigator.clipboard,'writeText').mockResolvedValue();
+    const conversation=thread('one','First colleague');
+    conversation.participants[1].last_read_at=created;
+    vi.mocked(api.chats).mockResolvedValue([conversation]);
+    vi.mocked(api.chatMessagePage).mockResolvedValue({items:[{id:'copy-message',body:'Copy this message',sender:me,created_at:created,edited_at:null,deleted_at:null,reactions:[]}],has_more:false,next_cursor:null});
+    vi.spyOn(api,'markChatRead').mockResolvedValue({last_read_at:created});
+    render(<ChatPanel workspaceId="org" currentUser={me} members={[]}/>);
+    await user.click(await screen.findByRole('button',{name:/First colleague/}));
+    expect(await screen.findByText('Today')).toBeTruthy();expect(screen.getByLabelText('Seen')).toBeTruthy();
+    await user.click(screen.getByRole('button',{name:'Message options'}));await user.click(screen.getByRole('button',{name:'Copy'}));
+    expect(clipboard).toHaveBeenCalledWith('Copy this message');
+    expect(await screen.findByRole('status')).toHaveProperty('textContent','Message copied');
+  });
+
   it('keeps search and group filters available without opening a conversation',async()=>{
     const group={...thread('project','Colleague'),kind:'group' as const,title:'Project Apollo'};
     vi.mocked(api.chats).mockResolvedValue([thread('one','First colleague'),group]);
@@ -187,8 +204,8 @@ describe('Simple conversation navigation',()=>{
     const user=userEvent.setup();render(<ChatPanel workspaceId="org" currentUser={me} members={[]}/>);
     await user.click(await screen.findByRole('button',{name:/First colleague/}));
     const trigger=screen.getByRole('button',{name:'Conversation options'});
-    await user.click(trigger);expect(document.activeElement).toBe(screen.getByRole('button',{name:'Pin chat'}));
-    await user.keyboard('{ArrowDown}');expect(document.activeElement).toBe(screen.getByRole('button',{name:'Mute'}));
+    await user.click(trigger);expect(document.activeElement).toBe(screen.getByRole('button',{name:'Contact info'}));
+    await user.keyboard('{ArrowDown}');expect(document.activeElement).toBe(within(screen.getByRole('group',{name:'Conversation actions'})).getByRole('button',{name:'Search in conversation'}));
     await user.keyboard('{End}');expect(document.activeElement).toBe(screen.getByRole('button',{name:'Archive chat'}));
     await user.keyboard('{Escape}');expect(screen.queryByRole('group',{name:'Conversation actions'})).toBeNull();
     expect(document.activeElement).toBe(trigger);

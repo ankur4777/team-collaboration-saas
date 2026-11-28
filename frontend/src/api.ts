@@ -227,6 +227,8 @@ export const api = {
   messageContext: (kind:'chat'|'channel',id:string,messageId:string) => request<{items:Message[]}>(`${kind==='chat'?'chats':'channels'}/${id}/messages/${messageId}/context/`),
   workspacePresence: (id:string) => post<{workspace_id:string;members:Presence[]}>(`organizations/${id}/presence/`,{}),
   chatAttachments: (chatId:string) => request<PrivateAttachment[]>(`chats/${chatId}/attachments/`),
+  chatMedia:(chatId:string,cursor?:ChannelMessageCursor|null)=>request<{items:PrivateAttachment[];next_cursor:ChannelMessageCursor|null}>(`chats/${chatId}/attachments/?${new URLSearchParams({page:'1',...(cursor||{})}).toString()}`),
+  searchChatMessages:(chatId:string,q:string,cursor?:ChannelMessageCursor|null)=>request<ChatMessagePage>(`chats/${chatId}/messages/?${new URLSearchParams({page:'1',q,...(cursor||{})}).toString()}`),
   channelAttachments: (channelId:string) => request<PrivateAttachment[]>(`channels/${channelId}/attachments/`),
   uploadChatAttachment: (chatId:string,file:File,caption?:string,replyTo?:string|null) => uploadPrivateFile<PrivateAttachment & {message:ChatMessage}>(`chats/${chatId}/attachments/`,file,caption,replyTo),
   privateAttachmentPreviewUrl:(row:PrivateAttachment)=>`/api/attachments/${encodeURIComponent(row.id)}/download/?preview=1`,

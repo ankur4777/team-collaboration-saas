@@ -170,15 +170,17 @@ export default function CallRoom({
   meeting,
   userId,
   onLeave,
+  initialVideo = true,
 }: {
   meeting: MeetingRecord;
   userId: string;
   onLeave: () => void;
+  initialVideo?: boolean;
 }) {
   const [joined, setJoined] = useState(false);
   const [joining, setJoining] = useState(false);
   const [audio, setAudio] = useState(true);
-  const [video, setVideo] = useState(true);
+  const [video, setVideo] = useState(initialVideo);
   const [local, setLocal] = useState<MediaStream | null>(null);
   const [remotes, setRemotes] = useState<Record<string, Remote>>({});
   const [error, setError] = useState('');
@@ -218,7 +220,7 @@ export default function CallRoom({
   const refreshIce = useRef<ReturnType<typeof setInterval> | null>(null);
   const media = useRef({
     audio: true,
-    video: true,
+    video: initialVideo,
     hand_raised: false,
     screen_sharing: false,
   });
@@ -1263,3 +1265,4 @@ export default function CallRoom({
     </div>
   );
 }
+

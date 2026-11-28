@@ -32,10 +32,14 @@ ALLOWED = {
     '.webp': 'image/webp',
     '.pdf': 'application/pdf',
     '.txt': 'text/plain',
+    '.webm': 'audio/webm',
+    '.ogg': 'audio/ogg',
+    '.m4a': 'audio/mp4',
+    '.mp3': 'audio/mpeg',
 }
 
 
-def validate_upload(upload):
+def validate_upload(upload, *, allow_audio=False):
     if upload is None or not hasattr(upload, 'read'):
         raise ValidationError({'file': 'Please choose a file to upload'})
     if upload.size <= 0 or upload.size > MAX_BYTES:
@@ -46,8 +50,8 @@ def validate_upload(upload):
         raise ValidationError({'file': 'Invalid file name'})
     name = name[:120]
     extension = Path(name).suffix.lower()
-    if extension not in ALLOWED:
-        raise ValidationError({'file': 'Allowed formats: PNG, JPEG, WebP, PDF, TXT'})
+    if extension not in ALLOWED or (extension in ('.webm','.ogg','.m4a','.mp3') and not allow_audio):
+        raise ValidationError({'file': 'Allowed formats: PNG, JPEG, WebP, PDF, TXT'+(', WebM, OGG, M4A, MP3' if allow_audio else '')})
     beginning = upload.read(min(upload.size, 4096))
     upload.seek(0)
     valid = {
@@ -56,6 +60,10 @@ def validate_upload(upload):
         '.jpeg': beginning.startswith(b'\xff\xd8\xff'),
         '.webp': beginning.startswith(b'RIFF') and beginning[8:12] == b'WEBP',
         '.pdf': beginning.startswith(b'%PDF-'),
+        '.webm': beginning.startswith(b'\x1aE\xdf\xa3'),
+        '.ogg': beginning.startswith(b'OggS'),
+        '.m4a': len(beginning) >= 12 and beginning[4:8] == b'ftyp',
+        '.mp3': beginning.startswith(b'ID3') or len(beginning)>1 and beginning[0]==255 and beginning[1]&224==224,
     }
     if extension == '.txt':
         try:
@@ -104,13 +112,33 @@ def visible_channel_attachments(request, channel):
 class ChatAttachmentsView(APIView):
     def get(self, request, chat_id):
         chat = accessible_chat(request, chat_id)
-        rows = list(visible_chat_attachments(request, chat).order_by('-created_at')[:50])
+        query = visible_chat_attachments(request, chat)
+        if request.query_params.get('page') == '1':
+            from django.db.models import Q
+            from django.utils.dateparse import parse_datetime
+            from uuid import UUID
+            before = request.query_params.get('before')
+            if before:
+                try:
+                    stamp = parse_datetime(before)
+                    identity = UUID(request.query_params.get('before_id', ''))
+                    if stamp is None or timezone.is_naive(stamp):
+                        raise ValueError()
+                except (TypeError, ValueError):
+                    raise ValidationError({'before': 'Choose a valid media page cursor'})
+                query = query.filter(Q(created_at__lt=stamp) | Q(created_at=stamp, id__lt=identity))
+            rows = list(query.order_by('-created_at', '-id')[:51])
+            more, rows = len(rows)>50, rows[:50]
+            last = rows[-1] if more else None
+            return Response({'items':[response_row(row) for row in rows], 'next_cursor':
+                {'before':last.created_at.isoformat(),'before_id':str(last.pk)} if last else None})
+        rows = list(query.order_by('-created_at')[:50])
         return Response([response_row(row) for row in rows])
 
     def post(self, request, chat_id):
         chat = accessible_chat(request, chat_id)
         upload = request.FILES.get('file')
-        name, kind = validate_upload(upload)
+        name, kind = validate_upload(upload, allow_audio=True)
         caption = str(request.data.get('caption', '')).strip()
         if len(caption) > 4000:
             raise ValidationError({'caption': 'Caption must contain at most 4000 characters'})
@@ -180,7 +208,7 @@ class AttachmentDownloadView(APIView):
         except (FileNotFoundError, OSError):
             from rest_framework.exceptions import NotFound
             raise NotFound('File is no longer stored')
-        preview = request.query_params.get('preview') == '1' and attachment.content_type in ('image/png', 'image/jpeg', 'image/webp')
+        preview = request.query_params.get('preview') == '1' and attachment.content_type in ('image/png', 'image/jpeg', 'image/webp', 'audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg')
         response = FileResponse(stream, as_attachment=not preview, filename=attachment.original_name,
                                 content_type=attachment.content_type if preview else 'application/octet-stream')
         response['Cache-Control'] = 'private, no-store'

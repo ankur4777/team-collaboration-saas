@@ -13,6 +13,8 @@ from .license_access import module_allowed, require_module
 from .views import broadcast_message
 from .notification_events import publish_notification_refresh
 from .serializers import ChatMessageSerializer, MessageSerializer
+from .models import PrivateAttachment
+from django.core.files.base import ContentFile
 
 
 def chat_rows(org, user):
@@ -73,12 +75,24 @@ class ForwardMessageView(APIView):
             joined = channel_joined_at(source, user.pk)
             original = get_object_or_404(Message.objects.select_for_update(), pk=message_id,
                                          channel=source, deleted_at__isnull=True, created_at__gte=joined)
-        if not original.body.strip():
+        attachment = PrivateAttachment.objects.filter(chat_message=original).first() if source_kind == 'chat' else None
+        if attachment and dest_kind != 'chat':
+            raise ValidationError({'destination': 'Forward files to a chat or group.'})
+        if not original.body.strip() and not attachment:
             raise ValidationError({'message_id': 'Only nonempty text messages can be forwarded'})
         # A new, explicit copy; never expose source IDs, author, or reply metadata.
         if dest_kind == 'chat':
             dest = get_object_or_404(chat_rows(org, user), pk=dest_id)
             message = ChatMessage.objects.create(conversation=dest, sender=user, body=original.body, is_forwarded=True)
+            if attachment:
+                try:
+                    with attachment.file.open('rb') as source:
+                        contents = source.read()
+                except OSError:
+                    raise ValidationError({'message_id': 'The original file is no longer available.'})
+                PrivateAttachment.objects.create(organization_id=org, chat=dest, chat_message=message,
+                    uploaded_by=user, original_name=attachment.original_name, content_type=attachment.content_type,
+                    size=attachment.size, file=ContentFile(contents, name=attachment.original_name))
             ChatConversation.objects.filter(pk=dest.pk).update(updated_at=timezone.now())
             payload = ChatMessageSerializer(message).data
             recipients = list(ChatParticipant.objects.filter(
@@ -99,3 +113,4 @@ class ForwardMessageView(APIView):
         # Mentions in forwarded text are not re-triggered.
         transaction.on_commit(lambda: publish_notification_refresh(org, recipients))
         return Response({'kind': dest_kind, 'destination_id': str(dest.pk), 'message': payload}, status=201)
+

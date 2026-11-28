@@ -1,22 +1,24 @@
 import {useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
-import {Ellipsis,Reply,Forward,Pin,PinOff,Pencil,Trash2} from 'lucide-react';
+import {Copy,Ellipsis,Reply,Forward,Pin,PinOff,Pencil,Trash2} from 'lucide-react';
 
 interface Props {
   busy?:boolean;
   pinned?:boolean;
   onReply?:()=>void;
+  onCopy?:()=>void;
   onForward?:()=>void;
   onPin?:()=>void;
   onEdit?:()=>void;
   onDelete?:()=>void;
 }
-export default function MessageActions({busy=false,pinned=false,onReply,onForward,onPin,onEdit,onDelete}:Props){
+export default function MessageActions({busy=false,pinned=false,onReply,onCopy,onForward,onPin,onEdit,onDelete}:Props){
   const [position,setPosition]=useState<{top:number;left:number}|null>(null);
   const trigger=useRef<HTMLButtonElement>(null),panel=useRef<HTMLDivElement>(null);
   const open=position!==null;
   const actions=[
     {label:'Reply',icon:Reply,run:onReply},
+    {label:'Copy',icon:Copy,run:onCopy},
     {label:'Forward',icon:Forward,run:onForward},
     {label:pinned?'Unpin':'Pin',icon:pinned?PinOff:Pin,run:onPin},
     {label:'Edit',icon:Pencil,run:onEdit},
@@ -60,3 +62,4 @@ export default function MessageActions({busy=false,pinned=false,onReply,onForwar
     </div>,document.body)}
   </div>;
 }
+

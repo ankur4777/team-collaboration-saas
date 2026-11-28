@@ -308,6 +308,11 @@ class ChatMessagesView(APIView):
         if chat.kind == ChatConversation.Kind.GROUP:
             participant = ChatParticipant.objects.get(conversation=chat, user=request.user)
             records = records.filter(created_at__gte=participant.joined_at)
+        query = request.query_params.get('q', '').strip()
+        if len(query) > 100:
+            raise ValidationError({'q': 'Search text must contain at most 100 characters'})
+        if query:
+            records = records.filter(Q(body__icontains=query) | Q(file_attachment__original_name__icontains=query))
         before = request.query_params.get('before')
         before_id = request.query_params.get('before_id')
         paged = request.query_params.get('page')
