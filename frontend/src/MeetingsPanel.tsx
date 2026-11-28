@@ -64,6 +64,11 @@ function when(value: string) {
   });
 }
 
+// Chat calls use meeting records for their call rooms, but are not scheduled meetings.
+function isChatCall(meeting: MeetingRecord) {
+  return /^(?:voice|video) call\\s+·/i.test(meeting.title);
+}
+
 function MeetingEditor({
   meeting,
   now,
@@ -448,7 +453,7 @@ export default function MeetingsPanel({
     const refresh = () => {
       const now = new Date();
       meetingsApi.list(new Date(now.getTime() - 86400000).toISOString(), new Date(now.getTime() + 365 * 86400000).toISOString())
-        .then((data) => { if (active) setStartedMeetings(data.results.filter((m) => m.organizer_in_call && m.organizer.id !== userId && !m.cancelled && !m.call_ended)); })
+        .then((data) => { if (active) setStartedMeetings(data.results.filter((m) => !isChatCall(m) && m.organizer_in_call && m.organizer.id !== userId && !m.cancelled && !m.call_ended)); })
         .catch(() => {});
     };
     refresh();
@@ -616,6 +621,7 @@ export default function MeetingsPanel({
   }
   const now = Date.now();
   const filtered = rows
+    .filter((m) => !isChatCall(m))
     .filter((m) =>
       calendar
         ? !m.cancelled
