@@ -38,7 +38,7 @@ export interface WorkspaceFile {
   can_delete:boolean;
   created_at:string; uploaded_by:Pick<Person,'id'|'full_name'|'email'>;
 }
-export interface Message { id: string; body: string; created_at: string; edited_at: string|null; deleted_at: string|null; sender: Person; reply_to_id?: string|null; is_forwarded?: boolean; pinned_at?: string|null }
+export interface Message { id: string; body: string; created_at: string; edited_at: string|null; deleted_at: string|null; sender: Person; reply_to_id?: string|null; is_forwarded?: boolean; pinned_at?: string|null; attachment?:PrivateAttachment|null }
 export type ForwardDestination = {kind:'chat'|'channel';id:string;label:string};
 export type ForwardResult = {kind:'chat'|'channel';destination_id:string;message:Message|ChatMessage};
 export interface ChannelMessageCursor { before:string; before_id:string }
@@ -116,21 +116,22 @@ async function secureLogin(path: string, body: unknown) {
   await csrf(); // Django rotates CSRF secret after login.
   return session;
 }
-async function uploadPrivateFile(path:string,file:File): Promise<PrivateAttachment> {
+async function uploadPrivateFile<T=PrivateAttachment>(path:string,file:File,caption?:string,replyTo?:string|null): Promise<T> {
   if(!csrfToken)await csrf();
   const body=new FormData();
   body.append('file',file);
+  if(caption)body.append('caption',caption);
+  if(replyTo)body.append('reply_to_id',replyTo);
   const response=await fetch(`/api/${path}`,{
     method:'POST',credentials:'same-origin',
     headers:{'X-CSRFToken':csrfToken},body,
   });
   if(!response.ok){
     const details=await response.json().catch(()=>null);
-    const message=typeof details?.file==='string'?details.file:
-      Array.isArray(details?.file)?details.file.join(', '):'Could not upload attachment';
+    const message=typeof details?.detail==='string'?details.detail:details&&typeof details==='object'?Object.values(details).map(value=>Array.isArray(value)?value.join(', '):String(value)).join('; '):'Could not upload attachment';
     throw new Error(message);
   }
-  return response.json() as Promise<PrivateAttachment>;
+  return response.json() as Promise<T>;
 }
 
 async function downloadPrivateFile(row:PrivateAttachment): Promise<void> {
@@ -227,7 +228,8 @@ export const api = {
   workspacePresence: (id:string) => post<{workspace_id:string;members:Presence[]}>(`organizations/${id}/presence/`,{}),
   chatAttachments: (chatId:string) => request<PrivateAttachment[]>(`chats/${chatId}/attachments/`),
   channelAttachments: (channelId:string) => request<PrivateAttachment[]>(`channels/${channelId}/attachments/`),
-  uploadChatAttachment: (chatId:string,file:File) => uploadPrivateFile(`chats/${chatId}/attachments/`,file),
+  uploadChatAttachment: (chatId:string,file:File,caption?:string,replyTo?:string|null) => uploadPrivateFile<PrivateAttachment & {message:ChatMessage}>(`chats/${chatId}/attachments/`,file,caption,replyTo),
+  privateAttachmentPreviewUrl:(row:PrivateAttachment)=>`/api/attachments/${encodeURIComponent(row.id)}/download/?preview=1`,
   uploadChannelAttachment: (channelId:string,file:File) => uploadPrivateFile(`channels/${channelId}/attachments/`,file),
   downloadPrivateAttachment: (row:PrivateAttachment) => downloadPrivateFile(row),
   workspaceFiles: (query='',category:'all'|'images'|'documents'='all') => request<{results:WorkspaceFile[];limit:number}>(`files/?${new URLSearchParams({q:query,category}).toString()}`),

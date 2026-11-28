@@ -15,8 +15,13 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .chat_views import accessible_chat
-from .models import ChatConversation, ChatParticipant, PrivateAttachment, TeamMember
+from .chat_views import accessible_chat, visible_chat_messages, publish_chat_message
+from .models import ChatConversation, ChatMessage, ChatParticipant, PrivateAttachment, TeamMember
+from .serializers import ChatMessageSerializer
+from .message_replies import resolve_reply_target
+from .mentions import create_mentions
+from .notification_events import publish_notification_refresh
+from django.utils import timezone
 from .permissions import get_active_membership, require_channel_access, channel_joined_at
 
 MAX_BYTES = 5 * 1024 * 1024
@@ -80,7 +85,7 @@ def response_row(attachment):
 
 def visible_chat_attachments(request, chat):
     query = PrivateAttachment.objects.filter(
-        organization_id=chat.organization_id, chat=chat,
+        organization_id=chat.organization_id, chat=chat, chat_message__deleted_at__isnull=True,
     ).select_related('uploaded_by')
     if chat.kind == ChatConversation.Kind.GROUP:
         participant = ChatParticipant.objects.get(conversation=chat, user=request.user)
@@ -106,13 +111,34 @@ class ChatAttachmentsView(APIView):
         chat = accessible_chat(request, chat_id)
         upload = request.FILES.get('file')
         name, kind = validate_upload(upload)
-        with transaction.atomic():
-            attachment = PrivateAttachment.objects.create(
-                organization_id=chat.organization_id, chat=chat,
-                uploaded_by=request.user, file=upload, original_name=name,
-                content_type=kind, size=upload.size,
-            )
-        return Response(response_row(attachment), status=status.HTTP_201_CREATED)
+        caption = str(request.data.get('caption', '')).strip()
+        if len(caption) > 4000:
+            raise ValidationError({'caption': 'Caption must contain at most 4000 characters'})
+        attachment = None
+        try:
+            with transaction.atomic():
+                reply_id = resolve_reply_target(request, visible_chat_messages(request, chat))
+                message = ChatMessage.objects.create(conversation=chat, sender=request.user,
+                                                     body=caption or name, reply_to_id=reply_id)
+                attachment = PrivateAttachment.objects.create(
+                    organization_id=chat.organization_id, chat=chat, chat_message=message,
+                    uploaded_by=request.user, file=upload, original_name=name,
+                    content_type=kind, size=upload.size,
+                )
+                ChatConversation.objects.filter(pk=chat.pk).update(updated_at=timezone.now())
+                payload = ChatMessageSerializer(message).data
+                transaction.on_commit(lambda: publish_chat_message(chat.pk, payload), robust=True)
+                participants = list(ChatParticipant.objects.filter(conversation=chat, user__is_active=True,
+                    user__organization_memberships__organization_id=chat.organization_id).select_related('user').distinct())
+                create_mentions(organization_id=chat.organization_id, sender_id=request.user.pk, body=caption,
+                                eligible_users=[p.user for p in participants], chat_message=message)
+                recipients = [p.user_id for p in participants]
+                transaction.on_commit(lambda: publish_notification_refresh(chat.organization_id, recipients), robust=True)
+        except Exception:
+            if attachment and attachment.file:
+                attachment.file.storage.delete(attachment.file.name)
+            raise
+        return Response({**response_row(attachment), 'message': payload}, status=status.HTTP_201_CREATED)
 
 
 class ChannelAttachmentsView(APIView):
@@ -154,10 +180,11 @@ class AttachmentDownloadView(APIView):
         except (FileNotFoundError, OSError):
             from rest_framework.exceptions import NotFound
             raise NotFound('File is no longer stored')
-        response = FileResponse(
-            stream, as_attachment=True, filename=attachment.original_name,
-            content_type='application/octet-stream',
-        )
+        preview = request.query_params.get('preview') == '1' and attachment.content_type in ('image/png', 'image/jpeg', 'image/webp')
+        response = FileResponse(stream, as_attachment=not preview, filename=attachment.original_name,
+                                content_type=attachment.content_type if preview else 'application/octet-stream')
         response['Cache-Control'] = 'private, no-store'
         response['X-Content-Type-Options'] = 'nosniff'
+        response['Content-Security-Policy'] = "default-src 'none'; sandbox"
         return response
+

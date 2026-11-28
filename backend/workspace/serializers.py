@@ -106,6 +106,19 @@ class ChatMessageSerializer(serializers.ModelSerializer):
     reply_to_id = serializers.UUIDField(read_only=True, allow_null=True)
     sender = UserSerializer(read_only=True)
     reactions = serializers.SerializerMethodField()
+    attachment = serializers.SerializerMethodField()
+
+    def get_attachment(self, obj):
+        if obj.deleted_at:
+            return None
+        from .models import PrivateAttachment
+        try:
+            row = obj.file_attachment
+        except PrivateAttachment.DoesNotExist:
+            return None
+        return {'id': str(row.pk), 'name': row.original_name, 'size': row.size,
+                'content_type': row.content_type, 'created_at': row.created_at.isoformat(),
+                'uploaded_by': UserSerializer(row.uploaded_by).data}
 
     def get_reactions(self, obj):
         if obj.deleted_at is not None:
@@ -121,5 +134,5 @@ class ChatMessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ChatMessage
-        fields = ('id', 'body', 'created_at', 'edited_at', 'deleted_at', 'sender', 'reactions', 'reply_to_id', 'is_forwarded', 'pinned_at')
+        fields = ('id', 'body', 'created_at', 'edited_at', 'deleted_at', 'sender', 'reactions', 'reply_to_id', 'is_forwarded', 'pinned_at', 'attachment')
 

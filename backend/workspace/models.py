@@ -456,6 +456,7 @@ class PrivateAttachment(models.Model):
     uploaded_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='uploaded_attachments')
     chat = models.ForeignKey(ChatConversation, on_delete=models.CASCADE, related_name='attachments', null=True, blank=True)
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name='attachments', null=True, blank=True)
+    chat_message = models.OneToOneField(ChatMessage, on_delete=models.CASCADE, related_name='file_attachment', null=True, blank=True)
     file = models.FileField(upload_to=private_attachment_path)
     original_name = models.CharField(max_length=120)
     content_type = models.CharField(max_length=100)

@@ -302,7 +302,7 @@ class ChatsView(APIView):
 class ChatMessagesView(APIView):
     def get(self, request, chat_id):
         chat = accessible_chat(request, chat_id)
-        records = ChatMessage.objects.filter(conversation=chat).select_related('sender').prefetch_related('reactions')
+        records = ChatMessage.objects.filter(conversation=chat).select_related('sender', 'file_attachment__uploaded_by').prefetch_related('reactions')
         # Newly invited group participants see messages from their join date,
         # not the historical conversation that existed before their invitation.
         if chat.kind == ChatConversation.Kind.GROUP:

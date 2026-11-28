@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
-import { Archive, ArchiveRestore, ArrowLeft, ArrowRight, Bell, BellOff, CheckSquare, LogOut, MessageCircle, Pin, PinOff, Plus, RefreshCw, Search, Send, Trash2, Users, X } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowLeft, ArrowRight, Bell, BellOff, CheckSquare, LogOut, MessageCircle, Pin, PinOff, Plus, RefreshCw, Search, Trash2, Users, X } from 'lucide-react';
 import { api, type ChatMessage, type ChannelMessageCursor, type ChatThread, type Member, type Person, type PresenceMap, type ChatDirectoryData } from './api';
 import ChatDirectory from './ChatDirectory';
 import TasksPanel from './TasksPanel';
 import ChatReactionBar from './ChatReactionBar';
 import {connectConversationSocket,mergeFreshHistory} from './conversationSocket';
 import {ApiError} from './api';
-import AttachmentPanel from './AttachmentPanel';
-import MentionInput from './MentionInput';
+import {ChatComposer,ChatFileMessage} from './ChatFileMessage';
 import {useConversationDraft} from './conversationDrafts';
 import ReplyPreview from './ReplyPreview';
 import MessageActions from './MessageActions';
@@ -339,6 +338,22 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
     } finally { setWorking(false); }
   }
 
+  async function sendAttachment(file:File){
+    if(!selected||working)throw new Error('Wait for the current action to finish.');
+    const chatId=selected,orgId=workspaceId,originalDraft=draft,replyId=replyTarget?.id;
+    setWorking(true);emitTyping(false);
+    try{
+      const result=await api.uploadChatAttachment(chatId,file,draft.trim(),replyId);
+      if(scopeRef.current.workspaceId!==orgId)return;
+      writeDraft(chatId,value=>value===originalDraft?'':value);
+      if(scopeRef.current.selected===chatId){
+        setReplyTo(null);
+        setMessages(rows=>rows.some(row=>row.id===result.message.id)?rows:[...rows,result.message].sort(messageOrder));
+      }
+      await loadThreads();
+    }finally{setWorking(false);}
+  }
+
   async function editMessage(e: FormEvent, messageId: string) {
     e.preventDefault();
     if (!selected || !editDraft.trim() || working) return;
@@ -532,10 +547,10 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
           <div className="private-chat-history" ref={historyRef}>
             {historyCursor && <div style={{textAlign:"center",padding:"8px"}}><button type="button" className="outline-button" disabled={loadingOlder} onClick={()=>void loadOlder()}>{loadingOlder?"Loading…":"Load older messages"}</button></div>}
             {messages.length === 0 && <div className="private-chat-welcome"><MessageCircle size={30}/><h3>Start the conversation</h3><p>Only participants in this workspace can read these messages.</p></div>}
-            {messages.map(message => <div key={message.id} className={`private-message ${message.sender.id===currentUser.id ? 'mine' : ''}`}>
+            {messages.map(message => <div key={message.id} className={`private-message ${message.sender.id===currentUser.id ? 'mine' : ''}${message.attachment&&!message.deleted_at?' has-file':''}`}>
               <div className="private-message-meta"><strong>{message.sender.full_name}</strong><time>{timeFor(message.created_at)}</time>
                 {!message.deleted_at&&editingId!==message.id&&<MessageActions busy={working} pinned={Boolean(message.pinned_at)}
-                onReply={()=>setReplyTo({chatId:selected!,messageId:message.id})} onForward={()=>setForwardId(message.id)}
+                onReply={()=>setReplyTo({chatId:selected!,messageId:message.id})} onForward={message.attachment?undefined:()=>setForwardId(message.id)}
                 onPin={()=>void pinMessage(message)}
                 onEdit={message.sender.id===currentUser.id?()=>{setEditingId(message.id);setEditDraft(message.body);}:undefined}
                 onDelete={message.sender.id===currentUser.id?()=>void deleteMessage(message):undefined}/>}
@@ -546,7 +561,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
               {editingId===message.id ? <form className="message-edit-form" onSubmit={e => void editMessage(e,message.id)}>
                 <input autoFocus aria-label="Edit message" maxLength={4000} value={editDraft} onChange={e => setEditDraft(e.target.value)}/>
                 <div><button type="button" onClick={() => setEditingId(null)} disabled={working}>Cancel</button><button type="submit" disabled={working || !editDraft.trim()}>Save</button></div>
-              </form> : <div className={`private-message-body ${message.deleted_at ? 'deleted' : ''}`}>{message.deleted_at ? 'Message deleted' : message.body}{!message.deleted_at && message.edited_at && <small className="edited-note"> (edited)</small>}</div>}
+              </form> : <div className={`private-message-body ${message.deleted_at ? 'deleted' : ''}`}>{message.deleted_at?'Message deleted':message.attachment?<><ChatFileMessage file={message.attachment}/>{message.body!==message.attachment.name&&<div className="chat-file-caption">{message.body}</div>}</>:message.body}{!message.deleted_at && message.edited_at && <small className="edited-note"> (edited)</small>}</div>}
               {message.sender.id===currentUser.id && <div className="chat-read-receipt">{
                 active.participants.some(p=>p.user.id!==currentUser.id && p.last_read_at && new Date(p.last_read_at).getTime()>=new Date(message.created_at).getTime())
                   ? (active.kind==='direct' ? 'Seen' : `Seen by ${active.participants.filter(p=>p.user.id!==currentUser.id && p.last_read_at && new Date(p.last_read_at).getTime()>=new Date(message.created_at).getTime()).length}`)
@@ -558,9 +573,8 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
             <div ref={bottomRef}/>
           </div>
           {Object.keys(typingUsers).length>0&&<div className="chat-typing-indicator" aria-live="polite">{Object.values(typingUsers).join(', ')} {Object.keys(typingUsers).length>1?'are':'is'} typing…</div>}
-          <AttachmentPanel key={'chat-files:'+selected} kind="chat" parentId={selected!}/>
           {replyTarget&&<div className="chat-reply-compose"><ReplyPreview message={replyTarget} onCancel={()=>setReplyTo(null)}/></div>}
-          <form className="private-chat-compose" onSubmit={send}><MentionInput key={selected} ariaLabel="Write a message" value={draft} placeholder="Write a message... (@ to mention)" people={active.participants.map(p=>p.user).filter(user=>user.id!==currentUser.id)} onChange={changeDraft} onBlur={()=>emitTyping(false)}/><button className="send-button" aria-label="Send message" disabled={!draft.trim()||working}><Send size={18}/></button></form>
+          <ChatComposer key={'composer:'+workspaceId+':'+selected} draft={draft} onDraft={changeDraft} onBlur={()=>emitTyping(false)} people={active.participants.map(p=>p.user).filter(user=>user.id!==currentUser.id)} busy={working} onSendText={send} onSendFile={sendAttachment}/>
         </> : <div className="private-chat-welcome"><MessageCircle size={32}/><h3>Select a conversation</h3><p>Choose a chat or group from the list to start messaging.</p></div>}
       </div>
     </div>

@@ -198,7 +198,7 @@ describe('Simple conversation navigation',()=>{
 });
 
 describe('Chat conversation panel identity',()=>{
-  it('keeps one pins panel, attachment panel and composer across chat switches and search navigation',async()=>{
+  it('keeps one pins panel and attachment composer across chat switches and search navigation',async()=>{
     const user=userEvent.setup();
     const props={workspaceId:'org',currentUser:me,members:[]};
     const view=render(<ChatPanel {...props}/>);
@@ -206,7 +206,8 @@ describe('Chat conversation panel identity',()=>{
     await screen.findByRole('heading',{name:'First colleague'});
     const check=()=>{
       expect(screen.getAllByRole('button',{name:/^Pinned messages$/})).toHaveLength(1);
-      expect(screen.getAllByRole('region',{name:'Shared attachments'})).toHaveLength(1);
+      expect(screen.getAllByRole('button',{name:'Attach a file'})).toHaveLength(1);
+      expect(screen.queryByRole('region',{name:'Shared attachments'})).toBeNull();
       expect(screen.getAllByRole('button',{name:'Send message'})).toHaveLength(1);
     };
     check();
