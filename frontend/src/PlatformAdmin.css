@@ -23,3 +23,40 @@
 .pa-admin-shell .pa-section-nav .pa-nav:hover{background:#fff4f5;color:#e60019}
 .pa-admin-shell .pa-section-nav .pa-nav.selected{background:#fff0f2;color:#e60019;box-shadow:inset 3px 0 #f00018}
 .pa-stat,.pa-table-card,.pa-login-card,.pa-report-panel{background:#fff;border-color:#f0dfe3;color:#101c2c}
+
+/* Super Admin operational overview — scoped to provider dashboard. */
+.pa-overview .pa-heading{margin-bottom:4px}
+.pa-overview-meta{font-size:11px;color:#687386;margin:0 0 16px}
+.pa-overview-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(195px,100%),1fr));gap:14px;margin-bottom:20px}
+.pa-overview-stat{gap:9px;min-width:0;padding:17px;white-space:normal!important}
+.pa-overview-stat-top{display:flex;justify-content:space-between;align-items:center;color:#8994a4}
+.pa-overview-stat-top .pa-overview-icon{display:grid;place-items:center;width:36px;height:36px;background:#fff0f2;color:#e60019;border-radius:10px}
+.pa-overview-stat strong{font-size:30px;line-height:1.15;letter-spacing:-.6px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.pa-overview-stat small,.pa-overview-panel small{font-size:11px;color:#687386;line-height:1.5}
+.pa-overview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:20px}
+.pa-overview-panel{padding:20px;min-width:0}
+.pa-overview-panel-head{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:19px}
+.pa-overview-panel-head h2{font-size:16px;display:flex;align-items:center;gap:7px;margin:0 0 5px}
+.pa-overview-panel-head p{font-size:11px;color:#687386;line-height:1.5;margin:0}
+.pa-overview-segments{display:flex;height:15px;border-radius:8px;overflow:hidden;gap:2px;background:#f1f3f6}
+.pa-overview-segments span{min-width:0}
+.pa-overview-legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 20px;margin-top:18px}
+.pa-overview-legend>div{display:flex;gap:7px;align-items:center;font-size:12px;color:#526575}
+.pa-overview-legend i{width:9px;height:9px;border-radius:3px;flex-shrink:0}
+.pa-overview-legend strong{margin-left:auto;color:#101c2c;font-variant-numeric:tabular-nums}
+.pa-overview-currency{display:flex;align-items:center;gap:8px;font-size:12px;color:#526575;margin-bottom:12px}
+.pa-overview-currency select{border:1px solid #dfe2e9;border-radius:7px;padding:6px 10px;color:#172033;background:#fff;font:inherit}
+.pa-overview-money{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.pa-overview-money>div{display:flex;flex-direction:column;gap:7px;padding:12px;background:#fafafb;border:1px solid #f0e6e8;border-radius:8px;min-width:0}
+.pa-overview-money span{font-size:11px;color:#687386}
+.pa-overview-money strong{font-size:16px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.pa-overview-renewal-list>div{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #f2e7e9;padding:11px 0}
+.pa-overview-renewal-list>div:last-child{border-bottom:0}
+.pa-overview-renewal-list>div>div{min-width:0;display:flex;flex-direction:column;gap:4px}
+.pa-overview-renewal-list strong{font-size:13px;overflow-wrap:anywhere}
+.pa-overview-action{display:flex;align-items:center;text-align:left;gap:10px;padding:11px 12px;width:100%;border:1px solid #eee4e7;background:#fff;border-radius:8px;margin-top:8px;color:#526575;font-size:12px;cursor:pointer;white-space:normal!important}
+.pa-overview-action span{flex:1}
+.pa-overview-action:hover{background:#fff4f5;color:#e60019;border-color:#f0ccd1}
+.pa-overview-empty{font-size:12px;color:#687386;line-height:1.6;padding:10px 0}
+@media(max-width:1100px){.pa-overview-grid{grid-template-columns:1fr}}
+@media(max-width:480px){.pa-overview-panel{padding:15px}.pa-overview-legend,.pa-overview-money{grid-template-columns:1fr}}

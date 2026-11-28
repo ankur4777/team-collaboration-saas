@@ -168,6 +168,7 @@ async function downloadWorkspaceFile(row:WorkspaceFile): Promise<void> {
 export type LicenseStatus='unassigned'|'trial'|'active'|'suspended'|'cancelled';
 export interface CompanyLicense {contact_email:string;country?:string;country_code?:string;phone?:string;website?:string;tax_number?:string;address?:string;plan:string;status:LicenseStatus;seat_limit:number|null;starts_on:string|null;ends_on:string|null;modules:string[];enforce_modules?:boolean}
 export interface PlatformCompany extends CompanyLicense, SubscriptionTiming {id:string;name:string;slug:string;created_at:string;employee_count:number;seats_remaining?:number|null;team_count:number;owner_emails:string[];owner_names?:string[];pending_owner_email:string|null;effective_status:string}
+export interface PlatformOverview {as_of:string;today:string;renewal_window_days:number;stats:{companies:number;active:number;trial:number;expired:number;scheduled:number;suspended:number;cancelled:number;unassigned:number;expiring:number;memberships:number;online_memberships:number;pending_tickets:number};recent_companies:PlatformCompany[];upcoming_renewals:{id:string;name:string;ends_on:string;days_remaining:number}[]}
 export interface PlatformCompanies {items:PlatformCompany[];total:number;page:number;page_size:number;stats:{companies:number;active:number;trial:number;expired:number;suspended:number;memberships:number}}
 export interface ProviderMember {id:string;user_id:string;company_id:string;company:string;full_name:string;email:string;role:'admin'|'member';contact_phone?:string;editable?:boolean;active:boolean;email_verified:boolean;joined_at:string;last_seen_at:string|null}
 export interface ProviderMemberPage {items:ProviderMember[];total:number;page:number;page_size:number}
@@ -203,6 +204,7 @@ export const api = {
   deleteEmployeeTask:(id:string)=>request<void>(`tasks/${id}/`,'DELETE'),
   deleteProjectGroup:(id:string)=>request<void>(`chats/${id}/`,'DELETE'),
   companyUsage:(id:string)=>request<CompanyUsage>(`platform/companies/${id}/usage/`),
+  platformOverview:()=>request<PlatformOverview>('platform/overview/'),
   revenueReport:(start:string,end:string)=>request<RevenueReport>(`platform/revenue/?${new URLSearchParams({start,end})}`),
   supportTickets:(provider:boolean,status:string,page:number)=>request<SupportPage>(`${provider?'platform/':''}support/?${new URLSearchParams({status,page:String(page)})}`),
   supportDetail:(provider:boolean,id:string)=>request<SupportDetail>(`${provider?'platform/':''}support/${id}/`),

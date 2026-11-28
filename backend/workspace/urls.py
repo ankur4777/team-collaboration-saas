@@ -27,6 +27,7 @@ urlpatterns = [
     path('platform/users/', platform_users.UserDirectoryView.as_view()),
     path('platform/users/<uuid:member_id>/', platform_users.UserMembershipView.as_view()),
     path('platform/companies/<uuid:company_id>/invite-user/', platform_users.InviteUserView.as_view()),
+    path('platform/overview/', platform_reports.PlatformOverviewView.as_view()),
     path('platform/revenue/', platform_reports.RevenueView.as_view()),
     path('platform/companies/<uuid:company_id>/usage/', platform_reports.CompanyUsageView.as_view()),
     path('platform/support/', support.PlatformTicketsView.as_view()),

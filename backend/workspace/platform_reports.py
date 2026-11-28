@@ -1,15 +1,54 @@
 """Aggregate provider reports. No message bodies, filenames or mailbox contents."""
 from datetime import timedelta
 from decimal import Decimal
-from django.db.models import Sum
+from django.db.models import Sum, Count, Q
 from django.db.models.functions import TruncMonth
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.response import Response
-from .platform_admin import PlatformView
+from .platform_admin import PlatformView, companies, company_data
 from .models import (Organization, OrganizationMember, Team, Channel, Message, ChatConversation,
-                     ChatMessage, Meeting, WorkspaceFile, PrivateAttachment, BillingInvoice)
+                     ChatMessage, Meeting, WorkspaceFile, PrivateAttachment, BillingInvoice, SupportTicket)
+
+
+class PlatformOverviewView(PlatformView):
+    """Operational summary using aggregate tenant metadata only."""
+    def get(self, request):
+        now = timezone.now()
+        today = timezone.localdate(now)
+        horizon = today + timedelta(days=30)
+        rows = Organization.objects.all()
+        current = Q(license__status__in=['active', 'trial'])
+        expired = current & Q(license__ends_on__lt=today)
+        scheduled = current & Q(license__starts_on__gt=today) & (
+            Q(license__ends_on__isnull=True) | Q(license__ends_on__gte=today))
+        active = Q(license__status='active') & ~expired & ~scheduled
+        trial = Q(license__status='trial') & ~expired & ~scheduled
+        expiring = (active | trial) & Q(license__ends_on__range=(today, horizon))
+        counts = rows.aggregate(
+            companies=Count('pk'), active=Count('pk', filter=active),
+            trial=Count('pk', filter=trial), expired=Count('pk', filter=expired),
+            scheduled=Count('pk', filter=scheduled),
+            suspended=Count('pk', filter=Q(license__status='suspended')),
+            cancelled=Count('pk', filter=Q(license__status='cancelled')),
+            unassigned=Count('pk', filter=Q(license__isnull=True) | Q(license__status='unassigned')),
+            expiring=Count('pk', filter=expiring),
+        )
+        counts['memberships'] = OrganizationMember.objects.count()
+        counts['online_memberships'] = OrganizationMember.objects.filter(
+            user__is_active=True, last_seen_at__gte=now-timedelta(seconds=90)).count()
+        counts['pending_tickets'] = SupportTicket.objects.filter(status__in=['open','in_progress']).count()
+        return Response({
+            'as_of': now.isoformat(), 'today': today.isoformat(), 'renewal_window_days': 30,
+            'stats': counts,
+            'recent_companies': [company_data(org) for org in companies().order_by('-created_at','-pk')[:5]],
+            'upcoming_renewals': [
+                {'id': str(row.pk), 'name': row.name, 'ends_on': row.license.ends_on.isoformat(),
+                 'days_remaining': (row.license.ends_on-today).days}
+                for row in rows.filter(expiring).select_related('license').order_by('license__ends_on','pk')[:5]
+            ],
+        })
 
 
 class CompanyUsageView(PlatformView):

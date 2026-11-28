@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useRef,useState,type FormEvent} from 'react';
 import {Building2,Users,ShieldCheck,LogOut,Home,SlidersHorizontal,CalendarClock,Receipt,ChartNoAxesCombined,Headset,Wallet,Menu,X} from 'lucide-react';
-import {api,type Session,type CompanyLicense,type PlatformCompany,type PlatformCompanies,type PlatformAudit,type LicenseStatus} from './api';
+import {api,type Session,type CompanyLicense,type PlatformCompany,type PlatformAudit,type LicenseStatus} from './api';
 import './PlatformAdmin.css';
 import Brand from './Brand';
 import {CompanyDirectory,UserDirectory,type DirectoryMode} from './ProviderDirectory';
@@ -8,6 +8,7 @@ import RenewalPanel from './RenewalPanel';
 import BillingPanel from './BillingPanel';
 import {CompanyUsagePanel,RevenuePanel} from './ProviderReports';
 import SupportPanel from './SupportPanel';
+import ProviderOverview from './ProviderOverview';
 
 const modules=[['teams','Teams & Channels'],['chats','Chats & Groups'],['search','Search Messages'],['email','Email Inbox'],['meetings','Meetings'],['calendar','Calendar'],['files','Shared Files']];
 const statuses=['unassigned','trial','active','suspended','cancelled'];
@@ -31,19 +32,14 @@ const sectionTabs:Record<DirectoryMode,EditorTab>={companies:'profile',modules:'
 function Dashboard({session,onLogout}:{session:Session;onLogout:()=>void}){
   const [section,setSection]=useState<Section>('overview'),[mobile,setMobile]=useState(false),[version,setVersion]=useState(0);
   const [editor,setEditor]=useState<{company:PlatformCompany|null;tab:EditorTab}|null>(null),[notice,setNotice]=useState('');
-  const [overview,setOverview]=useState<PlatformCompanies|null>(null),[error,setError]=useState('');
   const refresh=()=>setVersion(v=>v+1);
-  useEffect(()=>{if(section!=='overview')return;let active=true;setError('');api.platformCompanies('','',1,10).then(r=>{if(active)setOverview(r);}).catch(e=>{if(active)setError(message(e));});return()=>{active=false;};},[section,version]);
   const current=navigation.find(n=>n.id===section)!;
-  const stats=overview?.stats;
   const open=(company:PlatformCompany,tab:EditorTab)=>{setNotice('');setEditor({company,tab});};
   return <div className="pa-layout pa-admin-shell">
     <header className="pa-global-header"><div className="pa-global-brand"><button className="pa-mobile-menu" aria-label="Toggle navigation" onClick={()=>setMobile(v=>!v)}>{mobile?<X size={20}/>:<Menu size={20}/>}</button><strong>Admin Workspace</strong><Brand/></div><div className="pa-global-user"><span>{session.user.full_name}</span><span className="pa-avatar" aria-label="Platform administrator">{session.user.full_name.split(/\s+/).slice(0,2).map(s=>s[0]?.toUpperCase()).join('')||'SA'}</span><button type="button" className="outline-button" onClick={onLogout}><LogOut size={15}/> Sign out</button></div></header>
     <aside className={'pa-sidebar '+(mobile?'mobile-open':'')}><nav className="pa-section-nav" aria-label="Provider navigation">{navigation.map(item=><button key={item.id} type="button" className={'pa-nav '+(section===item.id?'selected':'')} aria-current={section===item.id?'page':undefined} onClick={()=>{setSection(item.id);setNotice('');setMobile(false);}}><item.icon size={18}/>{item.label}</button>)}</nav><div className="pa-sidebar-note"><span>Powered by</span><strong className="pa-powered-brand">SHABDD <b>TECHNOLOGY</b></strong><small>TeamWorkspace · Provider console</small><small>Private tenant content is not accessible here.</small></div></aside>
     <main className="pa-main"><section className="pa-content"><div className="pa-breadcrumb">Administration <span>›</span> {current.label}</div>{notice&&<p role="status" className="pa-info">{notice}</p>}
-    {section==='overview'?<><div className="pa-heading"><div><h1>Overview</h1><p>Manage your companies and TeamWorkspace subscriptions.</p></div><button type="button" className="primary-button" onClick={()=>{setSection('companies');setEditor({company:null,tab:'profile'});}}>New Company</button></div>
-      {error&&<p role="alert" className="pa-error">{error}</p>}<div className="pa-stats">{[['Companies',stats?.companies,'companies'],['Active licenses',stats?.active,'subscriptions'],['Trial licenses',stats?.trial,'subscriptions'],['Expired licenses',stats?.expired,'subscriptions'],['Suspended licenses',stats?.suspended,'subscriptions'],['Employee memberships',stats?.memberships,'users']].map(([label,value,target])=><button type="button" className="pa-stat pa-stat-link" key={label} onClick={()=>setSection(target as Section)}><span>{label}</span><strong>{value??'—'}</strong></button>)}</div>
-      <section className="pa-table-card"><div className="pa-table-head"><h2>Recent companies</h2><button className="outline-button" onClick={()=>setSection('companies')}>View all companies</button></div><div className="pa-table-scroll"><table><thead><tr><th>Company</th><th>Plan</th><th>Status</th><th>Employees</th><th>Expiry</th><th>Action</th></tr></thead><tbody>{overview?.items.map(row=><tr key={row.id}><td>{row.name}</td><td>{row.plan||'Unassigned'}</td><td><span className={'pa-status '+row.effective_status}>{title(row.effective_status)}</span></td><td>{row.employee_count}</td><td>{row.ends_on||'No expiry'}</td><td><button className="pa-edit-link" onClick={()=>open(row,'profile')}>Manage</button></td></tr>)}</tbody></table>{overview?.items.length===0&&<p className="pa-loading">No companies yet.</p>}</div></section></>
+    {section==='overview'?<ProviderOverview key={version} onNavigate={setSection} onNew={()=>{setSection('companies');setEditor({company:null,tab:'profile'});}} onManage={row=>open(row,'profile')} onRenewals={()=>setSection('subscriptions')}/>
     :section==='users'?<UserDirectory key={version}/>
     :section==='support'?<SupportPanel provider/>
     :section==='revenue'?<RevenuePanel/>
