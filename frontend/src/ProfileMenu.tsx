@@ -7,7 +7,7 @@ import './ProfileMenu.css';
 
 function initials(name:string){return name.split(' ').filter(Boolean).slice(0,2).map(part=>part[0].toUpperCase()).join('')||'TW';}
 
-function ProfilePhotoViewer({source,onClose}:{source:string;onClose:()=>void}){
+export function ProfilePhotoViewer({source,onClose}:{source:string;onClose:()=>void}){
   return <WorkspaceDialog title="Profile photo" onClose={onClose}>
     <div className="profile-photo-viewer"><img src={source} alt="Full size profile photo"/></div>
   </WorkspaceDialog>;

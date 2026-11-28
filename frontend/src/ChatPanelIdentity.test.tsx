@@ -339,3 +339,36 @@ describe('Explicit conversation selection',()=>{
   });
 });
 
+
+describe('Read-only chat profiles', () => {
+  it('opens the other person’s profile from the chat header photo', async () => {
+    const user = userEvent.setup();
+    const direct = thread('one', 'First colleague');
+    direct.participants[1].user.avatar_url = '/api/chats/one/profiles/one/avatar/';
+    vi.mocked(api.chats).mockResolvedValue([direct]);
+    render(<ChatPanel workspaceId="org" currentUser={me} members={[]}/>);
+
+    await user.click(await screen.findByRole('button', {name: /First colleague/}));
+    await user.click(screen.getByRole('button', {name: 'View contact profile'}));
+    const profile = within(screen.getByRole('region', {name: 'Profile'}));
+    expect(profile.getByRole('heading', {name: 'First colleague'})).toBeTruthy();
+    expect(profile.getByText('one@example.test')).toBeTruthy();
+    expect(profile.getByRole('button', {name: 'View full profile photo'}).querySelector('img')?.getAttribute('src'))
+      .toBe(direct.participants[1].user.avatar_url);
+    expect(profile.queryByRole('button', {name: /edit/i})).toBeNull();
+  });
+
+  it('opens a participant’s profile from group info and returns to the participant list', async () => {
+    const user = userEvent.setup();
+    const group: ChatThread = {...thread('group', 'Group colleague'), kind: 'group', title: 'Project chat'};
+    vi.mocked(api.chats).mockResolvedValue([group]);
+    render(<ChatPanel workspaceId="org" currentUser={me} members={[]}/>);
+
+    await user.click(await screen.findByRole('button', {name: /Project chat/}));
+    await user.click(screen.getByRole('button', {name: 'View group info'}));
+    await user.click(screen.getByRole('button', {name: 'View profile for Group colleague'}));
+    expect(within(screen.getByRole('region', {name: 'Profile'})).getByText('group@example.test')).toBeTruthy();
+    await user.click(screen.getByRole('button', {name: 'Back to group info'}));
+    expect(screen.getByRole('button', {name: 'View profile for Group colleague'})).toBeTruthy();
+  });
+});

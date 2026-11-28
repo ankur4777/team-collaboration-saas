@@ -538,7 +538,10 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
         {active ? <>
           <header className="private-chat-toolbar">
             <button type="button" className="icon-button chat-back-button" aria-label="Back to conversations" onClick={()=>setSelected(null)}><ArrowLeft size={20}/></button>
-            <span className="chat-thread-avatar large">{active.kind === 'group' ? <Users size={19}/> : <ChatAvatar person={active.participants.find(p=>p.user.id===peerId)?.user}/>}</span>
+            <button type="button" className="chat-thread-avatar large chat-profile-trigger"
+              aria-label={active.kind==='group'?'View group info':'View contact profile'} onClick={()=>setDetails('info')}>
+              {active.kind==='group'?<Users size={19}/>:<ChatAvatar person={active.participants.find(p=>p.user.id===peerId)?.user}/>}
+            </button>
             <div className="chat-conversation-title"><button type="button" className="chat-title-button" aria-label={active.kind==='group'?'Open group info':'Open contact info'} onClick={()=>setDetails('info')}><h2>{titleFor(active,currentUser.id)}</h2></button>{active.kind==='direct'?<PresenceStatus row={presence[peerId||'']}/>:<p>{active.participants.length} participants · {onlineCount} online</p>}</div>
             <div className="chat-toolbar-actions">
               {callsEnabled&&<ChatCallControls key={'calls:'+selected} chat={active} userId={currentUser.id} onActivity={onRead}/>}
@@ -591,7 +594,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
           {Object.keys(typingUsers).length>0&&<div className="chat-typing-indicator" aria-live="polite">{Object.values(typingUsers).join(', ')} {Object.keys(typingUsers).length>1?'are':'is'} typing…</div>}
           {replyTarget&&<div className="chat-reply-compose"><ReplyPreview message={replyTarget} onCancel={()=>setReplyTo(null)}/></div>}
           <ChatComposer key={'composer:'+workspaceId+':'+selected} draft={draft} onDraft={changeDraft} onBlur={()=>emitTyping(false)} people={active.participants.map(p=>p.user).filter(user=>user.id!==currentUser.id)} busy={working} onSendText={send} onSendFile={sendAttachment}/>
-          {details&&<ChatDetails key={selected+':'+details} chat={active} mode={details} currentUserId={currentUser.id} onClose={()=>setDetails(null)} onOpenMessage={id=>{setJumpClosed(requestedChat?.nonce??null);setSearchJump({id,nonce:Date.now()});setDetails(null);}}/>}
+          {details&&<ChatDetails key={selected+':'+details} chat={active} mode={details} currentUserId={currentUser.id} presence={presence} onClose={()=>setDetails(null)} onOpenMessage={id=>{setJumpClosed(requestedChat?.nonce??null);setSearchJump({id,nonce:Date.now()});setDetails(null);}}/>}
         </> : <div className="private-chat-welcome"><MessageCircle size={32}/><h3>Select a conversation</h3><p>Choose a chat or group from the list to start messaging.</p></div>}
       </div>
     </div>
