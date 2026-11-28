@@ -1,5 +1,5 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
-import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
+import {cleanup,fireEvent,render,screen,waitFor,within} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ProfileMenu from './ProfileMenu';
 import {api,csrf,type Person} from './api';
@@ -20,6 +20,34 @@ async function edit(){
 }
 
 describe('Profile editing',()=>{
+  it('opens the saved photo from the profile menu and closes back to the profile icon',async()=>{
+    render(<ProfileMenu user={{...person,avatar_url:'/api/auth/profile/avatar/?v=saved'}} onSaved={vi.fn()}/>);
+    const trigger=screen.getByRole('button',{name:'Open profile menu'});
+    await userEvent.click(trigger);await userEvent.click(screen.getByRole('button',{name:'View photo'}));
+    const viewer=screen.getByRole('dialog',{name:'Profile photo'});
+    expect(within(viewer).getByRole('img',{name:'Full size profile photo'}).getAttribute('src')).toBe('/api/auth/profile/avatar/?v=saved');
+    await userEvent.click(within(viewer).getByRole('button',{name:'Close dialog'}));
+    expect(screen.queryByRole('dialog')).toBeNull();expect(document.activeElement).toBe(trigger);
+  });
+
+  it('enlarges an unsaved photo and returns to the editor with its name and photo intact',async()=>{
+    vi.spyOn(api,'updateProfile').mockResolvedValue(person);
+    render(<ProfileMenu user={person} onSaved={vi.fn()}/>);await edit();
+    const name=screen.getByRole('textbox',{name:'Display name'});
+    await userEvent.clear(name);await userEvent.type(name,'Draft name');
+    await userEvent.upload(screen.getByLabelText('Choose profile photo'),new File(['png'],'photo.png',{type:'image/png'}));
+    const photo=screen.getByRole('button',{name:'View profile photo'});await userEvent.click(photo);
+    const viewer=screen.getByRole('dialog',{name:'Profile photo'});
+    expect(within(viewer).getByRole('img',{name:'Full size profile photo'}).getAttribute('src')).toBe('blob:photo-preview');
+    fireEvent(viewer,new Event('cancel',{cancelable:true}));
+    expect(screen.queryByRole('dialog',{name:'Profile photo'})).toBeNull();
+    expect(screen.getByRole('dialog',{name:'Edit profile'})).toBeTruthy();
+    expect(name).toHaveProperty('value','Draft name');expect(document.activeElement).toBe(photo);
+    expect(revokeUrl).not.toHaveBeenCalled();expect(api.updateProfile).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button',{name:'Cancel'}));
+    expect(revokeUrl).toHaveBeenCalledWith('blob:photo-preview');
+  });
+
   it('opens from the avatar, saves a name, and displays the saved photo',async()=>{
     const updated={...person,full_name:'Updated Name',avatar_url:'/api/auth/profile/avatar/?v=photo'};
     vi.spyOn(api,'updateProfile').mockResolvedValue(updated);
