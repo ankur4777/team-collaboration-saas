@@ -66,7 +66,7 @@ function when(value: string) {
 
 // Chat calls use meeting records for their call rooms, but are not scheduled meetings.
 function isChatCall(meeting: MeetingRecord) {
-  return /^(?:voice|video) call\\s+·/i.test(meeting.title);
+  return /^(?:voice|video) call\s+·/i.test(meeting.title);
 }
 
 function MeetingEditor({
