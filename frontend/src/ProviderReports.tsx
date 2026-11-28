@@ -1,6 +1,7 @@
 import {useEffect,useState,type FormEvent} from 'react';
 import {api,type CompanyUsage,type RevenueReport} from './api';
 import './PlatformAdmin.css';
+import {CompanyUserFilter,csvCell} from './ProviderDirectory';
 
 const errorText=(e:unknown)=>e instanceof Error?e.message:'Request failed';
 const today=()=>new Date().toISOString().slice(0,10);
@@ -34,18 +35,37 @@ export function CompanyUsagePanel({companyId}:{companyId:string}){
 }
 
 export function RevenuePanel(){
-  const [start,setStart]=useState(yearStart),[end,setEnd]=useState(today),[range,setRange]=useState({start:yearStart(),end:today()}),[data,setData]=useState<RevenueReport|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false),[currency,setCurrency]=useState('');
-  useEffect(()=>{let active=true;setLoading(true);setError('');setData(null);api.revenueReport(range.start,range.end).then(r=>{if(active){setData(r);setCurrency(old=>r.totals.some(t=>t.currency===old)?old:r.totals[0]?.currency||'');}}).catch(e=>{if(active)setError(errorText(e));}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[range]);
-  function search(e:FormEvent){e.preventDefault();setRange({start,end});}
-  const monthly=data?.monthly.filter(r=>r.currency===currency)||[];
-  const max=Math.max(1,...monthly.map(r=>Number(r.received)));
-  return <div className="pa-revenue"><div className="pa-heading"><div><div className="pa-eyebrow">PROVIDER REPORTS</div><h1>Revenue reports</h1><p>Manual invoice and received payment totals, separated by currency.</p></div></div>
-    <form className="pa-report-filters" onSubmit={search}><label>From (UTC)<input type="date" required value={start} max={end} onChange={e=>setStart(e.target.value)}/></label><label>To (UTC)<input type="date" required value={end} min={start} onChange={e=>setEnd(e.target.value)}/></label><button className="primary-button" disabled={loading}>Apply / refresh</button></form>
-    {error&&<p role="alert" className="pa-error">{error}</p>}{loading&&<p>Loading report…</p>}
-    {data&&<><p className="pa-info">Billed by issue date; received by payment date. Outstanding and overdue are current balances as of {data.as_of}, not restricted to this date range. Void invoices excluded. No currency conversion.</p>
+  const [start,setStart]=useState(yearStart),[end,setEnd]=useState(today),[company,setCompany]=useState(''),[filterCurrency,setFilterCurrency]=useState('');
+  const [range,setRange]=useState({start:yearStart(),end:today(),company:'',currency:''}),[data,setData]=useState<RevenueReport|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false),[currency,setCurrency]=useState('');
+  useEffect(()=>{let active=true;setLoading(true);setError('');setData(null);api.revenueReport(range.start,range.end,range.company,range.currency).then(r=>{if(active){setData(r);setCurrency(old=>r.totals.some(t=>t.currency===old)?old:r.totals[0]?.currency||'');}}).catch(e=>{if(active)setError(errorText(e));}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[range]);
+  function search(e:FormEvent){e.preventDefault();setRange({start,end,company,currency:filterCurrency});}
+  const monthly=new Map<string,{month:string;received:string;billed:string}>();
+  for(const row of data?.monthly||[])if(row.currency===currency)monthly.set(row.month,{month:row.month,received:row.received,billed:'0.00'});
+  for(const row of data?.billed_monthly||[])if(row.currency===currency){const previous=monthly.get(row.month);monthly.set(row.month,{month:row.month,received:previous?.received||'0.00',billed:row.billed});}
+  const months=[...monthly.values()].sort((a,b)=>a.month.localeCompare(b.month));
+  const max=Math.max(1,...months.flatMap(r=>[Number(r.received),Number(r.billed)]));
+  const selectedTotal=data?.totals.find(t=>t.currency===currency);
+  const balances=data?.company_balances||[];
+  function download(){
+    if(!data)return;
+    const rows=[['Revenue report'],['From',data.start,'To',data.end],['Balances as of',data.as_of],['Company',data.company_name||'All companies'],['Currency',data.currency||'All currencies'],['Company balances truncated',data.balances_truncated?'Yes (500 rows)':'No'],[],
+      ['Currency','Billed (period)','Received (period)','Outstanding (current)','Overdue (current)'],...data.totals.map(t=>[t.currency,t.billed,t.received,t.outstanding,t.overdue]),[],
+      ['Month','Currency','Billed'],...(data.billed_monthly||[]).map(r=>[r.month,r.currency,r.billed]),[],['Month','Currency','Received'],...data.monthly.map(r=>[r.month,r.currency,r.received]),[],
+      ['Company ID','Company','Currency','Billed','Received','Outstanding','Overdue'],...balances.map(r=>[r.company_id,r.company,r.currency,r.billed,r.received,r.outstanding,r.overdue])];
+    const csv=rows.map(row=>row.map(csvCell).join(',')).join('\r\n');
+    const url=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));
+    const link=document.createElement('a');link.href=url;link.download='revenue-'+data.start+'-'+data.end+'.csv';document.body.appendChild(link);link.click();link.remove();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  return <div className="pa-revenue"><div className="pa-heading"><div><div className="pa-eyebrow">PROVIDER REPORTS</div><h1>Revenue reports</h1><p>Manual invoice and received payment totals, separated by currency.</p></div><button type="button" className="primary-button" disabled={!data||loading} onClick={download}>Download CSV report</button></div>
+    <CompanyUserFilter value={company} onChange={setCompany}/>
+    <form className="pa-report-filters" onSubmit={search}><label>From<input type="date" required value={start} max={end} onChange={e=>setStart(e.target.value)}/></label><label>To<input type="date" required value={end} min={start} onChange={e=>setEnd(e.target.value)}/></label><label>Currency filter<select value={filterCurrency} onChange={e=>setFilterCurrency(e.target.value)}><option value="">All currencies</option>{['INR','CAD','AUD','USD','GBP','EUR'].map(c=><option key={c}>{c}</option>)}</select></label><button className="primary-button" disabled={loading}>Apply / refresh</button></form>
+    {error&&<p role="alert" className="pa-error">{error}</p>}{loading&&<p role="status">Loading report…</p>}
+    {data&&<><p className="pa-info">Showing {data.company_name||'all companies'} · {data.currency||'all currencies'} · {data.start} to {data.end}. Billed by issue date; received by payment date. Outstanding and overdue are current balances as of {data.as_of}, not restricted to this date range. Void invoices excluded. No currency conversion.</p>
+      <div className="pa-report-head"><h2>Financial summary</h2><select aria-label="Report currency" value={currency} onChange={e=>setCurrency(e.target.value)}>{data.totals.map(t=><option key={t.currency}>{t.currency}</option>)}</select></div>
+      {selectedTotal&&<div className="pa-metric-grid">{[['Billed (period)',selectedTotal.billed],['Received (period)',selectedTotal.received],['Outstanding (current)',selectedTotal.outstanding],['Overdue (current)',selectedTotal.overdue]].map(([label,value])=><div key={label} className="pa-stat"><span>{label}</span><strong>{currency} {value}</strong></div>)}</div>}
       <div className="pa-table-card pa-table-scroll"><table><thead><tr><th>Currency</th><th>Billed (period)</th><th>Received (period)</th><th>Outstanding (current)</th><th>Overdue (current)</th></tr></thead><tbody>{data.totals.map(t=><tr key={t.currency}><td>{t.currency}</td><td>{t.billed}</td><td>{t.received}</td><td>{t.outstanding}</td><td>{t.overdue}</td></tr>)}</tbody></table>{!data.totals.length&&<p className="pa-loading">No billing records for this view.</p>}</div>
-      <section className="pa-report-panel"><div className="pa-report-head"><h2>Monthly received payments</h2><select aria-label="Report currency" value={currency} onChange={e=>setCurrency(e.target.value)}>{data.totals.map(t=><option key={t.currency}>{t.currency}</option>)}</select></div>
-      {!monthly.length&&<p>No recorded payments for this currency and period.</p>}{monthly.map(r=><div key={r.month} className="pa-revenue-bar"><span>{r.month}</span><div><i style={{width:(Number(r.received)/max*100)+'%'}}/></div><strong>{r.received}</strong></div>)}</section>
-      <section className="pa-report-panel"><h2>Received by company</h2><p className="pa-renewal-description">Up to {data.customers_limit} company/currency rows.</p><div className="pa-table-card pa-table-scroll"><table><thead><tr><th>Company</th><th>Currency</th><th>Received</th></tr></thead><tbody>{data.customers.map(r=><tr key={r.company_id+r.currency}><td>{r.company}</td><td>{r.currency}</td><td>{r.received}</td></tr>)}</tbody></table></div></section>
+      <section className="pa-report-panel"><h2>Monthly billed vs received · {currency||'No currency'}</h2>
+      {!months.length&&<p>No recorded invoices or payments for this currency and period.</p>}{months.map(r=><div key={r.month}><div className="pa-revenue-bar"><span>{r.month}</span><div aria-hidden="true"><i style={{width:(Number(r.billed)/max*100)+'%',background:'#8b96a8'}}/></div><strong>Billed: {r.billed}</strong></div><div className="pa-revenue-bar"><span>Received</span><div aria-hidden="true"><i style={{width:(Number(r.received)/max*100)+'%'}}/></div><strong>{r.received}</strong></div></div>)}</section>
+      <section className="pa-report-panel"><h2>Company-wise financial report</h2><p className="pa-renewal-description">{data.balances_truncated?'Showing first 500 company/currency rows; narrow the company or currency filter for more detail.':'Includes companies with invoices, payments or outstanding balances in this view.'}</p><div className="pa-table-card pa-table-scroll"><table><thead><tr><th>Company</th><th>Currency</th><th>Billed (period)</th><th>Received (period)</th><th>Outstanding (current)</th><th>Overdue (current)</th></tr></thead><tbody>{balances.map(r=><tr key={r.company_id+r.currency}><td>{r.company}</td><td>{r.currency}</td><td>{r.billed}</td><td>{r.received}</td><td>{r.outstanding}</td><td>{r.overdue}</td></tr>)}</tbody></table>{!balances.length&&<p className="pa-loading">No matching company balances.</p>}</div></section>
     </>}</div>;
 }

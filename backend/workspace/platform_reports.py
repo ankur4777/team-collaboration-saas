@@ -8,6 +8,7 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.response import Response
 from .platform_admin import PlatformView, companies, company_data
+from .platform_billing import CURRENCIES
 from .models import (Organization, OrganizationMember, Team, Channel, Message, ChatConversation,
                      ChatMessage, Meeting, WorkspaceFile, PrivateAttachment, BillingInvoice, SupportTicket)
 
@@ -101,10 +102,13 @@ class RevenueQuery(serializers.Serializer):
     start = serializers.DateField(required=False)
     end = serializers.DateField(required=False)
     company = serializers.UUIDField(required=False)
+    currency = serializers.ChoiceField(choices=CURRENCIES,required=False)
 
     def validate(self, data):
         end = data.get('end', timezone.localdate())
-        start = data.get('start', end-timedelta(days=364))
+        start = data.get('start')
+        if start is None:
+            start = end-timedelta(days=min(364,end.toordinal()-1))
         if end < start or (end-start).days > 3660:
             raise serializers.ValidationError('Choose a valid range of at most 10 years')
         data.update(start=start,end=end)
@@ -118,9 +122,13 @@ class RevenueView(PlatformView):
         start,end = form.validated_data['start'],form.validated_data['end']
         rows = BillingInvoice.objects.exclude(status='void')
         company = form.validated_data.get('company')
+        company_name = None
         if company:
-            get_object_or_404(Organization,pk=company)
+            company_name = get_object_or_404(Organization,pk=company).name
             rows = rows.filter(organization_id=company)
+        currency = form.validated_data.get('currency')
+        if currency:
+            rows = rows.filter(currency=currency)
         totals = {}
         def group(currency):
             return totals.setdefault(currency, {'currency':currency,'billed':Decimal('0.00'),
@@ -128,8 +136,9 @@ class RevenueView(PlatformView):
         billed=rows.filter(issued_on__range=(start,end))
         paid=rows.filter(status='paid',payment__paid_on__range=(start,end))
         open_rows=rows.filter(status='unpaid')
-        for key,query in [('billed',billed),('received',paid),('outstanding',open_rows),
-                          ('overdue',open_rows.filter(due_on__lt=timezone.localdate()))]:
+        overdue = open_rows.filter(due_on__lt=timezone.localdate())
+        queries = [('billed',billed),('received',paid),('outstanding',open_rows),('overdue',overdue)]
+        for key,query in queries:
             for row in query.order_by().values('currency').annotate(total=Sum('amount')):
                 group(row['currency'])[key]=row['total']
         monthly=[]
@@ -138,6 +147,30 @@ class RevenueView(PlatformView):
         customers=[{'company_id':str(row['organization_id']),'company':row['organization__name'],
                     'currency':row['currency'],'received':str(row['total'])}
                    for row in paid.order_by().values('organization_id','organization__name','currency').annotate(total=Sum('amount')).order_by('organization__name','currency')[:500]]
+        # Preserve the original received-only response; expose a separate complete
+        # set of financial metrics for the first 500 relevant company/currency pairs.
+        relevant = rows.filter(Q(issued_on__range=(start,end))|
+            Q(status='paid',payment__paid_on__range=(start,end))|Q(status='unpaid'))
+        pairs = list(relevant.order_by('organization__name','organization_id','currency').values(
+            'organization_id','organization__name','currency').distinct()[:501])
+        balances = {}
+        for row in pairs[:500]:
+            key=(row['organization_id'],row['currency'])
+            balances[key]={'company_id':str(key[0]),'company':row['organization__name'],'currency':key[1],
+                'billed':'0.00','received':'0.00','outstanding':'0.00','overdue':'0.00'}
+        if balances:
+            # Bound each aggregate to the displayed companies, then select exact pairs.
+            company_ids={key[0] for key in balances}
+            for field,query in queries:
+                for row in query.filter(organization_id__in=company_ids).order_by().values(
+                        'organization_id','currency').annotate(total=Sum('amount')):
+                    key=(row['organization_id'],row['currency'])
+                    if key in balances:
+                        balances[key][field]=format(row['total'],'.2f')
+        billed_monthly=[{'month':r['month'].strftime('%Y-%m'),'currency':r['currency'],'billed':format(r['total'],'.2f')}
+            for r in billed.order_by().annotate(month=TruncMonth('issued_on')).values('month','currency').annotate(total=Sum('amount')).order_by('month','currency')]
         return Response({'start':start.isoformat(),'end':end.isoformat(),'as_of':timezone.localdate().isoformat(),
+                         'company_name':company_name,'currency':currency,'billed_monthly':billed_monthly,
+                         'company_balances':list(balances.values()),'balances_truncated':len(pairs)>500,
                          'totals':[{k:str(v) for k,v in totals[c].items()} for c in sorted(totals)],
                          'monthly':monthly,'customers':customers,'customers_limit':500})

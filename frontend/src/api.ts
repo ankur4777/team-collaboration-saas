@@ -175,7 +175,7 @@ export interface ProviderMemberPage {items:ProviderMember[];total:number;page:nu
 export interface ProviderInvitation {id:string;company_id:string;company:string;email:string;role:'admin'|'member';created_at:string;expires_at:string}
 export interface ProviderInvitationPage {items:ProviderInvitation[];total:number;page:number;page_size:number}
 export interface CompanyUsage {company_id:string;as_of:string;window_days:number;members:number;recent_members:number;online_members:number;teams:number;channels:number;conversations:number;channel_messages:number;chat_messages:number;recent_messages:number;meetings:number;recent_meetings:number;shared_files:number;attachments:number;storage_bytes:number;window_start?:string;timezone?:string;active_accounts?:number;inactive_accounts?:number;recent_files?:number;daily?:{date:string;channel_messages:number;chat_messages:number;meetings:number;shared_files:number;attachments:number}[]}
-export interface RevenueReport {start:string;end:string;as_of:string;totals:{currency:string;billed:string;received:string;outstanding:string;overdue:string}[];monthly:{month:string;currency:string;received:string}[];customers:{company_id:string;company:string;currency:string;received:string}[];customers_limit:number}
+export interface RevenueReport {start:string;end:string;as_of:string;totals:{currency:string;billed:string;received:string;outstanding:string;overdue:string}[];monthly:{month:string;currency:string;received:string}[];customers:{company_id:string;company:string;currency:string;received:string}[];customers_limit:number;company_name?:string|null;currency?:string|null;billed_monthly?:{month:string;currency:string;billed:string}[];company_balances?:{company_id:string;company:string;currency:string;billed:string;received:string;outstanding:string;overdue:string}[];balances_truncated?:boolean}
 export type TicketStatus='open'|'in_progress'|'resolved'|'closed';
 export interface SupportTicket {id:string;company_id:string;company:string;subject:string;priority:'normal'|'high';status:TicketStatus;requester:string;created_at:string;updated_at:string}
 export interface SupportDetail extends SupportTicket {replies:{id:string;author:string;from_provider:boolean;body:string;created_at:string}[]}
@@ -207,7 +207,7 @@ export const api = {
   deleteProjectGroup:(id:string)=>request<void>(`chats/${id}/`,'DELETE'),
   companyUsage:(id:string,days=30)=>request<CompanyUsage>(`platform/companies/${id}/usage/?days=${days}`),
   platformOverview:()=>request<PlatformOverview>('platform/overview/'),
-  revenueReport:(start:string,end:string)=>request<RevenueReport>(`platform/revenue/?${new URLSearchParams({start,end})}`),
+  revenueReport:(start:string,end:string,company='',currency='')=>request<RevenueReport>(`platform/revenue/?${new URLSearchParams({start,end,...(company?{company}:{}),...(currency?{currency}:{})})}`),
   supportTickets:(provider:boolean,status:string,page:number,filters:{q?:string;priority?:string;sort?:string}={})=>request<SupportPage>(`${provider?'platform/':''}support/?${new URLSearchParams({status,page:String(page),q:filters.q||'',priority:filters.priority||'',sort:filters.sort||'updated'})}`),
   supportDetail:(provider:boolean,id:string)=>request<SupportDetail>(`${provider?'platform/':''}support/${id}/`),
   createSupportTicket:(data:{subject:string;priority:string;body:string})=>post<SupportDetail>('support/',data),
