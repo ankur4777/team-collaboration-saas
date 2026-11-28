@@ -17,8 +17,6 @@ import ForwardMessageDialog from './ForwardMessageDialog';
 import ChatOptionsMenu from './ChatOptionsMenu';
 import ChatDetails from './ChatDetails';
 import ChatAvatar from './ChatAvatar';
-import {ProfileEditor} from './ProfileMenu';
-import {Pencil} from 'lucide-react';
 import ChatCallControls from './ChatCallControls';
 import './ChatPanel.css';
 import './WhatsAppChat.css';
@@ -37,10 +35,9 @@ function messageOrder(a: ChatMessage, b: ChatMessage) {
   return a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id);
 }
 
-interface Props { workspaceId: string|null; currentUser: Person; members: Member[]; presence?: PresenceMap; requestedChat?: {id:string;nonce:number;messageId?:string}|null; onRead?: ()=>void; notificationVersion?:number; callsEnabled?:boolean; onProfileSaved?:(user:Person)=>void }
+interface Props { workspaceId: string|null; currentUser: Person; members: Member[]; presence?: PresenceMap; requestedChat?: {id:string;nonce:number;messageId?:string}|null; onRead?: ()=>void; notificationVersion?:number; callsEnabled?:boolean }
 
-export default function ChatPanel({workspaceId, currentUser, members, presence={}, requestedChat, onRead,notificationVersion=0,callsEnabled=false,onProfileSaved}: Props) {
-  const [editingOwnProfile,setEditingOwnProfile]=useState(false);
+export default function ChatPanel({workspaceId, currentUser, members, presence={}, requestedChat, onRead,notificationVersion=0,callsEnabled=false}: Props) {
   const [details,setDetails]=useState<'info'|'search'|'media'|null>(null),[searchJump,setSearchJump]=useState<{id:string;nonce:number}|null>(null),[notice,setNotice]=useState('');
   useEffect(()=>{setDetails(null);setSearchJump(null);},[workspaceId]);
   useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(''),2200);return()=>clearTimeout(timer);},[notice]);
@@ -499,7 +496,6 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
   }
 
   return <section className={`private-chat-page simple-chats${active?' has-chat':''}`}>
-    {editingOwnProfile&&onProfileSaved&&<ProfileEditor user={currentUser} onSaved={onProfileSaved} onClose={()=>setEditingOwnProfile(false)}/>}
     {notice&&<div className="chat-copy-notice" role="status">{notice}</div>}
     {selected&&forwardTarget&&<ForwardMessageDialog key={selected+forwardTarget.id} kind="chat" sourceId={selected} message={forwardTarget} onClose={()=>setForwardId(null)} onSent={result=>{if(result.kind==='chat'&&result.destination_id===selected&&'reactions' in result.message){const sent=result.message;setMessages(old=>old.some(row=>row.id===sent.id)?old:[...old,sent].sort(messageOrder));}void loadThreads();}}/>}
     <div className="private-chat-heading">
@@ -553,7 +549,6 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
                 {label:active.kind==='group'?'Group info':'Contact info',icon:Info,onSelect:()=>setDetails('info')},
                 {label:'Search in conversation',icon:Search,onSelect:()=>setDetails('search')},
                 {label:'Shared media and files',icon:FileText,onSelect:()=>setDetails('media')},
-                ...(onProfileSaved?[{label:'Edit my profile',icon:Pencil,onSelect:()=>setEditingOwnProfile(true)}]:[]),
                 {label:active.is_pinned?'Unpin chat':'Pin chat',icon:active.is_pinned?PinOff:Pin,onSelect:()=>void changeChatPreference('is_pinned')},
                 {label:active.is_muted?'Unmute':'Mute',icon:active.is_muted?Bell:BellOff,onSelect:()=>void changeChatPreference('is_muted')},
                 {label:active.archived_at?'Restore chat':'Archive chat',icon:active.archived_at?ArchiveRestore:Archive,onSelect:()=>void archiveActiveChat()},
