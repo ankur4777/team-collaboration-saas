@@ -94,16 +94,38 @@ class ProfileAvatarView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        avatar = request.user.avatar
-        kind = AVATAR_TYPES.get(Path(avatar.name).suffix.lower()) if avatar else None
-        if not kind:
-            raise NotFound('No profile photo has been set.')
-        try:
-            stream = avatar.open('rb')
-        except (FileNotFoundError, OSError):
+        return avatar_response(request.user.avatar)
+
+
+class ChatProfileAvatarView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, chat_id, user_id):
+        from .chat_views import accessible_chat
+        from .models import ChatParticipant, OrganizationMember
+
+        chat = accessible_chat(request, chat_id)
+        participant = ChatParticipant.objects.select_related('user').filter(
+            conversation=chat, user_id=user_id, user__is_active=True,
+            user_id__in=OrganizationMember.objects.filter(
+                organization_id=chat.organization_id,
+            ).values('user_id'),
+        ).first()
+        if participant is None:
             raise NotFound('Profile photo is unavailable.')
-        response = FileResponse(stream, content_type=kind[1])
-        response['Cache-Control'] = 'private, no-store'
-        response['X-Content-Type-Options'] = 'nosniff'
-        response['Content-Security-Policy'] = "default-src 'none'; sandbox"
-        return response
+        return avatar_response(participant.user.avatar)
+
+
+def avatar_response(avatar):
+    kind = AVATAR_TYPES.get(Path(avatar.name).suffix.lower()) if avatar else None
+    if not kind:
+        raise NotFound('No profile photo has been set.')
+    try:
+        stream = avatar.open('rb')
+    except (FileNotFoundError, OSError):
+        raise NotFound('Profile photo is unavailable.')
+    response = FileResponse(stream, content_type=kind[1])
+    response['Cache-Control'] = 'private, no-store'
+    response['X-Content-Type-Options'] = 'nosniff'
+    response['Content-Security-Policy'] = "default-src 'none'; sandbox"
+    return response

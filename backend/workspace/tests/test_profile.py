@@ -7,7 +7,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TransactionTestCase, override_settings
 from django.test.client import encode_multipart, BOUNDARY, MULTIPART_CONTENT
 
-from workspace.models import User
+from workspace.models import ChatConversation, ChatParticipant, Organization, OrganizationMember, User
 
 
 class ProfileTests(TransactionTestCase):
@@ -111,3 +111,34 @@ class ProfileTests(TransactionTestCase):
         self.assertEqual(result.status_code, 403)
         self.user.refresh_from_db()
         self.assertEqual(self.user.full_name, 'Original')
+
+    def test_chat_photo_requires_current_chat_participation(self):
+        workspace = Organization.objects.create(name='Workspace', slug='profile-test', created_by=self.user)
+        outsider = User.objects.create_user(email='outside@example.com', full_name='Outside')
+        for user in (self.user, self.other, outsider):
+            OrganizationMember.objects.create(organization=workspace, user=user)
+        chat = ChatConversation.objects.create(organization=workspace, kind='direct', created_by=self.user)
+        for user in (self.user, self.other):
+            ChatParticipant.objects.create(conversation=chat, user=user)
+
+        self.assertEqual(self.upload(self.image()).status_code, 200)
+
+        def client_for(user):
+            client = Client()
+            client.force_login(user)
+            session = client.session
+            session['active_organization_id'] = str(workspace.pk)
+            session.save()
+            return client
+
+        peer = client_for(self.other)
+        participant = next(row['user'] for row in peer.get('/api/chats/').json()[0]['participants']
+                           if row['user']['id'] == str(self.user.pk))
+        url = participant['avatar_url']
+        response = peer.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'image/png')
+        response.close()
+        self.assertEqual(client_for(outsider).get(url).status_code, 404)
+        OrganizationMember.objects.filter(organization=workspace, user=self.user).delete()
+        self.assertEqual(peer.get(url).status_code, 404)

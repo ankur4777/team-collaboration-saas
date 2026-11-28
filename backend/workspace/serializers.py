@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from rest_framework import serializers
 from .models import User, Organization, OrganizationMember, Team, Channel, Message, ChatConversation, ChatParticipant, ChatMessage
 
@@ -36,7 +38,17 @@ class MessageSerializer(serializers.ModelSerializer):
 
 
 class ChatParticipantSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
+    user = serializers.SerializerMethodField()
+
+    def get_user(self, participant):
+        user = participant.user
+        data = dict(UserSerializer(user).data)
+        data['avatar_url'] = (
+            f'/api/chats/{participant.conversation_id}/profiles/{user.pk}/avatar/'
+            f'?v={Path(user.avatar.name).stem}'
+            if user.avatar and user.is_active else None
+        )
+        return data
 
     class Meta:
         model = ChatParticipant

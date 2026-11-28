@@ -13,7 +13,7 @@ function ProfilePhotoViewer({source,onClose}:{source:string;onClose:()=>void}){
   </WorkspaceDialog>;
 }
 
-function ProfileEditor({user,onSaved,onClose}:{user:Person;onSaved:(person:Person)=>void;onClose:()=>void}){
+export function ProfileEditor({user,onSaved,onClose}:{user:Person;onSaved:(person:Person)=>void;onClose:()=>void}){
   const [name,setName]=useState(user.full_name),[photo,setPhoto]=useState<File|null>(null);
   const [remove,setRemove]=useState(false),[preview,setPreview]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   const [viewingPhoto,setViewingPhoto]=useState(false);

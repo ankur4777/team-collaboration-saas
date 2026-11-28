@@ -16,6 +16,7 @@ from . import auth_views, views, member_views, chat_views, channel_notifications
 urlpatterns = [
     path('auth/profile/', profile_views.ProfileView.as_view()),
     path('auth/profile/avatar/', profile_views.ProfileAvatarView.as_view()),
+    path('chats/<uuid:chat_id>/profiles/<uuid:user_id>/avatar/', profile_views.ChatProfileAvatarView.as_view()),
     path('chat-directory/', directory.ChatDirectoryView.as_view()),
     path('departments/', directory.DepartmentsView.as_view()),
     path('chat-directory/teams/<uuid:team_id>/', directory.DirectoryTeamView.as_view()),
