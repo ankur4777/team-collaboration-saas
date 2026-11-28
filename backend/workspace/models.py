@@ -39,10 +39,16 @@ class UserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 
+def profile_avatar_path(instance, filename):
+    from pathlib import Path
+    return f'profiles/{instance.pk}/{uuid.uuid4().hex}{Path(filename).suffix.lower()}'
+
+
 class User(AbstractBaseUser, PermissionsMixin):
     id = models.UUIDField(primary_key=True, default=make_id, editable=False)
     email = models.EmailField(unique=True, max_length=254)
     full_name = models.CharField(max_length=150)
+    avatar = models.FileField(upload_to=profile_avatar_path, blank=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     email_verified_at = models.DateTimeField(null=True, blank=True)

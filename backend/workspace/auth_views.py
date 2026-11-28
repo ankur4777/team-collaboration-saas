@@ -41,11 +41,13 @@ def set_active_org(request, user):
 
 
 def auth_payload(request):
+    from pathlib import Path
     from .license_access import access_summary
     memberships = list(OrganizationMember.objects.filter(user=request.user).select_related('organization', 'organization__license').order_by('joined_at'))
     return {
         'user': {'id': str(request.user.id), 'email': request.user.email, 'full_name': request.user.full_name,
                  'email_verified': request.user.email_verified_at is not None,
+                 'avatar_url': f'/api/auth/profile/avatar/?v={Path(request.user.avatar.name).stem}' if request.user.avatar else None,
                  'is_platform_admin': bool(request.user.is_active and request.user.is_staff and request.user.is_superuser)},
         'organizations': [{'id': str(m.organization_id), 'name': m.organization.name,
                            'slug': m.organization.slug, 'role': m.role,

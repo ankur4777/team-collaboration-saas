@@ -1,6 +1,6 @@
 export interface Presence { user_id:string; online:boolean; last_seen_at:string|null }
 export type PresenceMap = Record<string,Presence>;
-export interface Person { id: string; email: string; full_name: string; email_verified: boolean; is_platform_admin?: boolean }
+export interface Person { id: string; email: string; full_name: string; email_verified: boolean; is_platform_admin?: boolean; avatar_url?:string|null }
 export interface NotificationPreferences { direct_chats: boolean; group_chats: boolean; team_channels: boolean }
 export interface AccountDeviceSession {
   id:string; user_agent:string; ip_address:string|null;
@@ -93,12 +93,13 @@ export async function csrf(): Promise<void> {
 }
 async function request<T>(path: string, method = 'GET', data?: unknown): Promise<T> {
   if (method !== 'GET' && !csrfToken) await csrf();
+  const multipart = data instanceof FormData;
   const response = await fetch(`/api/${path}`, {
     method,
     credentials: 'same-origin',
-    headers: { ...(data === undefined ? {} : { 'Content-Type': 'application/json' }),
+    headers: { ...(data === undefined || multipart ? {} : { 'Content-Type': 'application/json' }),
       ...(method === 'GET' ? {} : { 'X-CSRFToken': csrfToken }) },
-    body: data === undefined ? undefined : JSON.stringify(data),
+    body: data === undefined ? undefined : multipart ? data : JSON.stringify(data),
   });
   let payload: any;
   try { payload = await response.json(); } catch { payload = {}; }
@@ -184,6 +185,12 @@ export interface RenewalInput {request_id:string;days:number;reactivate:boolean;
 export interface RenewalPage {items:SubscriptionRenewal[];total:number;page:number;page_size:number}
 export interface PlatformAudit {action:string;actor:string;created_at:string;changes:Record<string,unknown>}
 export const api = {
+  updateProfile:(full_name:string,avatar:File|null,removeAvatar=false)=>{
+    const data=new FormData();data.append('full_name',full_name);
+    if(avatar)data.append('avatar',avatar);
+    if(removeAvatar)data.append('remove_avatar','true');
+    return request<Person>('auth/profile/','PATCH',data);
+  },
   chatDirectory:()=>request<ChatDirectoryData>('chat-directory/'),
   createDepartment:(name:string)=>post<{id:string;name:string}>('departments/',{name}),
   moveDirectoryTeam:(id:string,department_id:string|null)=>request(`chat-directory/teams/${id}/`,'PATCH',{department_id}),

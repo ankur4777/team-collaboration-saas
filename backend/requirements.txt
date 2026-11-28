@@ -13,3 +13,4 @@ cryptography>=44,<51
 tzdata>=2025.2
 
 reportlab>=4.2,<5
+Pillow>=10.4,<14
