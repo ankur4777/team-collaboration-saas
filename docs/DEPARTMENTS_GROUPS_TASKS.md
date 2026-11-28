@@ -1,6 +1,10 @@
 # Departments, project groups, and employee tasks
 
-Chats & Groups starts with a department directory. Expand a department, then a team, and click an employee to open their existing direct chat or start a new one. No conversation opens automatically. Existing teams without a department appear under **Unassigned teams**.
+Chats & Groups opens with **Messages** and a searchable conversation list. Use **All**, **Chats**, or **Groups** to filter the list, and **Archived chats** at the bottom to find archived conversations. No conversation opens automatically. On a phone, selecting a conversation opens the chat; use the back arrow to return to the list. Drafts are preserved when switching conversations.
+
+Open **People** to browse the department directory. Expand a department, then a team, and click an employee to open their existing direct chat or start a new one. Existing teams without a department appear under **Unassigned teams**.
+
+The conversation header keeps pinned messages and group management within reach. Open **Conversation options** (the three dots) to pin/unpin, mute/unmute, archive/restore, leave a group, or delete a group when permitted. Group management still includes renaming, adding/removing participants, and transferring ownership. Shared files, message replies, forwarding, editing, deletion, reactions, and read receipts remain available in the conversation.
 
 Company admins can open **Manage departments and positions** beside the Departments heading. They can create departments and teams, assign existing teams to departments, add existing workspace employees to teams, and set each employee's position title and position order. A smaller order is displayed first; equal positions are sorted by employee name.
 

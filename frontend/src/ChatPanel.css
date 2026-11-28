@@ -1,0 +1,83 @@
+.private-chat-page.simple-chats{padding:24px;gap:0;background:#fff;overflow:hidden}
+.simple-chats [hidden]{display:none!important}
+.simple-chats .private-chat-heading{padding:0 0 20px;flex-shrink:0}
+.simple-chats .private-chat-heading h1{font-size:24px;letter-spacing:-.045em;margin:0 0 6px;color:#132238}
+.simple-chats .private-chat-heading p{color:#7c899b;font-size:12px}
+.simple-chats .org-chat-heading-actions{gap:8px;flex-shrink:0}
+.simple-chats .org-chat-heading-actions button{padding:10px 14px;box-shadow:none}
+.simple-chats .org-chat-section-switch{padding:0;gap:22px;border-bottom:1px solid #e8ecf1;margin-bottom:18px;flex-shrink:0}
+.simple-chats .org-chat-section-switch button{border:0;border-bottom:2px solid transparent;border-radius:0;box-shadow:none;background:transparent;padding:0 2px 13px;color:#788597;font-size:12px;font-weight:600}
+.simple-chats .org-chat-section-switch button[aria-pressed=true]{border-color:#f42a32;color:#df1e2a;background:transparent}
+.simple-chats .private-chat-layout{grid-template-columns:310px minmax(0,1fr);min-height:0;border:1px solid #e5eaf0;border-radius:12px;box-shadow:0 4px 20px #13223804}
+.simple-chats .private-chat-list{overflow:hidden;background:#fff;border-color:#e8ecf1}
+.simple-chats .chat-list-tabs{display:flex;gap:4px;background:#f3f5f8;border-radius:9px;margin:16px 16px 4px;padding:4px;flex-shrink:0}
+.simple-chats .chat-list-tabs button{display:flex;align-items:center;justify-content:center;gap:8px;flex:1;border:0;border-radius:6px;padding:9px 6px;background:transparent;font-size:12px;font-weight:600;color:#7a8799}
+.simple-chats .chat-list-tabs button[aria-pressed=true]{background:#fff;color:#172a42;box-shadow:0 1px 5px #1322380d}
+.simple-chats .chat-messages-pane{display:flex;flex-direction:column;flex:1;min-height:0}
+.simple-chats .chat-list-controls{padding:0 16px 10px;flex-shrink:0}
+.simple-chats .private-chat-list-heading{padding:12px 0 10px;gap:8px}
+.simple-chats .private-chat-list-heading strong{font-size:11px;font-weight:600;color:#8490a0;letter-spacing:.025em}
+.simple-chats .chat-search-field{display:flex;align-items:center;gap:8px;border:1px solid #e7ebf0;background:#f9fafc;border-radius:8px;padding:0 10px;color:#96a1b0;min-width:0}
+.simple-chats .chat-search-field:focus-within{border-color:#ed9ea7;box-shadow:0 0 0 2px #fff0f2}
+.simple-chats .chat-search-field .chat-filter{border:0;outline:0;box-shadow:none;width:100%;min-width:0;margin:0;padding:10px 0;background:transparent;color:#24364d;font-size:12px}
+.simple-chats .chat-filter::placeholder{color:#99a3b2}
+.simple-chats .org-chat-kind-filter{gap:5px;margin:12px 0 0}
+.simple-chats .org-chat-kind-filter button{border:0;border-radius:7px;background:transparent;color:#8390a1;padding:8px 6px;font-size:11px}
+.simple-chats .org-chat-kind-filter button[aria-pressed=true]{background:#fff0f2;color:#e02331;font-weight:600}
+.simple-chats .chat-thread-scroll{flex:1;min-height:0;overflow:auto;padding:0 8px 10px}
+.simple-chats .chat-thread{gap:11px;padding:14px 10px;border:0;border-radius:9px;margin-bottom:3px;color:#23354b;min-height:70px}
+.simple-chats .chat-thread:hover{background:#f6f8fb}
+.simple-chats .chat-thread.selected{background:#fff0f2}
+.simple-chats .chat-thread-avatar{width:39px;height:39px;border-radius:50%;background:#edf2f8;color:#516783;font-size:12px}
+.simple-chats .chat-thread-avatar.is-group{background:#f1edfa;color:#8270b0}
+.simple-chats .chat-thread-details strong{font-size:12px;font-weight:600;color:#26364d}
+.simple-chats .chat-thread-details small{font-size:11px;color:#8a96a7}
+.simple-chats .chat-thread-indicators{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:5px;color:#a0a9b5;flex-shrink:0}
+.simple-chats .chat-unread-badge{background:#f42a32;color:#fff;border-radius:20px;min-width:19px;padding:3px 5px;font-size:10px}
+.simple-chats .chat-list-empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:35px 18px;color:#8e9aad;font-size:12px}
+.simple-chats .chat-list-empty strong{color:#4c5e76;font-size:13px;font-weight:600}
+.simple-chats .chat-list-empty p{max-width:210px;font-size:11px}
+.simple-chats .chat-archive-toggle{display:flex;align-items:center;gap:10px;flex-shrink:0;background:#fff;border:0;border-top:1px solid #eef1f5;padding:15px 18px;text-align:left;font-size:11px;color:#8591a2}
+.simple-chats .chat-archive-toggle:hover,.simple-chats .chat-archive-toggle[aria-pressed=true]{background:#f8fafc;color:#364d69}
+.simple-chats .chat-archive-count{margin-left:auto;font-size:10px;background:#f0f3f7;border-radius:5px;padding:2px 6px}
+.simple-chats .chat-people-pane{position:relative;flex:1;min-height:0;overflow:auto;padding:0 16px 16px}
+.simple-chats .chat-people-help{font-size:11px;color:#8d98a8;line-height:1.7;padding:14px 28px 16px 0}
+.simple-chats .chat-directory-refresh{position:absolute;right:12px;top:13px}
+.simple-chats .org-directory{margin:0;padding:0;border:0}
+.simple-chats .org-directory-heading{color:#65758a;font-size:11px;margin-bottom:12px}
+.simple-chats .org-directory-department,.simple-chats .org-directory-team{border-radius:8px;padding:12px 8px;font-size:12px}
+.simple-chats .org-directory-member{border-radius:8px;padding:11px 8px}
+.simple-chats .private-chat-conversation{background:#f8fafc;min-height:0}
+.simple-chats .private-chat-toolbar{background:#fff;padding:15px 20px;gap:11px;flex-wrap:nowrap;min-width:0;flex-shrink:0;border-color:#e8ecf1}
+.simple-chats .chat-conversation-title{flex:1;min-width:0}
+.simple-chats .private-chat-toolbar h2{font-size:14px;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#21344d;margin:0 0 4px}
+.simple-chats .private-chat-toolbar p,.simple-chats .private-chat-toolbar .presence-status{font-size:10px;color:#8a96a7}
+.simple-chats .private-chat-toolbar .presence-status{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.simple-chats .chat-toolbar-actions{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.simple-chats .conversation-icon-button{border-color:transparent;color:#8090a5;background:transparent;border-radius:8px}
+.simple-chats .conversation-icon-button:hover{background:#f2f5f9;color:#283f5d}
+.simple-chats .chat-connected{width:6px;height:6px;background:#c7cfd9}
+.simple-chats .chat-connected.yes{background:#2daf78}
+.simple-chats .chat-back-button{display:none}
+.simple-chats .private-chat-history{max-height:none;background:#f8fafc;padding:24px;gap:18px}
+.simple-chats .private-message{max-width:min(82%,620px)}
+.simple-chats .private-message-body{border:1px solid #e7edf4;background:#fff;border-radius:0 12px 12px 12px;color:#34455c;padding:11px 14px;box-shadow:0 2px 4px #21344d03;font-size:12px;line-height:1.7}
+.simple-chats .private-message.mine .private-message-body{background:#fff0f2;border-color:#ffe0e6;border-radius:12px 0 12px 12px;color:#34455c}
+.simple-chats .private-message-meta{color:#9aa6b6;font-size:10px}
+.simple-chats .private-message-meta strong{color:#6e7f95;font-weight:500}
+.simple-chats .private-chat-welcome{max-width:340px;padding:30px 20px;gap:12px;color:#8c9aad}
+.simple-chats .private-chat-welcome>svg{color:#e3707d;padding:15px;background:#fff0f2;border-radius:18px;width:64px;height:64px;margin-bottom:3px}
+.simple-chats .private-chat-welcome h3{font-size:18px;font-weight:600;letter-spacing:-.03em;color:#3e526e}
+.simple-chats .private-chat-welcome p{font-size:12px;color:#8b98aa}
+.simple-chats .private-chat-compose{background:#fff;border-color:#e8ecf1;padding:14px 18px;gap:10px;flex-shrink:0}
+.simple-chats .workspace-attachments{background:#fff;border-color:#e8ecf1;font-size:11px}
+.simple-chats .org-chat-tasks{border:1px solid #e8ecf1;border-radius:12px;min-height:0}
+.simple-chats .org-chat-tasks .org-tasks-page{background:#f8fafc}
+.chat-options-popover{position:fixed;z-index:120;width:218px;max-height:calc(100dvh - 16px);overflow:auto;background:#fff;border:1px solid #e5eaf1;box-shadow:0 10px 35px #1c334a20;border-radius:11px;padding:7px}
+.chat-options-popover button{display:flex;align-items:center;gap:10px;width:100%;min-height:40px;padding:10px;border:0;border-radius:6px;background:transparent;color:#5c6f87;text-align:left;font-size:12px}
+.chat-options-popover button:hover,.chat-options-popover button:focus-visible{background:#f3f6fa;color:#213c5c}
+.chat-options-popover button.danger{color:#d62d42}
+.chat-options-popover button.danger:hover{background:#fff0f2}
+@media(max-width:1100px){.simple-chats .private-chat-layout{grid-template-columns:270px minmax(0,1fr)}.simple-chats .private-chat-toolbar{padding:14px 12px;gap:8px}.simple-chats .chat-toolbar-actions{gap:3px}.simple-chats .chat-connected{display:none}}
+@media(max-width:760px){.private-chat-page.simple-chats{padding:16px;flex:1;min-height:0}.simple-chats .private-chat-layout{display:flex;flex-direction:column;min-height:0}.simple-chats .private-chat-list{flex:1;max-height:none;border:0;min-height:0}.simple-chats .private-chat-conversation{display:none;flex:1;min-height:0}.simple-chats.has-chat .private-chat-list{display:none}.simple-chats.has-chat .private-chat-conversation{display:flex}.simple-chats .chat-back-button{display:inline-flex;flex-shrink:0}.simple-chats .private-chat-history{padding:18px;max-height:none}.simple-chats .private-chat-heading{gap:12px;padding-bottom:17px}.simple-chats .private-chat-heading h1{font-size:21px}.simple-chats .private-chat-heading p{display:none}.simple-chats .org-chat-heading-actions button{padding:9px 10px;font-size:11px}.simple-chats .org-chat-section-switch{margin-bottom:12px}.simple-chats .private-chat-list .chat-thread-avatar{width:42px;height:42px}.simple-chats .chat-thread{min-height:76px}.simple-chats .private-chat-history .private-chat-welcome{margin:auto}.simple-chats .private-chat-toolbar .chat-thread-avatar{width:32px;height:32px}.simple-chats .private-chat-toolbar h2{font-size:12px}}
+@media(max-width:420px){.private-chat-page.simple-chats{padding:12px 10px}.simple-chats .private-chat-heading h1{font-size:19px}.simple-chats .org-chat-heading-actions{gap:6px}.simple-chats .org-chat-heading-actions .outline-button span{display:none}.simple-chats .org-chat-heading-actions .outline-button{width:33px;padding:8px}.simple-chats .org-chat-section-switch{gap:18px}.simple-chats .private-chat-toolbar{padding:12px 8px;gap:6px}.simple-chats .chat-toolbar-actions .conversation-icon-button{width:30px;height:30px}.simple-chats .chat-back-button{padding:3px}.simple-chats .private-chat-compose{padding:12px}}

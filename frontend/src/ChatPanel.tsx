@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
-import { ArrowRight, MessageCircle, Plus, RefreshCw, Send, Users, X } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowLeft, ArrowRight, Bell, BellOff, CheckSquare, LogOut, MessageCircle, Pin, PinOff, Plus, RefreshCw, Search, Send, Trash2, Users, X } from 'lucide-react';
 import { api, type ChatMessage, type ChannelMessageCursor, type ChatThread, type Member, type Person, type PresenceMap, type ChatDirectoryData } from './api';
 import ChatDirectory from './ChatDirectory';
 import TasksPanel from './TasksPanel';
@@ -15,6 +15,8 @@ import MessageContext from './MessageContext';
 import {PresenceStatus,presenceLabel} from './WorkspacePresence';
 import PinnedMessages from './PinnedMessages';
 import ForwardMessageDialog from './ForwardMessageDialog';
+import ChatOptionsMenu from './ChatOptionsMenu';
+import './ChatPanel.css';
 
 function titleFor(chat: ChatThread, userId: string) {
   if (chat.kind === 'group') return chat.title;
@@ -34,6 +36,7 @@ interface Props { workspaceId: string|null; currentUser: Person; members: Member
 
 export default function ChatPanel({workspaceId, currentUser, members, presence={}, requestedChat, onRead,notificationVersion=0}: Props) {
   const [section,setSection]=useState<'chats'|'tasks'>('chats');
+  const [listView,setListView]=useState<'messages'|'people'>('messages');
   const [directory,setDirectory]=useState<ChatDirectoryData|null>(null),[directoryLoading,setDirectoryLoading]=useState(true);
   const [threadKind,setThreadKind]=useState<'all'|'direct'|'group'>('all');
   const directoryRun=useRef(0);
@@ -42,6 +45,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
   const [jumpClosed,setJumpClosed]=useState<number|null>(null);
   const [showArchived,setShowArchived]=useState(false);
   const [threads, setThreads] = useState<ChatThread[]>([]);
+  const [threadsLoading,setThreadsLoading]=useState(true);
   const [selected, setSelected] = useState<string|null>(null);
   const [pinVersion,setPinVersion]=useState(0);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -86,7 +90,8 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
   const loadThreads = useCallback(async () => {
     const run=++listRequest.current;
     const org=scopeRef.current.workspaceId;
-    if(!org)return;
+    if(!org){setThreadsLoading(false);return;}
+    setThreadsLoading(true);
     try {
       const rows = await api.chats();
       if(run!==listRequest.current||scopeRef.current.workspaceId!==org)return;
@@ -94,6 +99,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
       // Loading or refreshing the list must never open a conversation by itself.
       setSelected(current => current && rows.some(row => row.id === current) ? current : null);
     } catch (e) { if(run===listRequest.current&&scopeRef.current.workspaceId===org)setError(e instanceof Error ? e.message : 'Could not load chats'); }
+    finally{if(run===listRequest.current&&scopeRef.current.workspaceId===org)setThreadsLoading(false);}
   }, []);
 
   useEffect(() => {
@@ -104,6 +110,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
     setEditingId(null);
     setManagingGroup(false);
     setThreads([]);
+    setThreadsLoading(Boolean(workspaceId));
     if (workspaceId) void loadThreads();
     return()=>{listRequest.current++;};
   }, [workspaceId, loadThreads]);
@@ -119,7 +126,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
   useEffect(()=>{if(notificationVersion>0&&workspaceId)void loadThreads();},[notificationVersion,workspaceId,loadThreads]);
 
   useEffect(() => {
-    if(requestedChat?.id) {setSelected(requestedChat.id);setSection('chats');}
+    if(requestedChat?.id) {setSelected(requestedChat.id);setSection('chats');setListView('messages');}
   },[requestedChat?.nonce, requestedChat?.id]);
 
   const markViewed = useCallback(async(chatId:string, messageId:string)=>{
@@ -304,7 +311,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
       setGroupTitle('');
       setGroupEmails([]);
       await loadThreads();
-      setShowArchived(false);setSelected(thread.id);
+      setShowArchived(false);setThreadKind('all');setFilter('');setListView('messages');setSelected(thread.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not create conversation');
     } finally { setWorking(false); }
@@ -452,7 +459,7 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
   async function openEmployeeChat(email:string) {
     if(working)return;setWorking(true);setError('');
     const org=workspaceId;
-    try{const thread=await api.startDirectChat(email);if(scopeRef.current.workspaceId!==org)return;await loadThreads();setShowArchived(false);setThreadKind('all');setSelected(thread.id);}
+    try{const thread=await api.startDirectChat(email);if(scopeRef.current.workspaceId!==org)return;await loadThreads();setShowArchived(false);setThreadKind('all');setFilter('');setListView('messages');setSelected(thread.id);}
     catch(e){if(scopeRef.current.workspaceId===org)setError(e instanceof Error?e.message:'Could not open employee chat');}
     finally{setWorking(false);}
   }
@@ -464,45 +471,64 @@ export default function ChatPanel({workspaceId, currentUser, members, presence={
     catch(e){if(scopeRef.current.workspaceId===org)setError(e instanceof Error?e.message:'Could not delete group');}finally{setWorking(false);}
   }
 
-  return <section className="private-chat-page">
+  return <section className={`private-chat-page simple-chats${active?' has-chat':''}`}>
     {selected&&forwardTarget&&<ForwardMessageDialog key={selected+forwardTarget.id} kind="chat" sourceId={selected} message={forwardTarget} onClose={()=>setForwardId(null)} onSent={result=>{if(result.kind==='chat'&&result.destination_id===selected&&'reactions' in result.message){const sent=result.message;setMessages(old=>old.some(row=>row.id===sent.id)?old:[...old,sent].sort(messageOrder));}void loadThreads();}}/>}
     <div className="private-chat-heading">
-      <div><div className="eyebrow">YOUR WORKSPACE / MESSAGES</div><h1>Chats &amp; Groups</h1><p>Browse departments and teams to chat with an employee.</p></div>
-      {section==='chats'&&<div className="org-chat-heading-actions"><button className="primary-button" type="button" onClick={() => setMode('direct')}><Plus size={17}/> New chat</button></div>}
+      <div><h1>Chats &amp; Groups</h1><p>Conversations and project work, in one place.</p></div>
+      {section==='chats'&&<div className="org-chat-heading-actions">{directory?.can_create_groups&&<button className="outline-button" type="button" aria-label="Create project group" onClick={()=>setMode('group')}><Users size={16}/><span>New group</span></button>}<button className="primary-button" type="button" onClick={() => setMode('direct')}><Plus size={17}/> New chat</button></div>}
     </div>
     <div className="org-chat-section-switch" role="group" aria-label="Chats and groups sections">
-      <button className="outline-button" type="button" aria-pressed={section==='chats'} onClick={()=>setSection('chats')}>Chats &amp; Groups</button>
-      <button className="outline-button" type="button" aria-pressed={section==='tasks'} onClick={()=>setSection('tasks')}>Tasks</button>
+      <button className="outline-button" type="button" aria-pressed={section==='chats'} onClick={()=>setSection('chats')}><MessageCircle size={16}/>Chats &amp; Groups</button>
+      <button className="outline-button" type="button" aria-pressed={section==='tasks'} onClick={()=>setSection('tasks')}><CheckSquare size={16}/>Tasks</button>
     </div>
     {error && <div className="chat-alert" role="alert">{error}<button type="button" onClick={() => setError('')} aria-label="Dismiss error"><X size={16}/></button></div>}
     {section==='tasks'?<div className="org-chat-tasks"><TasksPanel key={workspaceId||'none'} workspaceId={workspaceId}/></div>:<div className="private-chat-layout">
       <aside className="private-chat-list">
-        <ChatDirectory data={directory} loading={directoryLoading} currentUserId={currentUser.id} busy={working} onReload={()=>void loadDirectory()} onStartChat={email=>void openEmployeeChat(email)}/>
-        <div className="private-chat-list-heading"><strong>Conversations</strong><button type="button" className="outline-button" aria-pressed={showArchived} onClick={()=>setShowArchived(value=>!value)}>{showArchived?'Active':'Archived'}</button><button type="button" className="icon-button" aria-label="Refresh chats" title="Refresh chats" onClick={() => void loadThreads()}><RefreshCw size={16}/></button></div>
-        <input className="chat-filter" aria-label="Search conversations" placeholder="Search conversations" value={filter} onChange={e => setFilter(e.target.value)}/>
+        <div className="chat-list-tabs" role="group" aria-label="Browse chats"><button type="button" aria-pressed={listView==='messages'} onClick={()=>setListView('messages')}><MessageCircle size={16}/>Messages</button><button type="button" aria-pressed={listView==='people'} onClick={()=>setListView('people')}><Users size={16}/>People</button></div>
+        <div className="chat-people-pane" hidden={listView!=='people'}>
+          <p className="chat-people-help">Choose a department, then a team to find a colleague.</p>
+          <button type="button" className="icon-button chat-directory-refresh" aria-label="Refresh people" title="Refresh people" onClick={()=>void loadDirectory()}><RefreshCw size={15}/></button>
+          <ChatDirectory data={directory} loading={directoryLoading} currentUserId={currentUser.id} busy={working} onReload={()=>void loadDirectory()} onStartChat={email=>void openEmployeeChat(email)}/>
+        </div>
+        <div className="chat-messages-pane" hidden={listView!=='messages'}>
+        <div className="chat-list-controls">
+        <div className="private-chat-list-heading"><strong>{showArchived?'Archived conversations':'Conversations'}</strong><button type="button" className="icon-button" aria-label="Refresh chats" title="Refresh chats" onClick={() => void loadThreads()}><RefreshCw size={16}/></button></div>
+        <div className="chat-search-field"><Search size={16} aria-hidden="true"/><input className="chat-filter" aria-label="Search conversations" placeholder="Search by name" value={filter} onChange={e => setFilter(e.target.value)}/>{filter&&<button type="button" className="icon-button" aria-label="Clear conversation search" onClick={()=>setFilter('')}><X size={14}/></button>}</div>
         <div className="org-chat-kind-filter" role="group" aria-label="Conversation type">{([['all','All'],['direct','Chats'],['group','Groups']] as const).map(([value,label])=><button type="button" key={value} aria-pressed={threadKind===value} onClick={()=>setThreadKind(value)}>{label}</button>)}</div>
-        {visibleThreads.map(thread => <button type="button" key={thread.id} className={`chat-thread ${selected === thread.id ? 'selected' : ''}${thread.unread_count>0?' has-unread':''}`} onClick={() => setSelected(thread.id)}>
-          <span className="chat-thread-avatar">{thread.kind === 'group' ? <Users size={17}/> : initials(titleFor(thread,currentUser.id))}</span>
-          <span className="chat-thread-details"><strong>{thread.is_pinned?'★ ':''}{titleFor(thread,currentUser.id)}{thread.is_muted?' · Muted':''}</strong><small>{thread.kind === 'group' ? `${thread.participants.length} participants` : presenceLabel(presence[thread.participants.find(p=>p.user.id!==currentUser.id)?.user.id||''])}</small></span>
+        </div>
+        <div className="chat-thread-scroll">
+        {visibleThreads.map(thread => <button type="button" key={thread.id} aria-current={selected===thread.id?'true':undefined} className={`chat-thread ${selected === thread.id ? 'selected' : ''}${thread.unread_count>0?' has-unread':''}`} onClick={() => setSelected(thread.id)}>
+          <span className={`chat-thread-avatar${thread.kind==='group'?' is-group':''}`}>{thread.kind === 'group' ? <Users size={18}/> : initials(titleFor(thread,currentUser.id))}</span>
+          <span className="chat-thread-details"><strong>{titleFor(thread,currentUser.id)}</strong><small>{thread.kind === 'group' ? `${thread.participants.length} members` : presenceLabel(presence[thread.participants.find(p=>p.user.id!==currentUser.id)?.user.id||''])}</small></span>
+          <span className="chat-thread-indicators">{thread.is_pinned&&<Pin size={13} aria-label="Pinned chat"/>}{thread.is_muted&&<BellOff size={13} aria-label="Muted chat"/>}
           {thread.unread_count>0&&<span className="chat-unread-badge" aria-label={`${thread.unread_count} unread messages`}>{thread.unread_count>99?'99+':thread.unread_count}</span>}
+          </span>
         </button>)}
-        {visibleThreads.length === 0 && <div className="chat-list-empty">No conversations yet. Start a new chat with a colleague.</div>}
-        {directory?.can_create_groups&&<button type="button" className="new-group-link" onClick={() => setMode('group')}><Users size={15}/> Create project group</button>}
+        {threadsLoading&&threads.length===0?<div className="chat-list-empty" role="status">Loading conversations…</div>:visibleThreads.length===0&&<div className="chat-list-empty"><MessageCircle size={24}/><strong>{filter?'No matching conversations':showArchived?'No archived conversations':threadKind==='group'?'No groups yet':'No conversations yet'}</strong><p>{filter?'Try a different name or clear your search.':showArchived?'Conversations you archive will appear here.':threadKind==='group'?'Project groups you join will appear here.':'Start a new chat or find a colleague in People.'}</p></div>}
+        </div>
+        <button type="button" className="chat-archive-toggle" aria-pressed={showArchived} onClick={()=>setShowArchived(value=>!value)}>{showArchived?<ArrowLeft size={16}/>:<Archive size={16}/>}<span>{showArchived?'Back to active chats':'Archived chats'}</span><span className="chat-archive-count">{threads.filter(thread=>Boolean(thread.archived_at)).length}</span></button>
+        </div>
       </aside>
       <div className="private-chat-conversation">
         {active ? <>
           <header className="private-chat-toolbar">
+            <button type="button" className="icon-button chat-back-button" aria-label="Back to conversations" onClick={()=>setSelected(null)}><ArrowLeft size={20}/></button>
             <span className="chat-thread-avatar large">{active.kind === 'group' ? <Users size={19}/> : initials(titleFor(active,currentUser.id))}</span>
-            <div><h2>{titleFor(active,currentUser.id)}</h2>{active.kind==='direct'?<PresenceStatus row={presence[peerId||'']}/>:<p>{active.participants.length} participants · {onlineCount} online</p>}</div>
-            {active.kind==='group' && active.created_by.id===currentUser.id && <button type="button" className="group-manage-button" onClick={() => setManagingGroup(true)}><Users size={15}/> Manage group</button>}
-            {active.kind==='group' && active.created_by.id!==currentUser.id && <button type="button" className="group-manage-button" disabled={working} onClick={() => void leaveGroup()}>Leave group</button>}
-            <button type="button" className="group-manage-button" disabled={working} onClick={()=>void archiveActiveChat()}>{active.archived_at?'Restore chat':'Archive chat'}</button>
-            {active.kind==='group'&&active.can_delete&&<button type="button" className="group-manage-button" disabled={working} onClick={()=>void deleteGroup()}>Delete group</button>}
-            <button className="group-manage-button" type="button" disabled={working} onClick={()=>void changeChatPreference('is_pinned')}>{active.is_pinned?'Unpin chat':'Pin chat'}</button><button className="group-manage-button" type="button" disabled={working} onClick={()=>void changeChatPreference('is_muted')}>{active.is_muted?'Unmute':'Mute'}</button>
-            <span className={`chat-connected ${connected ? 'yes' : ''}`} title={connected ? 'Live updates connected' : 'Messages saved; live updates unavailable'}/>
+            <div className="chat-conversation-title"><h2>{titleFor(active,currentUser.id)}</h2>{active.kind==='direct'?<PresenceStatus row={presence[peerId||'']}/>:<p>{active.participants.length} participants · {onlineCount} online</p>}</div>
+            <div className="chat-toolbar-actions">
+              {active.kind==='group'&&active.created_by.id===currentUser.id&&<button type="button" className="conversation-icon-button chat-manage-button" aria-label="Manage group" title="Manage group" disabled={working} onClick={()=>setManagingGroup(true)}><Users size={17}/></button>}
+              <PinnedMessages key={'chat-pins:'+selected} kind="chat" id={selected!} compact version={pinVersion} onUnpin={updated=>{if('reactions' in updated){setMessages(old=>old.map(row=>row.id===updated.id?updated as ChatMessage:row));setPinVersion(value=>value+1);}}}/>
+              <ChatOptionsMenu key={selected} busy={working} items={[
+                {label:active.is_pinned?'Unpin chat':'Pin chat',icon:active.is_pinned?PinOff:Pin,onSelect:()=>void changeChatPreference('is_pinned')},
+                {label:active.is_muted?'Unmute':'Mute',icon:active.is_muted?Bell:BellOff,onSelect:()=>void changeChatPreference('is_muted')},
+                {label:active.archived_at?'Restore chat':'Archive chat',icon:active.archived_at?ArchiveRestore:Archive,onSelect:()=>void archiveActiveChat()},
+                ...(active.kind==='group'&&active.created_by.id!==currentUser.id?[{label:'Leave group',icon:LogOut,onSelect:()=>void leaveGroup()}]:[]),
+                ...(active.kind==='group'&&active.can_delete?[{label:'Delete group',icon:Trash2,danger:true,onSelect:()=>void deleteGroup()}]:[]),
+              ]}/>
+              <span className={`chat-connected ${connected ? 'yes' : ''}`} title={connected ? 'Live updates connected' : 'Messages saved; live updates unavailable'}/>
+            </div>
           </header>
           {requestedChat?.id===selected&&requestedChat.messageId&&jumpClosed!==requestedChat.nonce&&<MessageContext key={'chat-context:'+requestedChat.nonce} kind="chat" id={selected!} messageId={requestedChat.messageId} version={pinVersion} onClose={()=>setJumpClosed(requestedChat.nonce)}/>}
-          <PinnedMessages key={'chat-pins:'+selected} kind="chat" id={selected!} version={pinVersion} onUnpin={updated=>{if("reactions" in updated){setMessages(old=>old.map(row=>row.id===updated.id?updated as ChatMessage:row));setPinVersion(value=>value+1);}}}/>
           <div className="private-chat-history" ref={historyRef}>
             {historyCursor && <div style={{textAlign:"center",padding:"8px"}}><button type="button" className="outline-button" disabled={loadingOlder} onClick={()=>void loadOlder()}>{loadingOlder?"Loading…":"Load older messages"}</button></div>}
             {messages.length === 0 && <div className="private-chat-welcome"><MessageCircle size={30}/><h3>Start the conversation</h3><p>Only participants in this workspace can read these messages.</p></div>}

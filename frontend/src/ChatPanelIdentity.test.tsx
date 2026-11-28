@@ -1,5 +1,5 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
-import {act,cleanup,render,screen,waitFor} from '@testing-library/react';
+import {act,cleanup,render,screen,waitFor,within} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ChatPanel from './ChatPanel';
 import {DraftProvider} from './conversationDrafts';
@@ -77,6 +77,7 @@ describe('Department chat navigation and Senior project groups',()=>{
     vi.mocked(api.chats).mockResolvedValueOnce([]).mockResolvedValue([thread('one','First colleague')]);
     const start=vi.spyOn(api,'startDirectChat').mockResolvedValue(thread('one','First colleague'));
     render(<ChatPanel workspaceId="org" currentUser={me} members={[]}/>);
+    await user.click(screen.getByRole('button',{name:'People'}));
     await user.click(await screen.findByRole('button',{name:/Engineering/}));
     await user.click(screen.getByRole('button',{name:/Platform/}));
     expect(start).not.toHaveBeenCalled();
@@ -93,6 +94,7 @@ describe('Department chat navigation and Senior project groups',()=>{
     const confirm=vi.spyOn(window,'confirm').mockReturnValue(true),user=userEvent.setup();
     render(<ChatPanel workspaceId="org" currentUser={me} members={[]}/>);
     await user.click(await screen.findByRole('button',{name:/Project Apollo/}));
+    await user.click(screen.getByRole('button',{name:'Conversation options'}));
     await user.click(screen.getByRole('button',{name:'Delete group'}));
     expect(confirm).toHaveBeenCalled();
     await waitFor(()=>expect(remove).toHaveBeenCalledWith('project'));
@@ -103,7 +105,95 @@ describe('Department chat navigation and Senior project groups',()=>{
     vi.mocked(api.chats).mockResolvedValue([{...thread('project','Colleague'),kind:'group',title:'Project Apollo',can_delete:false}]);
     render(<ChatPanel workspaceId="org" currentUser={me} members={[]}/>);
     await userEvent.setup().click(await screen.findByRole('button',{name:/Project Apollo/}));
+    await userEvent.click(screen.getByRole('button',{name:'Conversation options'}));
     expect(screen.queryByRole('button',{name:'Delete group'})).toBeNull();
+  });
+});
+
+describe('Simple conversation navigation',()=>{
+  it('keeps search and group filters available without opening a conversation',async()=>{
+    const group={...thread('project','Colleague'),kind:'group' as const,title:'Project Apollo'};
+    vi.mocked(api.chats).mockResolvedValue([thread('one','First colleague'),group]);
+    const user=userEvent.setup();render(<ChatPanel workspaceId="org" currentUser={me} members={[]}/>);
+    await screen.findByRole('button',{name:/First colleague/});
+    await user.click(screen.getByRole('button',{name:'Groups'}));
+    expect(screen.queryByRole('button',{name:/First colleague/})).toBeNull();
+    expect(screen.getByRole('button',{name:/Project Apollo/})).toBeTruthy();
+    await user.type(screen.getByRole('textbox',{name:'Search conversations'}),'Missing');
+    expect(screen.getByText('No matching conversations')).toBeTruthy();
+    await user.click(screen.getByRole('button',{name:'Clear conversation search'}));
+    await user.click(screen.getByRole('button',{name:'Chats'}));
+    expect(screen.getByRole('button',{name:/First colleague/})).toBeTruthy();
+    expect(screen.queryByRole('button',{name:/Project Apollo/})).toBeNull();
+    expect(api.chatMessagePage).not.toHaveBeenCalled();
+  });
+
+  it('keeps pin, mute, archive and restore accessible in conversation options',async()=>{
+    const preferences=vi.spyOn(api,'chatPreferences').mockResolvedValue({is_pinned:true,is_muted:false});
+    const archive=vi.spyOn(api,'archiveChat').mockResolvedValue({archived_at:now});
+    const user=userEvent.setup();render(<ChatPanel workspaceId="org" currentUser={me} members={[]}/>);
+    await user.click(await screen.findByRole('button',{name:/First colleague/}));
+    const options=()=>screen.getByRole('button',{name:'Conversation options'});
+    expect(screen.queryByRole('button',{name:'Archive chat'})).toBeNull();
+    await user.click(options());await user.click(screen.getByRole('button',{name:'Pin chat'}));
+    await waitFor(()=>expect(preferences).toHaveBeenCalledWith('one',{is_pinned:true}));
+    preferences.mockResolvedValue({is_pinned:true,is_muted:true});
+    await user.click(options());expect(screen.getByRole('button',{name:'Unpin chat'})).toBeTruthy();
+    await user.click(screen.getByRole('button',{name:'Mute'}));
+    await waitFor(()=>expect(preferences).toHaveBeenCalledWith('one',{is_muted:true}));
+    await user.click(options());expect(screen.getByRole('button',{name:'Unmute'})).toBeTruthy();
+    await user.click(screen.getByRole('button',{name:'Archive chat'}));
+    await waitFor(()=>expect(archive).toHaveBeenCalledWith('one',true));
+    await waitFor(()=>expect(screen.getByRole('button',{name:/Back to active chats/})).toHaveProperty('ariaPressed','true'));
+    archive.mockResolvedValue({archived_at:null});
+    await user.click(options());await user.click(screen.getByRole('button',{name:'Restore chat'}));
+    await waitFor(()=>expect(archive).toHaveBeenCalledWith('one',false));
+    expect(screen.getByRole('heading',{name:'First colleague'})).toBeTruthy();
+  });
+
+  it('retains group management and all permitted group actions',async()=>{
+    const owned={...thread('project','Colleague'),kind:'group' as const,title:'Project Apollo',can_delete:true};
+    const joined={...owned,id:'joined',title:'Joined project',created_by:person('senior','Senior'),can_delete:false};
+    vi.mocked(api.chats).mockResolvedValue([owned,joined]);
+    const user=userEvent.setup();render(<ChatPanel workspaceId="org" currentUser={me} members={[]}/>);
+    await user.click(await screen.findByRole('button',{name:/Project Apollo/}));
+    await user.click(screen.getByRole('button',{name:'Manage group'}));
+    const modal=within(screen.getByRole('dialog',{name:'Manage group participants'}));
+    expect(modal.getByRole('button',{name:'Rename group'})).toBeTruthy();
+    expect(modal.getByRole('button',{name:'Add to group'})).toBeTruthy();
+    await user.click(modal.getByRole('button',{name:'Close'}));
+    await user.click(screen.getByRole('button',{name:'Conversation options'}));
+    expect(screen.getByRole('button',{name:'Delete group'})).toBeTruthy();
+    expect(screen.queryByRole('button',{name:'Leave group'})).toBeNull();
+    await user.click(screen.getByRole('button',{name:/Joined project/}));
+    expect(screen.queryByRole('group',{name:'Conversation actions'})).toBeNull();
+    expect(screen.queryByRole('button',{name:'Manage group'})).toBeNull();
+    await user.click(screen.getByRole('button',{name:'Conversation options'}));
+    expect(screen.getByRole('button',{name:'Leave group'})).toBeTruthy();
+    expect(screen.queryByRole('button',{name:'Delete group'})).toBeNull();
+  });
+
+  it('returns to the conversation list and restores the draft when reopened',async()=>{
+    const user=userEvent.setup();render(<DraftProvider><ChatPanel workspaceId="org" currentUser={me} members={[]}/></DraftProvider>);
+    await user.click(await screen.findByRole('button',{name:/First colleague/}));
+    await user.type(screen.getByRole('textbox',{name:'Write a message'}),'Keep my draft');
+    await user.click(screen.getByRole('button',{name:'Back to conversations'}));
+    expect(screen.queryByRole('textbox',{name:'Write a message'})).toBeNull();
+    await user.click(screen.getByRole('button',{name:/First colleague/}));
+    expect(screen.getByRole('textbox',{name:'Write a message'})).toHaveProperty('value','Keep my draft');
+  });
+
+  it('supports keyboard navigation and dismissal of conversation options',async()=>{
+    const user=userEvent.setup();render(<ChatPanel workspaceId="org" currentUser={me} members={[]}/>);
+    await user.click(await screen.findByRole('button',{name:/First colleague/}));
+    const trigger=screen.getByRole('button',{name:'Conversation options'});
+    await user.click(trigger);expect(document.activeElement).toBe(screen.getByRole('button',{name:'Pin chat'}));
+    await user.keyboard('{ArrowDown}');expect(document.activeElement).toBe(screen.getByRole('button',{name:'Mute'}));
+    await user.keyboard('{End}');expect(document.activeElement).toBe(screen.getByRole('button',{name:'Archive chat'}));
+    await user.keyboard('{Escape}');expect(screen.queryByRole('group',{name:'Conversation actions'})).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    await user.click(trigger);await user.click(screen.getByRole('heading',{name:'First colleague'}));
+    expect(screen.queryByRole('group',{name:'Conversation actions'})).toBeNull();
   });
 });
 
