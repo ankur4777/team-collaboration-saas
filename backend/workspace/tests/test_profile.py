@@ -142,3 +142,41 @@ class ProfileTests(TransactionTestCase):
         self.assertEqual(client_for(outsider).get(url).status_code, 404)
         OrganizationMember.objects.filter(organization=workspace, user=self.user).delete()
         self.assertEqual(peer.get(url).status_code, 404)
+
+    def test_admin_and_member_can_edit_only_their_own_profile(self):
+        workspace = Organization.objects.create(
+            name='Workspace', slug='profile-role-test', created_by=self.user,
+        )
+        OrganizationMember.objects.create(organization=workspace, user=self.user, role='admin')
+        OrganizationMember.objects.create(organization=workspace, user=self.other, role='member')
+        chat = ChatConversation.objects.create(
+            organization=workspace, kind='direct', created_by=self.user,
+        )
+        for user in (self.user, self.other):
+            ChatParticipant.objects.create(conversation=chat, user=user)
+
+        for actor, teammate in ((self.user, self.other), (self.other, self.user)):
+            with self.subTest(actor=actor.email):
+                self.client.force_login(actor)
+                session = self.client.session
+                session['active_organization_id'] = str(workspace.pk)
+                session.save()
+                self.token = self.client.get('/api/auth/csrf/').json()['csrf_token']
+                teammate.refresh_from_db()
+                original = teammate.full_name, teammate.avatar.name
+
+                targeted = self.upload(self.image(), user_id=str(teammate.pk), full_name='Changed')
+                self.assertEqual(targeted.status_code, 400)
+                peer_url = f'/api/chats/{chat.pk}/profiles/{teammate.pk}/avatar/'
+                peer_edit = self.client.patch(peer_url, {'full_name': 'Changed'},
+                                              content_type='application/json', HTTP_X_CSRFTOKEN=self.token)
+                self.assertEqual(peer_edit.status_code, 405)
+
+                own_edit = self.upload(self.image(), full_name=f'Updated {actor.email}')
+                self.assertEqual(own_edit.status_code, 200, own_edit.content)
+                self.assertEqual(own_edit.json()['id'], str(actor.pk))
+                actor.refresh_from_db()
+                teammate.refresh_from_db()
+                self.assertEqual(actor.full_name, f'Updated {actor.email}')
+                self.assertTrue(actor.avatar)
+                self.assertEqual((teammate.full_name, teammate.avatar.name), original)
