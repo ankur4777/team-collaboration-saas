@@ -4,7 +4,8 @@ from io import BytesIO
 from xml.sax.saxutils import escape
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Sum, Q, Count
+from django.db.models import Sum, Q, Count, CharField, Value
+from django.db.models.functions import Cast, Concat, Replace, Upper
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -87,7 +88,12 @@ class InvoiceListView(PlatformView):
         if currency:
             rows = rows.filter(currency=currency)
         if q:
-            rows = rows.filter(Q(number__icontains=q)|Q(description__icontains=q)|Q(payment__reference__icontains=q))
+            # Invoice numbers are derived from the UUID, not stored in a field.
+            # Normalize hyphenated/native UUIDs and match the displayed TW- prefix.
+            rows = rows.annotate(display_number=Concat(Value('TW-'),
+                Upper(Replace(Cast('pk',output_field=CharField()),Value('-'),Value(''))),
+                output_field=CharField())).filter(
+                    Q(display_number__icontains=q)|Q(description__icontains=q)|Q(payment__reference__icontains=q))
         offset = (page-1)*PAGE_SIZE
         summary = {}
         for item in org.billing_invoices.exclude(status='void').values('currency','status').annotate(total=Sum('amount')):

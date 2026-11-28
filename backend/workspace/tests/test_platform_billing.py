@@ -66,6 +66,8 @@ class BillingTests(TestCase):
         self.assertEqual(data['today'],self.today.isoformat())
         for params,expected in [({'status':'unpaid'},2),({'currency':'INR','status':'paid'},1),
                                 ({'q':'REF-SEARCH'},1),({'q':'Annual renewal'},1),
+                                ({'q':unpaid['number']},1),({'q':unpaid['number'].lower()},1),
+                                ({'q':unpaid['number'][:15]},1),
                                 ({'status':'void','currency':'CAD'},0)]:
             self.assertEqual(self.client.get(self.url,params).json()['total'],expected)
         self.assertEqual(self.client.get(self.url,{'status':'unknown'}).status_code,400)

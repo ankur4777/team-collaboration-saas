@@ -77,7 +77,11 @@ try {
       await page.goto(base + '/');
       // Footer controls must stay inside short desktop viewports in every module.
       await page.setViewportSize({ width: 1366, height: 633 });
-      for (const module of ['Teams & Channels', 'Chats & Groups', 'Search messages', 'Email inbox', 'Meetings', 'Calendar', 'Shared files', 'Settings']) {
+      // Email Inbox is intentionally non-interactive in the current workspace UI.
+      const emailInbox = page.locator('.sidebar').getByRole('button', { name: /^Email inbox/ });
+      await emailInbox.waitFor();
+      assert.equal(await emailInbox.isDisabled(), true, 'Email inbox must remain disabled');
+      for (const module of ['Teams & Channels', 'Chats & Groups', 'Search messages', 'Meetings', 'Calendar', 'Shared files', 'Settings']) {
         await page.locator('.sidebar').getByRole('button', { name: new RegExp('^' + module.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click();
         for (const label of ['Members', 'Settings']) {
           const control = page.locator('.sidebar').getByRole('button', { name: new RegExp('^' + label) });
